@@ -1,0 +1,50 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--#set var="title" value="About JRuby"-->
+  <!--#include file="_header.shtml"-->
+  <body>
+    <!--#include file="_sidebar.html"-->
+    <div id="body">
+      <h1>About JRuby</h1>
+      <p>
+        JRuby is a pure Java implementation of the <a href="http://ruby-lang.org">Ruby</a>
+        interpreter, being developed by the <a href="credits.shtml">JRuby team</a>.
+      </p>
+      <p>
+        JRuby is free software released under a dual GPL/LGPL license.
+      </p>
+      <p>
+        JRuby is tightly integrated with Java to allow both to script
+        any Java class and to embed the interpreter into any Java application.
+      </p>
+
+      <div id="box_left">
+      <h1>Latest News</h1>
+      <!--#set var="display_news" value="latest"-->
+      <!--#include virtual="_news.shtml"-->
+        <div class="more-info">
+          <a href="news.shtml">More News...</a>
+        </div>
+      </div>
+
+      <div id="box_right">
+      <!--#include virtual="releases/_release.shtml"-->
+      <h1>Latest Release (<!--#echo var="release"-->)</h1>
+      <div class="release-description">
+        <!--#include virtual="releases/${release}/_release-overview"-->
+      </div>
+      <div class="more-info">
+        <a href="release-announcement.shtml?<!--#echo var="release"-->">Full Announcement...</a> 
+      </div>
+      <p class="release-download">
+        Download JRuby <!--#echo var="release"-->:
+      </p>
+      <ul>
+        <li><a href="http://prdownloads.sourceforge.net/jruby/jruby-bin-<!--#echo var="release"-->.tar.gz?download">Binary Distribution</a></li>
+        <li><a href="http://prdownloads.sourceforge.net/jruby/jruby-src-<!--#echo var="release"-->.tar.gz?download">Source Distribution</a></li>
+      </ul>
+      </div>
+    </div>
+    <!--#include file="_footer.html"-->
+  </body>
+</html>

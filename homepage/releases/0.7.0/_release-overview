@@ -1,0 +1,11 @@
+<p>
+  JRuby, after a long nap, is starting up development again.  This
+  release offers a number of changes:
+</p>
+<ul>
+  <li>Interpreter now thinks it is a ruby 1.8 interpreter (though it still
+  sometimes behaves like a 1.6 interpreter)</li>
+  <li>Simplified build environment (now eclipse friendly) (Thanks to Joey Gibson)</li>
+  <li>Various fixes and improvements to Kernel, Array, Dir, File, FileTest and String</li>
+  <li>many other changes...</li>
+</ul>

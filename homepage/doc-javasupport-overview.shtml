@@ -1,0 +1,17 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--#set var="title" value="Java Support Overview"-->
+  <!--#include file="_header.shtml"-->
+  <body>
+    <!--#include file="_sidebar.html"-->
+    <div id="body">
+      <!-- content starts here -->
+      <h1>Java Support Overview</h1>
+<pre>
+<!--#include file="Javasupport-overview.txt"-->
+</pre>
+      <!-- content ends here -->
+    </div>
+    <!--#include file="_footer.html"-->
+  </body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--#set var="title" value="JRuby Credits"-->
+  <!--#include file="_header.shtml"-->
+  <body>
+    <!--#include file="_sidebar.html"-->
+    <div id="body">
+      <h1>JRuby Credits</h1>
+      <p>
+        The following people have contributed to the JRuby project:
+      </p>
+      <ul>
+        <li>Stefan Matthias Aust</li>
+        <li>Anders Bengtsson</li>
+        <li>Geert Bevin</li>
+        <li>Piergiuliano Bossi</li>
+        <li>Johannes Brodwall</li>
+        <li>Rocky Burt</li>
+        <li>Paul Butcher</li>
+        <li>Benoit Cerrina</li>
+        <li>Wyss Clemens</li>
+        <li>Thomas E Enebo</li>
+        <li>Robert Feldt</li>
+        <li>Russ Freeman</li>
+        <li>Chad Fowler</li>
+        <li>Joey Gibson</li>
+        <li>Xandy Johnson</li>
+        <li>Kelvin Liu</li>
+        <li>Alan Moore</li>
+        <li>Akinori Musha</li>
+        <li>Takashi Okamoto</li>
+        <li>Jan Arne Petersen</li>
+        <li>Tobias Reif</li>
+        <li>David Saff</li>
+        <li>Ed Sinjiashvili</li>
+        <li>Daiki Ueno</li>
+        <li>Matthias Veit</li>
+        <li>Jason Voegele</li>
+        <li>Sergey Yevtushenko</li>
+        <li>Robert Yokota</li>
+      </ul>
+      <p>
+        And  all the people which we have forgotten to list here.
+      </p>
+    </div>
+    <!--#include file="_footer.html"-->
+  </body>
+</html>

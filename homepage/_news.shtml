@@ -1,0 +1,38 @@
+<!-- News template
+
+<div id="news">
+<h2>YYYY-MM-DD: title</h2>
+<p>
+  text...
+</p>
+</div>
+
+-->
+
+<!-- Add new news below this comment -->
+
+<div class="news">
+<h2>2004-03-12: <a href="release-announcement.shtml?0.7.0">JRuby 0.7.0</a> released</h2>
+<p>
+  After a long nap, JRuby is under development again...
+</p>
+</div>
+
+<div class="news">
+<h2>2004-03-08: JRuby 1.8.1 work is in progress!</h4>
+<p>
+  We are hard at work getting JRuby to be compliant with Ruby 1.8.1. A 
+  pre-release should be available soon. If you just can't wait, get the
+  latest code from <a href="download-cvs.shtml">CVS</a>.
+</p>
+</div>
+
+<!-- News above this comment are shown on the title page -->
+
+<!--#if expr="$display_news = all"-->
+
+<!-- News below this comment are only shown on the news page -->
+
+<!-- Move old news below this comment (there shouldn't be more than 2-3 news on the title page) -->
+
+<!--#endif -->

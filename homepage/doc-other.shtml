@@ -1,0 +1,18 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--#set var="title" value="JRuby Related Documentation"-->
+  <!--#include file="_header.shtml"-->
+  <body>
+    <!--#include file="_sidebar.html"-->
+    <div id="body">
+      <h1>Other Documentation</h1>
+      <p>
+	There is some more documentation avaiable:
+      </p>
+      <ul>
+	<li><a href="doc-bsf.shtml">Bean Scription Framework (BSF) Introduction</a></li>
+      </ul>
+    </div>
+    <!--#include file="_footer.html"-->
+  </body>
+</html>

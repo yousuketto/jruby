@@ -1,0 +1,33 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--#include virtual="releases/_release.shtml"-->
+  <!--#set var="title" value="Get JRuby $release"-->
+  <!--#include file="_header.shtml"-->
+  <body>
+    <!--#include file="_sidebar.html"-->
+    <div id="body">
+      <h1>Download Latest Release (JRuby <!--#echo var="release"-->)</h1>
+      <div class="release-description">
+        <!--#include virtual="releases/$release/_release-overview"-->
+      </div>
+      <div class="more-info">
+        <a href="release-announcement.shtml?<!--#echo var="release"-->">Full Release Announcement ...</a> 
+      </div>
+      <div class="release-download">
+        <p>
+        Download JRuby <!--#echo var="release"-->:
+        </p>
+        <ul>
+	  <li><a href="http://prdownloads.sourceforge.net/jruby/jruby-bin-<!--#echo var="release"-->.tar.gz?download">Binary Distribution</a></li>
+	  <li><a href="http://prdownloads.sourceforge.net/jruby/jruby-src-<!--#echo var="release"-->.tar.gz?download">Source Distribution</a></li>
+        </ul>
+      </div>
+      <h1>Download Older Releases</h1>
+      <p>
+        If you really need an older JRuby release you can get it
+        <a href="http://sourceforge.net/project/showfiles.php?group_id=35413">here</a>.
+      </p>
+    </div>
+    <!--#include file="_footer.html"-->
+  </body>
+</html>

@@ -1,0 +1,109 @@
+  Jruby, after a long nap, is starting up development again.  This
+release offers a number of changes:
+
+- Interpreter now thinks it is a ruby 1.8 interpreter (though it still
+  sometimes behaves like a 1.6 interpreter)
+- Simplified build environment (now eclipse friendly) (Thanks to Joey Gibson)
+- Added functions Float,Integer,String,Array to Kernel module
+- Various fixes to Kernel, Array, Dir, File, and String
+- IO expanded support for
+  - Random Access of files (seek, rewind,...)
+  - File descriptors
+  - reopen, dup
+  - sysread, syswrite
+  - many other IO fixes
+- Added FileTest 
+- Backout of inneffective callindexed optimization 
+- Able to run rubicon without hacking rubicon itself
+- many other changes...
+
+  Thanks to Jan Arne Petersen, Anders Bengtsson, Thomas E Enebo,
+  Benoit Cerrina. Joey Gibson, Hunter Kelly and Pergiuliani Bossi for
+  submitting fixes since the last release.
+
+  This version also boasts improved results in rubicon passing nearly
+100 more tests which translates into about 800 more assertions.  Here is 
+a test summary:
+
+========================================================================
+All Tests                     Test Results                        V0.3.5
+========================================================================
+                 Name   OK?   Tests  Asserts      Failures   Errors
+            ------------------------------------------------------------
+    Rubicon::TestCase             1        5             
+        AccessControl             3       18             
+                Array   FAIL     65      469          2        1
+               Arrays             0        0             
+           Assignment   FAIL      4       36          2  
+     BasicExpressions   FAIL      3       12          1  
+               Bignum            29     1598             
+              Binding             0        0             
+          BlocksProcs   FAIL      3        9          1  
+   BooleanExpressions             1        2             
+           CatchThrow             1        1             
+                Class             5       16             
+              Classes             1        5             
+           Comparable             7       26             
+            Constants             3       20             
+         Continuation   FAIL      5        0                   5
+                  Dir   FAIL     21       62          4        1
+           Enumerable            17       76             
+                 Eval   FAIL      9       18          2        5
+            Exception   FAIL      5        8                   2
+           Exceptions             6        6             
+           FalseClass             6       17             
+                 File   FAIL     33      175          6       24
+             FileTest   FAIL      4       16                   4
+           File__Stat   FAIL     32      128                  32
+               Fixnum            35      414             
+                 Flip   FAIL      7       26          1  
+                Float            28      178             
+               Floats   FAIL      4       22          1  
+                   GC             4        1             
+                 Hash   FAIL     42      269                   1
+               Hashes             1        5             
+                   IO   FAIL     53     1177                  17
+             IfUnless             1        2             
+              Integer             9      347             
+             Integers             1        5             
+           Invocation   FAIL      6       14          4  
+           KanjiIndex   FAIL     20       63         14  
+               Kernel   FAIL    108      992         17       23
+            LoopStuff            16       71             
+              Marshal   FAIL      6       26          2        2
+            MatchData   FAIL     11       17          2  
+                 Math             2       62             
+               Method             4       11             
+              Methods             3       11             
+               Module   FAIL     25       91          1  
+        ModulePrivate            15       41             
+              Modules             1        5             
+                Names             1        5             
+             NilClass             7       20             
+              Numeric            10       21             
+               Object             0        0             
+          ObjectSpace   FAIL      4        3                   2
+  PredefinedVariables   FAIL      2        6          1  
+                 Proc   FAIL      4        6          1  
+                Range            10       46             
+               Ranges             1        5             
+               Regexp   FAIL     14       29          2        1
+   RegularExpressions   FAIL      4       25          2  
+                Scope   FAIL     13       20          2        6
+         SourceLayout   FAIL      8       20                   3
+               String   FAIL     79     1196          1        1
+              Strings             6       32             
+               Struct            11       47             
+          Struct__Tms   FAIL      1        0                   1
+               Symbol             8       20             
+              Symbols             1        5             
+               Thread   FAIL     32        0                  64
+          ThreadGroup   FAIL      4        0                   4
+                 Time   FAIL     41     1484         13        1
+            TrueClass             6       17             
+========================================================================
+         All 71 files   FAIL    933     9580         82      200
+========================================================================
+
+http://prdownloads.sourceforge.net/jruby/jruby-src-0.7.0.tar.gz?download
+http://prdownloads.sourceforge.net/jruby/jruby-bin-0.7.0.tar.gz?download

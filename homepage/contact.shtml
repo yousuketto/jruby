@@ -1,0 +1,23 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--#set var="title" value="Contact the JRuby Team"-->
+  <!--#include file="_header.shtml"-->
+  <body>
+    <!--#include file="_sidebar.html"-->
+    <div id="body">
+      <h1>Contact</h1>
+      <p>
+        There are two Mailing Lists for your questions or feedback:
+      </p>
+      <p>
+        <a href="http://lists.sourceforge.net/lists/listinfo/jruby-user">jruby-user</a>
+        if you want to use JRuby in your projects.
+      </p>
+      <p>
+        <a href="http://lists.sourceforge.net/lists/listinfo/jruby-devel">jruby-devel</a>
+        if you want to support the development of JRuby.
+      </p>
+    </div>
+    <!--#include file="_footer.html"-->
+  </body>
+</html>

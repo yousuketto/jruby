@@ -1,0 +1,15 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <!--#set var="title" value="Announcement JRuby $QUERY_STRING_UNESCAPED"-->
+  <!--#include file="_header.shtml"-->
+  <body>
+    <!--#include file="_sidebar.html"-->
+    <div id="body">
+      <h1>Announcement JRuby <!--#echo var="QUERY_STRING_UNESCAPED"--></h1>
+<pre>
+<!--#include virtual="releases/$QUERY_STRING_UNESCAPED/_release-announcement"-->
+</pre>
+    </div>
+    <!--#include file="_footer.html"-->
+  </body>
+</html>
