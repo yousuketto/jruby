@@ -5,7 +5,7 @@
 	<person name="Jan Arne Petersen" email="jpetersen@uni-bonn.de" type="admin" comment="is the Lead developer."/>
 	<person name="Benoit Cerrina" email="b.cerrina@wanadoo.fr" type="admin"/>
 	<person name="Anders Bengtsson" email="ndrsbngtssn@yahoo.se" type="admin"/>
-	<person name="Jason Voegele" email="jason@jvoegele.com" type="developer*"/>
+	<person name="Jason Voegele" email="jason@jvoegele.com" type="developer*" comment="added the Thread support."/>
 	
 	<person name="Stefan Matthias Aust" email="sma@3plus4.de" type="developer" comment="ported the Ruby parser from C to Java."/>
 	<person name="Alan Moore" email="alan_moore@gmx.net" type="developer"/>
