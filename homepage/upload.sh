@@ -6,4 +6,4 @@ else
 	user=$1
 fi
 
-exec scp build/* $user@shell.sf.net:/home/groups/j/jr/jruby/htdocs/
+exec scp -p build/* $user@shell.sf.net:/home/groups/j/jr/jruby/htdocs/
