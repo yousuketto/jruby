@@ -121,6 +121,47 @@ Java::JavaClass:
         If this Java class isn't an array class, then a TypeError is
         raised.
 
+    cls.declared_instance_methods -> anArray
+        Returns an array of Java::JavaMethod's for instance methods declared 
+        in this java class.  Unlike java_instance_methods(), this array 
+        is not limited to public methods, and does not return inherited 
+        methods.
+        
+    cls.declared_class_methods -> anArray
+        Returns an array of Java::JavaMethod's for class (or static) methods 
+        declared  in this java class.  Unlike java_class_methods(), this 
+        array is not limited to public methods, and does not return 
+        methods available to the class because of inheritance.
+        
+    cls.declared_fields -> anArray
+        Returns an array of Java::JavaField's for each field declared 
+        in this java class.  Unlike fields(), this array 
+        is not limited to public fields, and does not return inherited 
+        fields.
+    
+    cls.declared_field( aString ) -> aJavaField
+        Returns a Java::JavaField for the named field. Unlike field(), the field 
+        need not be public, and must not be inherited.
+
+        Raises NameError if there is no field by that name.
+
+    cls.declared_constructors -> anArray
+        Returns an array of Java::Constructor's with all constructors
+        decalred in this class.  The constructors are not necessarily 
+        public.
+        
+    cls.declared_constructor( [aString]* ) -> aJavaConstructor    
+        Returns a Java::JavaConstructor with parameter types given, even 
+        if it is not public.
+
+        Raises NameError if there isn't a matching constructor.
+
+    cls.declared_method( aString, [aString]* ) -> aJavaMethod
+        Returns a Java::JavaMethod for the named method with the matching
+        set of argument types. Unlike java_method(),
+        the method need not be public, and must not be inherited.
+
+        Raises NameError if there is no method by that name.
 
 Java::JavaMethod:
 
@@ -181,6 +222,13 @@ Java::JavaMethod:
         Example:
             meth = java_obj.java_method("toString")
             meth.return_type                        # -> "java.lang.String"
+            
+    meth.accessible? -> true or false
+        Return true if the given method is accessible
+   
+    meth.accessible=(true or false)-> method
+        Sets the method to be accessible, or not according to the parameter.
+            
 
 
 Java::JavaConstructor:
@@ -189,6 +237,9 @@ Java::JavaConstructor:
 
     cons.arity -> aFixnum
         Returns the number of arguments on this constructor.
+
+    meth.public? -> true or false
+        Returns true if the Java constructor is public, false otherwise.
 
     cons.new_instance( [anObject]* ) -> aJavaObject
         Creates a new instance of the Java class this constructor belongs
@@ -207,6 +258,12 @@ Java::JavaConstructor:
     cons.argument_types -> anArray
         Returns a list of the names of the Java argument types.
 
+    cons.accessible? -> true or false
+        Return true if the given constructor is accessible
+   
+    cons.accessible=(true or false)-> constructor
+        Sets the constructor to be accessible, or not according to the parameter.
+
 
 Java::JavaField:
 
@@ -220,7 +277,7 @@ Java::JavaField:
        Returns true if this field is final, false otherwise.
 
     field.value( anInstance ) -> aJavaObject
-       Returns the value of the instance field on the object given as argument.
+        Returns the value of the instance field on the object given as argument.
         The instance argument must be a JavaObject of the class that this
         field belongs to.
 
@@ -239,3 +296,10 @@ Java::JavaField:
 
     field.name -> aString
         Returns the name of the field.
+
+    field.accessible? -> true or false
+        Return true if the given method is accessible
+   
+    field.accessible=(true or false)-> field
+        Sets the field to be accessible, or not according to the parameter.
+        
