@@ -1,6 +1,7 @@
-package org.jruby.homepage;
+package org.jruby.homepage.plugins;
 
 import java.util.*;
+import org.jruby.homepage.*;
 
 public class Section {
 	private String name;
