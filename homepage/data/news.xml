@@ -1,10 +1,32 @@
 <?xml version="1.0"?>
 
 <news>
+	<message title="JRuby 1.6/0.5.1 beta released" date="2002/08/13">
+		<short>
+			The new 1.6/0.5.1 development version is released today.
+        </short>
+		<long>
+			<text>
+			<h3>Download</h3>
+			<p>
+			<ul>
+			<li>
+			<a href="http://prdownloads.sourceforge.net/jruby/jruby-0_5_1.tar.gz">Binary Distribution</a>
+			</li>
+			<li>
+			<a href="http://prdownloads.sourceforge.net/jruby/jruby-src-0_5_1.tar.gz">Source Distribution</a>
+			</li>
+			</ul>
+			</p>
+			<h3>Changes</h3>
+			<ul>
+			</ul>
+			</text>
+		</long>
 	<message title="JRuby 1.6/0.5.0 beta released" date="2002/05/16">
 		<short>
 			The new 1.6/0.5.0 beta development version is released today.
-                </short>
+        </short>
 		<long>
 			<text>
 			<h3>Download</h3>
