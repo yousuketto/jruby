@@ -24,5 +24,5 @@
 #DEFAULT (echo ""; id; echo %s; date; cat) >> $CVSROOT/CVSROOT/commitlog
 # or
 #DEFAULT (echo ""; id; echo %{sVv}; date; cat) >> $CVSROOT/CVSROOT/commitlog
-DEFAULT mail -s %s jruby-devel@lists.sourceforge.net
+DEFAULT mail -s %s jruby-commit@lists.sourceforge.net
 
