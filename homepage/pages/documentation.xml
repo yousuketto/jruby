@@ -18,11 +18,10 @@
     </left>
     <center width="60%">
       <text>
-        <p>
-      	<h1>No docs yet.</h1>
-      	</p><p>
-      	<h1>Help documenting jruby is welcome.</h1>
-      	</p>
+        <p>Currently available documentation:</p>
+        <ul>
+          <li><a href="TODO">TODO</a> - What to do; what is done</li>
+        </ul>
       </text>
     </center>
     <right/>
