@@ -5,7 +5,7 @@
   <xsl:template match="sectionindex">
     <xsl:variable name="section_doc" select="document(concat('../data/section_', @name, '.xml'))/section"/>
 
-    <table width="100%" cellspacing="0" class="section_{@name}">
+    <table width="100%" cellspacing="0" class="section-{@name}">
       <tr><td width="10">
         <xsl:attribute name="rowspan">
           <xsl:value-of select="count($section_doc/entry) + 1"/>
@@ -32,14 +32,14 @@
 
   <xsl:template match="entry" mode="section">
     <xsl:param name="section"/>
-    <tr><td class="section_{$section}_light">
+    <tr><td class="section-{$section}-light">
       <xsl:apply-templates/>
     </td></tr>
   </xsl:template>
 
   <xsl:template match="entry[position() mod 2 = 0]" mode="section">
     <xsl:param name="section"/>
-    <tr><td class="section_{$section}">
+    <tr><td class="section-{$section}">
       <xsl:apply-templates/>
     </td></tr>
   </xsl:template>
@@ -47,7 +47,7 @@
   <xsl:template match="entry" mode="section-description">
     <xsl:param name="section"/>
 	  
-    <tr><td class="section_{$section}_light">
+    <tr><td class="section-{$section}-light">
       <table width="100%" cellspacing="0">
       <tr><td colspan="2">
         <xsl:apply-templates/>
@@ -61,7 +61,7 @@
   <xsl:template match="entry[position() mod 2 = 0]" mode="section-description">
     <xsl:param name="section"/>
 
-    <tr><td class="section_{$section}">
+    <tr><td class="section-{$section}">
       <table width="100%" cellspacing="0">
         <tr><td colspan="2">
           <xsl:apply-templates/>

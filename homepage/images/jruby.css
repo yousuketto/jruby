@@ -10,40 +10,40 @@ a:visited {
 body {
 	background-color: #99CCFF
 }
-td.header_general {
+td.header-general {
 	background-color: #0099FF;
 }
-td.section_general {
+td.section-general {
 	background-color: #0099FF;
 }
-td.section_general_light {
+td.section-general-light {
 	background-color: #32adff;
 }
-table.section_general {
+table.section-general {
 	background-color: #0099FF;
 }
-td.header_user {
+td.header-user {
         background-color: #00E58C;
 }
-td.section_user {
+td.section-user {
 	background-color: #00E58C;
 }
-td.section_user_light {
+td.section-user-light {
 	background-color: #19FFA6;
 }
-table.section_user {
+table.section-user {
 	background-color: #00E58C;
 }
-td.header_development {
+td.header-development {
         background-color: #b07ac8;
 }   
-td.section_development {
+td.section-development {
         background-color: #b07ac8;
 }
-td.section_development_light {
+td.section-development-light {
         background-color: #C186DC;
 }
-table.section_development {
+table.section-development {
         background-color: #b07ac8;
 }
 
