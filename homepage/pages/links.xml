@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+
+<page title="Links" id="links.html" section="general">
+  <path/>
+  <content>
+    <left>
+      <layout type="vertical">
+        <entry>
+          <sectionindex name="general"/>
+	</entry><entry>
+	  <sectionindex name="user"/>
+	  </entry><entry>
+	  <sectionindex name="development"/>
+	</entry>
+      </layout>
+    </left>
+    <center width="60%">
+      <text>
+        <ul>
+          <li><a href="http://www.ruby-lang.org/">Ruby</a> - The original Ruby interpreter.</li>
+          <li><a href="http://jakarta.apache.org/ant/">Apache Ant</a> - The tool used to build JRuby.</li>
+          <li><a href="http://www.junit.org/">JUnit</a> - Unit testing framework.</li>
+        </ul>
+        <ul>
+          <li><a href="http://www.jython.org/">Jython</a> - A similar project; a Python interpreter in Java.</li>
+        </ul>
+      </text>
+    </center>
+    <right/>
+  </content>
+</page>
