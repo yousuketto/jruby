@@ -7,7 +7,7 @@
 
     <table width="100%">
       <tr><td bgcolor="#99b6ff">
-        <h2>Actual Releases:</h2>
+        <h2>Releases:</h2>
 	
 	<table width="100%" cellspacing="0">
           <xsl:apply-templates select="$releases/release"/>
