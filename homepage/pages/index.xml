@@ -19,7 +19,7 @@
         <p>
 		<b>JRuby</b> is a pure Java implementation of the <a href="http://www.ruby-lang.org">Ruby</a> interpreter, being developed by <a href="mailto:jpetersen@uni-bonn.de">Jan Arne Petersen</a> and <a href="team.html">others</a>.
 	</p><p>
-	<b>JRuby</b> is free software released under the GNU General Public License.
+	<b>JRuby</b> is free software released under a dual GPL/LGPL license.
         </p><p>
 	  <b>JRuby</b> is tightly integrated with Java to allow both to script any Java class and to embed the interpreter into any Java application.
         </p><p><h3>Features</h3>

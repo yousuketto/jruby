@@ -1,7 +1,11 @@
 #!/usr/local/bin/jruby
+require "java"
 
-Java.import("org.apache.xalan.xslt")
-Java.name("Process", "XalanProcess")
+module Xalan
+  include_package "org.apache.xalan.xslt"
+end
+
+XalanProcess = Xalan::Process
 
 puts "Transform pages:"
 

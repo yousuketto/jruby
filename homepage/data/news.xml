@@ -1,6 +1,44 @@
 <?xml version="1.0"?>
 
 <news>
+	<message title="JRuby 1.6/0.5.2 beta released" date="2002/10/06">
+	<short>
+		The new 1.6/0.5.2 development version is released today.
+        </short>
+	<long>
+	<text>
+<p>
+Proudly announcing the new beta version 1.6/0.5.2 of JRuby.
+</p><p>
+Since the latest version 1.6/0.5.1 a lot has happened. All this is available in the new Version 1.6/0.5.2, which is available at:
+<a href="http://sourceforge.net/project/showfiles.php?group_id=35413&amp;release_id=114834">http://sourceforge.net/project/showfiles.php?group_id=35413&amp;release_id=114834</a>
+</p><p>
+<b>Note:</b> JRuby is still <b>BETA</b> software. If it breaks you get to keep both pieces.
+</p>
+			<h3>Download</h3>
+			<p>
+			<ul>
+			<li>
+				<a href="http://prdownloads.sourceforge.net/jruby/jruby-bin-0.5.2.tar.gz?download">Binary Distribution</a>
+			</li>
+			<li>
+				<a href="http://prdownloads.sourceforge.net/jruby/jruby-src-0.5.2.tar.gz?download">Source Distribution</a>
+			</li>
+			</ul>
+			</p>
+			<h3>Changes since 1.6/0.5.1:</h3>
+			<ul>
+			<li>LGPL license added</li>
+			<li>New Java-support implementation and APIs</li>
+			<li>BSF documentation</li>
+			<li>Threading bug fixes</li>
+			<li>Simplified command-line interface</li>
+			<li>Marshaling improvements</li>
+			<li>Lots of other bug fixes</li>
+			</ul>
+			</text>
+		</long>
+	</message>
 	<message title="JRuby 1.6/0.5.1 beta released" date="2002/08/13">
 		<short>
 			The new 1.6/0.5.1 development version is released today.
