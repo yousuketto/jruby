@@ -48,6 +48,19 @@ following properties:
     methods. If a method is overloaded (two or more methods with the
     same name) then then the first one found matching the argument
     types is called.
+    
+    Additionally, 'ruby-style' attr_accessors are aliased for methods
+    that are recognzied by java.lang.Introspector as bean properties.
+    This generally means methods like this
+    	void setCount(int n) {...}
+    	int  getCount() {}
+    	
+    will be accessible as
+        x.count = and x.count respectively.
+        
+    Additionally, for boolean getters, an alias with consisting of 
+    property name + '?' is created.   So, "boolean getFoo()" or 
+    "boolean isFoo" will have aliases of "foo", and "foo?"
 
     If the Java object is an array then the following methods are
     available instead:
@@ -64,3 +77,22 @@ following properties:
 
         Sets the value in the given position of the array to the given
         value. The value is also returned.
+
+    Exceptions:
+    	Exceptions thrown from Java code are wrapped in a Ruby Exception
+    	called NavtiveException and thrown again.  If you specify the proxy 
+    	class that is derived from java.lang.Exception as part of a rescue 
+    	clause, NativeExceptions caused by the matching java exception will
+    	be rescued.
+    	
+    	Example:
+    		include 'java.lang.ClassCastException'
+    		
+    		begin
+    		   <call some Java code>
+    		rescue ClassCastException => native_exception
+    		   <handle java exception>
+    		end
+    	
+    	Note:  "native_exception" will contain a Ruby NativeException, not 
+    	a java.lang.ClassCastException
