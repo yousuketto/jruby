@@ -1,0 +1,49 @@
+Sat Dec 08 18:51:25 CET 2001  [debug] AvalonLogSystem initialized using logfile /home/jpetersen/tmp/eclipse/workspace/jruby-homepage/velocity_example.log
+Sat Dec 08 18:51:26 CET 2001   [info] Jakarta Velocity v1.2-rc3
+Sat Dec 08 18:51:26 CET 2001   [info] RuntimeInstance initializing.
+Sat Dec 08 18:51:26 CET 2001   [info] Default Properties File: org/apache/velocity/runtime/defaults/velocity.properties
+Sat Dec 08 18:51:26 CET 2001   [info] Resource manager initializing.
+Sat Dec 08 18:51:26 CET 2001   [info] Resource Loader Instantiated: org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:26 CET 2001   [info] FileResourceLoader : initialization starting.
+Sat Dec 08 18:51:26 CET 2001   [info] FileResourceLoader : adding path '.'
+Sat Dec 08 18:51:26 CET 2001   [info] FileResourceLoader : initialization complete.
+Sat Dec 08 18:51:26 CET 2001   [info] Loaded Pluggable Directive: org.apache.velocity.runtime.directive.Literal
+Sat Dec 08 18:51:26 CET 2001   [info] Loaded Pluggable Directive: org.apache.velocity.runtime.directive.Macro
+Sat Dec 08 18:51:26 CET 2001   [info] Loaded Pluggable Directive: org.apache.velocity.runtime.directive.Parse
+Sat Dec 08 18:51:26 CET 2001   [info] Loaded Pluggable Directive: org.apache.velocity.runtime.directive.Include
+Sat Dec 08 18:51:26 CET 2001   [info] Loaded Pluggable Directive: org.apache.velocity.runtime.directive.Foreach
+Sat Dec 08 18:51:27 CET 2001   [info] Created: 20 parsers.
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : initialization starting.
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : adding VMs from VM library template : VM_global_library.vm
+Sat Dec 08 18:51:27 CET 2001  [error] ResourceManager : unable to find resource 'VM_global_library.vm' in any resource loader.
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : error using  VM library template VM_global_library.vm : org.apache.velocity.exception.ResourceNotFoundException: Unable to find resource 'VM_global_library.vm'
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro :  VM library template macro registration complete.
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : allowInline = true : VMs can be defined inline in templates
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : allowInlineToOverride = false : VMs defined inline may NOT replace previous VM definitions
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : allowInlineLocal = false : VMs defined inline will be  global in scope if allowed.
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : messages on  : VM system will output logging messages
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : autoload off  : VM system will not automatically reload global library macros
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : initialization complete.
+Sat Dec 08 18:51:27 CET 2001   [info] Velocity successfully started.
+Sat Dec 08 18:51:27 CET 2001   [info] Velocimacro : added new VM : #showsubsection( subsection ) : source = jruby-template.vm
+Sat Dec 08 18:51:27 CET 2001  [error] VM #showsubsection: error : too few arguments to macro. Wanted 1 got 0  -->
+Sat Dec 08 18:51:28 CET 2001   [info] ResourceManager : found jruby-template.vm with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:28 CET 2001   [info] ResourceManager : found index.inc.html with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:28 CET 2001   [warn] Velocimacro : VM addition rejected : showsubsection : inline not allowed to replace existing VM
+Sat Dec 08 18:51:28 CET 2001   [info] ResourceManager : found jruby-template.vm with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:28 CET 2001   [info] ResourceManager : found team.inc.html with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:28 CET 2001   [warn] Velocimacro : VM addition rejected : showsubsection : inline not allowed to replace existing VM
+Sat Dec 08 18:51:28 CET 2001   [info] ResourceManager : found jruby-template.vm with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:28 CET 2001   [info] ResourceManager : found docs.inc.html with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:28 CET 2001   [warn] Velocimacro : VM addition rejected : showsubsection : inline not allowed to replace existing VM
+Sat Dec 08 18:51:29 CET 2001   [info] ResourceManager : found jruby-template.vm with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:29 CET 2001   [info] ResourceManager : found docs_bsf.inc.html with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:29 CET 2001   [warn] Velocimacro : VM addition rejected : showsubsection : inline not allowed to replace existing VM
+Sat Dec 08 18:51:29 CET 2001   [info] ResourceManager : found jruby-template.vm with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:29 CET 2001   [info] ResourceManager : found docs_java.inc.html with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:29 CET 2001   [warn] Velocimacro : VM addition rejected : showsubsection : inline not allowed to replace existing VM
+Sat Dec 08 18:51:30 CET 2001   [info] ResourceManager : found jruby-template.vm with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:30 CET 2001   [info] ResourceManager : found download.inc.html with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:30 CET 2001   [warn] Velocimacro : VM addition rejected : showsubsection : inline not allowed to replace existing VM
+Sat Dec 08 18:51:30 CET 2001   [info] ResourceManager : found jruby-template.vm with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader
+Sat Dec 08 18:51:30 CET 2001   [info] ResourceManager : found changelog.inc.html with loader org.apache.velocity.runtime.resource.loader.FileResourceLoader

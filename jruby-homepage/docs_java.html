@@ -1,0 +1,102 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="jruby.css" type="text/css">
+<title>JRuby - Use Javasupport in JRuby</title>
+</head>
+<body>
+<table width="100%">
+    <tr><td>
+        <img src="jruby_small.png" width="285" height="110" alt="JRuby"/>
+    </td><td>
+    	<h1>Use Javasupport in JRuby</h1>
+    </td></tr><tr><td valign="top">
+    		    <b><u>General</u></b>
+	    <ul>
+	    	    	    <li>
+            <a href="index.html">Home</a>
+            </li>
+	    	    	    <li>
+            <a href="team.html">Team</a>
+            </li>
+	    	    </ul>
+	    <hr align="center" size="0" width="80%"/>
+   		    <b><u>Use JRuby</u></b>
+	    <ul>
+	    	    	    <li>
+            <a href="docs.html">Documentation</a>
+                <ul>
+                        <li>
+            <a href="docs_bsf.html">JRuby and BSF</a>
+            </li>
+                        <li>
+            Javasupport
+            </li>
+                </ul>
+        </li>
+	    	    	    <li>
+            <a href="download.html">Download</a>
+                <ul>
+                </ul>
+        </li>
+	    	    </ul>
+	    <hr align="center" size="0" width="80%"/>
+   		    <b><u>Development</u></b>
+	    <ul>
+	    	    </ul>
+	    <hr align="center" size="0" width="80%"/>
+   		Hosted by:
+	<a href="http://sourceforge.net">
+	<img src="http://sourceforge.net/sflogo.php?group_id=35413" width="88" height="31" border="0" alt="SourceForge Logo"></a>
+	<hr align="center" size="0" width="80%">
+        <font size="-1">
+	    &copy; 2001 by 
+	    	    	<a href="mailto:jpetersen@uni-bonn.de">Jan Arne Petersen</a>
+	            </font>
+    </td><td width="70%" valign="top">
+    	                <h2>A first Swing example</h2>
+                <p>
+<pre>
+JavaObject.load_class "javax.swing.JFrame"
+JavaObject.load_class "javax.swing.JLabel"
+
+frame = JFrame.new("HelloWorldSwing")
+label = JLabel.new("Hello World")
+
+frame.getContentPane().add(label)
+
+frame.setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE)
+frame.pack();
+frame.setVisible(true);
+</pre>
+                </p>
+                <h2>JavaObject.load_class</h2>
+                <p>
+                    The load_class method takes upto two parameters.
+                    
+                    <ol>
+                        <li>The Java name of the class</li>
+                        <li><i>Optional.</i> The Ruby name of the class
+                        (Default: Java name without packages)</li>
+                    </ol>
+                    
+                    It defines a Ruby class which maps all methods and constants
+                    to a Java class.
+                </p><p>
+                    The arguments are automatically converted between Ruby and
+                    Java types.
+                </p><p>
+                    If a method returns a new Java class it will be automatically
+                    be loaded.
+                </p>
+                <h2>Kernel.require (*.jar)</h2>
+                <p>
+                    The Kernel.require takes one argument.
+                </p><p>
+                    The method adds the Jar library which is specified in the
+                    first argument to the Classpath. 
+                </p>
+    </td></tr>
+</table>
+</body>
+</html>

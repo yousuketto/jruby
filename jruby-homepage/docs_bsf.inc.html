@@ -1,0 +1,45 @@
+                <h2>What is BSF?</h2>
+                <p>
+                    The <a
+                    href="http://www-124.ibm.com/developerworks/projects/bsf">
+                    Bean Scripting Framework</a> (BSF) is an architecture for
+                    incorporating scripting into Java applications and applets.
+                </p>
+                <p>
+                    It is used for example in the <a
+                    href="http://xml.apache.org/xalan-j/index.html">Xalan</a>
+                    XSLT processor and in the <a
+                    href="http://jakarta.apache.org/taglibs/doc/bsf-doc/intro.html">Jakarta BSF Taglib</a>.
+                </p>
+                <p>
+                    With JRuby you can also use Ruby as a scripting language in
+                    this applications.
+                </p>
+                <h2>How to use JRuby with BSF?</h2>
+                <ol>
+                <li>
+                    First you need to download <a
+                    href="http://www-124.ibm.com/developerworks/projects/bsf">BSF</a>.
+                </li><li>
+                    JRuby supports BSF but BSF doesn't support JRuby. There are
+                    two possibilities:
+                    <ol>
+                        <li>Add this line to the com/ibm/bsf/Language.properties file:
+<pre>
+jruby = org.jruby.javasupport.bsf.JRubyEngine, rb
+</pre>
+                        </li>
+                        <li><a href="data/bsf.jar">Download</a> a patched version of the bsf.jar file</li>
+                    </ol>
+                </li><li>
+                    Now you can use JRuby like the other scripting languages in
+                    BSF.
+                    <p>
+                    For example:
+<pre>
+BSFManager bsfManager = new BSFManager();
+bsfManager.eval("jruby", "script", 0, 0, "puts \"Hello from JRuby\"\n");
+</pre>
+                    </p>
+                </li>
+                </ol>

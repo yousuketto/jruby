@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+
+<menu>
+	<section name="General">
+		<section name="Home" id="index" link="index.html"/>
+		<section name="Team" id="team" link="team.html"/>
+	</section>
+	<section name="Use JRuby">
+		<section name="Documentation" id="docs" link="docs.html">
+			<section name="JRuby and BSF" id="docs_bsf" link="docs_bsf.html"/>
+			<section name="Javasupport" id="docs_java" link="docs_java.html"/>
+		</section>
+		<section name="Download" id="download" link="download.html">
+			<section name="Changelog" id="changelog" link="changelog.html"/>
+		</section>
+	</section>
+	<section name="Development">
+	</section>
+</menu>

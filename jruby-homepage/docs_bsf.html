@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="jruby.css" type="text/css">
+<title>JRuby - Use BSF with JRuby</title>
+</head>
+<body>
+<table width="100%">
+    <tr><td>
+        <img src="jruby_small.png" width="285" height="110" alt="JRuby"/>
+    </td><td>
+    	<h1>Use BSF with JRuby</h1>
+    </td></tr><tr><td valign="top">
+    		    <b><u>General</u></b>
+	    <ul>
+	    	    	    <li>
+            <a href="index.html">Home</a>
+            </li>
+	    	    	    <li>
+            <a href="team.html">Team</a>
+            </li>
+	    	    </ul>
+	    <hr align="center" size="0" width="80%"/>
+   		    <b><u>Use JRuby</u></b>
+	    <ul>
+	    	    	    <li>
+            <a href="docs.html">Documentation</a>
+                <ul>
+                        <li>
+            JRuby and BSF
+            </li>
+                        <li>
+            <a href="docs_java.html">Javasupport</a>
+            </li>
+                </ul>
+        </li>
+	    	    	    <li>
+            <a href="download.html">Download</a>
+                <ul>
+                </ul>
+        </li>
+	    	    </ul>
+	    <hr align="center" size="0" width="80%"/>
+   		    <b><u>Development</u></b>
+	    <ul>
+	    	    </ul>
+	    <hr align="center" size="0" width="80%"/>
+   		Hosted by:
+	<a href="http://sourceforge.net">
+	<img src="http://sourceforge.net/sflogo.php?group_id=35413" width="88" height="31" border="0" alt="SourceForge Logo"></a>
+	<hr align="center" size="0" width="80%">
+        <font size="-1">
+	    &copy; 2001 by 
+	    	    	<a href="mailto:jpetersen@uni-bonn.de">Jan Arne Petersen</a>
+	            </font>
+    </td><td width="70%" valign="top">
+    	                <h2>What is BSF?</h2>
+                <p>
+                    The <a
+                    href="http://www-124.ibm.com/developerworks/projects/bsf">
+                    Bean Scripting Framework</a> (BSF) is an architecture for
+                    incorporating scripting into Java applications and applets.
+                </p>
+                <p>
+                    It is used for example in the <a
+                    href="http://xml.apache.org/xalan-j/index.html">Xalan</a>
+                    XSLT processor and in the <a
+                    href="http://jakarta.apache.org/taglibs/doc/bsf-doc/intro.html">Jakarta BSF Taglib</a>.
+                </p>
+                <p>
+                    With JRuby you can also use Ruby as a scripting language in
+                    this applications.
+                </p>
+                <h2>How to use JRuby with BSF?</h2>
+                <ol>
+                <li>
+                    First you need to download <a
+                    href="http://www-124.ibm.com/developerworks/projects/bsf">BSF</a>.
+                </li><li>
+                    JRuby supports BSF but BSF doesn't support JRuby. There are
+                    two possibilities:
+                    <ol>
+                        <li>Add this line to the com/ibm/bsf/Language.properties file:
+<pre>
+jruby = org.jruby.javasupport.bsf.JRubyEngine, rb
+</pre>
+                        </li>
+                        <li><a href="data/bsf.jar">Download</a> a patched version of the bsf.jar file</li>
+                    </ol>
+                </li><li>
+                    Now you can use JRuby like the other scripting languages in
+                    BSF.
+                    <p>
+                    For example:
+<pre>
+BSFManager bsfManager = new BSFManager();
+bsfManager.eval("jruby", "script", 0, 0, "puts \"Hello from JRuby\"\n");
+</pre>
+                    </p>
+                </li>
+                </ol>
+    </td></tr>
+</table>
+</body>
+</html>

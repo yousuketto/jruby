@@ -1,0 +1,54 @@
+#macro (showsubsection $subsection)
+    <li>
+    #if ($subsection.link)
+        <a href="$subsection.link">$subsection.name</a>
+    #else
+        $subsection.name
+    #end
+    #if ($subsection.childs)
+        <ul>
+        #foreach ($subsubsection in $subsection.childs)
+            #showsubsection ($subsubsection)
+        #end
+        </ul>
+    #end
+    </li>
+#end
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="jruby.css" type="text/css">
+<title>JRuby - $title</title>
+</head>
+<body>
+<table width="100%">
+    <tr><td>
+        <img src="jruby_small.png" width="285" height="110" alt="JRuby"/>
+    </td><td>
+    	<h1>$title</h1>
+    </td></tr><tr><td valign="top">
+    	#foreach ($section in $menu)
+	    <b><u>$section.name</u></b>
+	    <ul>
+	    #foreach ($subsection in $section.childs)
+	    	#showsubsection ($subsection)
+	    #end
+	    </ul>
+	    <hr align="center" size="0" width="80%"/>
+   	#end
+	Hosted by:
+	<a href="http://sourceforge.net">
+	<img src="http://sourceforge.net/sflogo.php?group_id=35413" width="88" height="31" border="0" alt="SourceForge Logo"></a>
+	<hr align="center" size="0" width="80%">
+        <font size="-1">
+	    &copy; $copyright by 
+	    #foreach ($author in $authors)
+	    	<a href="mailto:$author.email">$author.name</a>
+	    #end
+        </font>
+    </td><td width="70%" valign="top">
+    	#include($content)
+    </td></tr>
+</table>
+</body>
+</html>
