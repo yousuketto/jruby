@@ -3,7 +3,12 @@
 <section>
   <title>Development</title>
   <link>development.html</link>
-  <entry>
-	  <link name="Build JRuby" link="build_instruction.html"/>
+  <entry description="Most information on JRuby development can be found in our Sourceforge project.">
+    <link name="Sourceforge" href="http://sourceforge.net/projects/jruby"/>
   </entry>
+<!--
+  <entry>
+    <link name="Build JRuby" href="build_instruction.html"/>
+  </entry>
+-->
 </section>

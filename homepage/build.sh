@@ -24,3 +24,8 @@ for i in tmp/news*.xml; do
 
    java $CP org.apache.xalan.xslt.Process -in $i -xsl xsl/main.xsl -out build/${j/\.xml/\.html} -HTML
 done
+
+for i in images/*; do
+    echo $i
+    cp $i build/
+done

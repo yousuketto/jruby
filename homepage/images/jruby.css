@@ -1,0 +1,49 @@
+a:active {
+	color: black;
+} 
+a:link {
+	color: black;
+}
+a:visited {
+	color: black;
+}
+body {
+	background-color: #99CCFF
+}
+td.header_general {
+	background-color: #0099FF;
+}
+td.section_general {
+	background-color: #0099FF;
+}
+td.section_general_light {
+	background-color: #32adff;
+}
+table.section_general {
+	background-color: #0099FF;
+}
+td.header_user {
+        background-color: #00E58C;
+}
+td.section_user {
+	background-color: #00E58C;
+}
+td.section_user_light {
+	background-color: #19FFA6;
+}
+table.section_user {
+	background-color: #00E58C;
+}
+td.header_development {
+        background-color: #b07ac8;
+}   
+td.section_development {
+        background-color: #b07ac8;
+}
+td.section_development_light {
+        background-color: #C186DC;
+}
+table.section_development {
+        background-color: #b07ac8;
+}
+
