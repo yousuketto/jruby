@@ -1,19 +1,14 @@
+#!/usr/local/bin/jruby
 
 Java.import("org.apache.xalan.xslt")
 Java.name("Process", "XalanProcess")
-
-#Java.import("java.lang")
-#Java.name("System", "JavaSystem")
-
-#JavaSystem.setProperty("user.language", "en")
-#JavaSystem.setProperty("user.country", "US")
 
 puts "Transform pages:"
 
 Dir.new('pages').grep(/\.xml$/).each {|i|
   j = "build/" + i.gsub(/\.xml$/, '.html')
   puts "#{i} => #{j}"
-  XalanProcess.main(["-in", 'pages/' + i, "-xsl", "xsl/main.xsl", "-out", j, "-HTML"])
+  XalanProcess.main(["-in", 'pages/' + i, "-xsl", "xsl/main.xsl", "-out", j])
 }
 
 puts "Generate News:"
