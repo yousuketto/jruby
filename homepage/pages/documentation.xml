@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<page title="Documentaion" id="documentation.html" section="user">
+  <path>
+    <entry name="User" link="user.html"/>
+  </path>
+  <content>
+    <left>
+    <layout type="vertical">
+        <entry>
+			<sectionindex name="general"/>
+		</entry><entry>
+			<sectionindex name="user"/>
+	  	</entry><entry>
+			<sectionindex name="development"/>
+		</entry>
+	</layout>
+    </left>
+    <center width="60%">
+      <text>
+        <p>
+      	<h1>No docs yet.</h1>
+      	</p><p>
+      	<h1>Help documenting jruby is welcome.</h1>
+      	</p>
+      </text>
+    </center>
+    <right/>
+  </content>
+</page>
