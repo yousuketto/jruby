@@ -23,6 +23,7 @@
 	<person name="Wyss Clemens" email="WYS@helbling.ch" type="bug"/>
 	<person name="Xandy Johnson" email="xandy@fgm.com" type="bug"/>
         <person name="Sergey Yevtushenko" type="bug"/>
+        <person name="Piergiuliano Bossi" type="bug"/>
 
 	<person name="Daiki Ueno" email="ueno@unixuser.org" type="developer" comment="created the first BSF support."/>
 	<person name="David Saff" email="dsaff@users.sf.net" type="developer" comment="fixed a bug in the ORO Regexp adapter."/>
@@ -30,4 +31,7 @@
 	<person name="Takashi Okamoto" email="tora@debian.org" type="developer" comment="wrote the ORO Regexp adapter."/>
 	<person name="Paul Butcher" email="" type="developer*" comment="add support for using RubyObject's in imported Java classes"/>
 	<person name="Robert Yokota" email="" type="developer*" comment="fixed infinite loop bug in JavaSupport."/>
+        <person name="Geert Bevin" email="" type="developer*" comment="BSF bug fixes"/>
+        <person name="Thomas E Enebo" email="" type="developer*" comment="Small test cleanup"/>
+
 </team>
