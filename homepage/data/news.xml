@@ -7,6 +7,14 @@
         </short>
 		<long>
 			<text>
+<p>
+Proudly announcing a new version of JRuby:
+</p><p>
+Since our latest release in May we have made lots of progress. All of this is in our new beta release 1.6/0.5.1, available at
+<a href="http://sourceforge.net/project/showfiles.php?group_id=35413&amp;release_id=104911">http://sourceforge.net/project/showfiles.php?group_id=35413&amp;release_id=104911</a>
+</p><p>
+Note: JRuby is still <b>BETA</b> software. In particular, the thread support may (will) have bad interactions with other threads when JRuby is embedded.
+</p>
 			<h3>Download</h3>
 			<p>
 			<ul>
@@ -18,12 +26,18 @@
 			</li>
 			</ul>
 			</p>
-			<h3>Changes</h3>
+			<h3>Changes since 1.6/0.5.0:</h3>
 			<ul>
+			<li>Improved support for built-in classes.</li>
+			<li>Speed improvements.</li>
+			<li>Better Java-Ruby support.</li>
+			<li>Memory management improvements.</li>
+			<li>New start script.</li>
+			<li>Lots of bug fixes.</li>
 			</ul>
 			</text>
 		</long>
-        </message>
+    </message>
 	<message title="JRuby 1.6/0.5.0 beta released" date="2002/05/16">
 		<short>
 			The new 1.6/0.5.0 beta development version is released today.
