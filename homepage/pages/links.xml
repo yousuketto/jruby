@@ -18,6 +18,9 @@
       <text>
         <ul>
           <li><a href="http://www.ruby-lang.org/">Ruby</a> - The original Ruby interpreter.</li>
+          <li><a href="http://www.rubycentral.com/book/">Programming Ruby</a> - Online book with Ruby API reference.</li>
+        </ul>
+        <ul>
           <li><a href="http://jakarta.apache.org/ant/">Apache Ant</a> - The tool used to build JRuby.</li>
           <li><a href="http://www.junit.org/">JUnit</a> - Unit testing framework.</li>
         </ul>
