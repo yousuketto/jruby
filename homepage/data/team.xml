@@ -27,5 +27,5 @@
 	<person name="David Saff" email="dsaff@users.sf.net" type="developer" comment="fixed a bug in the ORO Regexp adapter."/>
 	<person name="Rocky Burt" email="rocky@atlas.nh.bricsnet.com" type="developer" comment="fixed some bugs"/>
 	<person name="Takashi Okamoto" email="tora@debian.org" type="developer" comment="wroted the ORO Regexp adapter."/>
-	<person name="Paul Butcher" email="" type="developer*" comment="created some Java 1.3 compatibility patches."/>
+	<person name="Paul Butcher" email="" type="developer*" comment="add support for using RubyObject's in imported Java classes"/>
 </team>
