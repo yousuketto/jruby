@@ -28,4 +28,5 @@
 	<person name="Rocky Burt" email="rocky@atlas.nh.bricsnet.com" type="developer" comment="fixed some bugs"/>
 	<person name="Takashi Okamoto" email="tora@debian.org" type="developer" comment="wrote the ORO Regexp adapter."/>
 	<person name="Paul Butcher" email="" type="developer*" comment="add support for using RubyObject's in imported Java classes"/>
+	<person name="Robert Yokota" email="" type="developer*" comment="fixed infinite loop bug in JavaSupport."/>
 </team>
