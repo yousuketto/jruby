@@ -22,6 +22,7 @@
 	<person name="Robert Feldt" email="feldt@ce.chalmers.se" type="bug"/>
 	<person name="Wyss Clemens" email="WYS@helbling.ch" type="bug"/>
 	<person name="Xandy Johnson" email="xandy@fgm.com" type="bug"/>
+        <person name="Sergey Yevtushenko" type="bug"/>
 
 	<person name="Daiki Ueno" email="ueno@unixuser.org" type="developer" comment="created the first BSF support."/>
 	<person name="David Saff" email="dsaff@users.sf.net" type="developer" comment="fixed a bug in the ORO Regexp adapter."/>
