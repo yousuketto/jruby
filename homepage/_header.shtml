@@ -3,7 +3,7 @@
   <meta name="author" content="Jan Arne Petersen" />
   <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
   <meta http-equiv="Content-Style-Type" content="text/css" />
-  <!--#if expr="$HTTP_USER_AGENT=/(M|m)(S|s)(I|i)(E|e)/" -->
+  <!--#if expr="$HTTP_USER_AGENT=/MSIE/" -->
     <link rel="stylesheet" type="text/css" href="simple.css" />
   <!--#else -->
     <link rel="stylesheet" type="text/css" href="default.css" />

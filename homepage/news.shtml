@@ -3,7 +3,7 @@
   <!--#set var="title" value="News from the JRuby Project"-->
   <!--#include file="_header.shtml"-->
   <body>
-    <!--#include file="_sidebar.html"-->
+    <!--#include file="_sidebar.shtml"-->
     <div id="body">
       <h1>News</h1>
       <!--#set var="display_news" value="all"-->

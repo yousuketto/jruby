@@ -3,7 +3,7 @@
   <!--#set var="title" value="Get JRuby from CVS"-->
   <!--#include file="_header.shtml"-->
   <body>
-    <!--#include file="_sidebar.html"-->
+    <!--#include file="_sidebar.shtml"-->
     <div id="body">
       <h1>CVS</h1>
       <p>

@@ -3,7 +3,7 @@
   <!--#set var="title" value="Java Support Low-level API"-->
   <!--#include file="_header.shtml"-->
   <body>
-    <!--#include file="_sidebar.html"-->
+    <!--#include file="_sidebar.shtml"-->
     <div id="body">
       <!-- content starts here -->
       <h1>Java Support Low-level API</h1>

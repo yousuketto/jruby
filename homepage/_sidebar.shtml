@@ -1,5 +1,9 @@
-<div id="index">
-  <img src="images/jruby_logo.png" alt="JRuby"/>
+<div id="sidebar">
+  <!--#if expr="$HTTP_USER_AGENT=/MSIE/" -->
+    <img src="images/jruby_logo.jpeg" alt="JRuby"/>
+  <!--#else -->
+    <img src="images/jruby_logo.png" alt="JRuby"/>
+  <!--#endif -->
   <div id="links">
     <p class="section">Main</p>
     <ul>

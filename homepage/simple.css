@@ -66,7 +66,7 @@ div.news p {
 }
 
 /* Left index bar */
-#index   {
+#sidebar {
   position: absolute;
   top: 0px;
   left: 0px;
@@ -79,11 +79,11 @@ div.news p {
   background-color: #89a4cd;
 }
 
-#index a {
+#sidebar a {
   color: #4e51ff;
 }
 
-#index a:visited {
+#sidebar a:visited {
   color: #4c5c73;
 }
 

@@ -3,7 +3,7 @@
   <!--#set var="title" value="Java Support in JRuby"-->
   <!--#include file="_header.shtml"-->
   <body>
-    <!--#include file="_sidebar.html"-->
+    <!--#include file="_sidebar.shtml"-->
     <div id="body">
       <h1>Java Support</h1>
       <p>
