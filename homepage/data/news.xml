@@ -1,6 +1,41 @@
 <?xml version="1.0"?>
 
 <news>
+	<message title="JRuby 1.6/0.5.2 beta released" date="2002/10/28">
+	<short>
+		The new 1.6/0.5.3 development version is released today.
+        </short>
+	<long>
+	<text>
+<p>
+Proudly announcing the new beta version 1.6/0.5.3 of JRuby.
+</p><p>
+Since the latest version 1.6/0.5.2 we fixed a lot of bugs. This new bug-fixed version 1.6/0.5.3 is available at:
+<a href="http://sourceforge.net/project/showfiles.php?group_id=35413&amp;release_id=118947">http://sourceforge.net/project/showfiles.php?group_id=35413&amp;release_id=118947</a>
+</p><p>
+<b>Note:</b> JRuby is still <b>BETA</b> software. If it breaks you get to keep both pieces.
+</p>
+			<h3>Download</h3>
+			<p>
+			<ul>
+			<li>
+				<a href="http://prdownloads.sourceforge.net/jruby/jruby-bin-0.5.3.tar.gz?download">Binary Distribution</a>
+			</li>
+			<li>
+				<a href="http://prdownloads.sourceforge.net/jruby/jruby-src-0.5.3.tar.gz?download">Source Distribution</a>
+			</li>
+			</ul>
+			</p>
+			<h3>Changes since 1.6/0.5.2:</h3>
+			<ul>
+			<li>Java support bugfixes</li>
+			<li>Fixed eval() bug affecting samples/eval.rb</li>
+			<li>Dropped the (broken) support for the $= variable</li>
+			<li>Other small fixes</li>
+			</ul>
+			</text>
+		</long>
+	</message>
 	<message title="JRuby 1.6/0.5.2 beta released" date="2002/10/06">
 	<short>
 		The new 1.6/0.5.2 development version is released today.
