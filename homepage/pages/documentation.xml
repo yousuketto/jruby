@@ -20,6 +20,10 @@
       <text>
         <p>Currently available documentation:</p>
         <ul>
+          <li><a href="BeanScriptingFramework">BSF</a> - Bean Scripting Framework overview</li>
+          <li><a href="Javasupport-overview.txt">Javasupport Overview</a></li>
+          <li><a href="Javasupport-highlevel.txt">Javasupport Highlevel API</a> - The API to use for most Java access</li>
+          <li><a href="Javasupport-lowlevel.txt">Javasupport Lowlevel API</a> - Direct access to Java's Reflection</li>
           <li><a href="TODO">TODO</a> - What to do; what is done</li>
         </ul>
       </text>
