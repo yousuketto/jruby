@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+
+<section>
+  <title>User</title>
+  <link>user.html</link>
+  <entry><link name="Download" href="download.html"/></entry>
+  <entry><link name="Documentation" link="documentation.html"/></entry>
+  <entry><link name="Support" link="support.html"/></entry>
+</section>

@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+
+<news>
+	<message title="JRuby 1.6/0.5.0 beta released" date="2002/05/16">
+		<short>
+			The new 1.6/0.5.0 beta development version is released today.
+                </short>
+		<long>
+			<text>
+			<h3>Download</h3>
+			<p>
+			<ul>
+			<li>
+			<a href="http://prdownloads.sourceforge.net/jruby/jruby-0_5_0.tar.gz">Binary Distribution</a>
+			</li>
+			<li>
+			<a href="http://prdownloads.sourceforge.net/jruby/jruby-src-0_5_0.tar.gz">Source Distribution</a>
+			</li>
+			</ul>
+			</p>
+			<h3>Changes</h3>
+			<ul>
+			<li>Improved parser and lexer. New evaluator.</li>
+			<li>Improved support for builtin classes (Marhsal, pack, unpack, rand, srand, |, ^, `, each_byte, to_f, each_value, each_key, proc, sort, invert, join, dirname).</li>
+			<li>RegexpAdapter is selected automatically.</li>
+			<li>Improved Java support (automatically convert numeric types). Use always the real Java class and not the declared type.</li>
+			<li>A lot of Bugfixes.</li>
+			</ul>
+			</text>
+		</long>
+	</message>
+	<message title="New Homepage" date="2002/01/31">
+		<short>
+			A new design and more information.
+		</short>
+		<long>
+			<p>Not all pages are created yet.</p><p>We also need some help to create documentation. If you want to help please contact <link href="mailto:jpetersen@uni-bonn.de" name="us"/>.</p>
+		</long>
+	</message>
+	<message title="JRuby 1.6/0.3.1 released" date="2002/01/22">
+		<short>
+			The new 1.6/0.3.1 beta development version is released today. 
+		</short>
+		<long>
+			There are a lot of new builtin classes and methods implemented to reach a better Ruby 1.6 compatibility. Also the Java integration support improved. For example you can access public methods now.
+		</long>
+	</message>
+	<message title="JRuby 0.3.0 released" date="2001/12/22">
+		<short>
+			JRuby 0.3.0 beta released.
+		</short>
+	</message>
+	<message title="JRuby 0.2.4 released" date="2001/12/22">
+                <short>
+			JRuby 0.2.4 beta released.
+                </short>
+	</message>
+	<message title="JRuby 0.2.3 released" date="2001/11/20">
+                <short>
+                        JRuby 0.2.3 beta released.
+                </short>
+	</message>
+	<message title="Swing example added" date="2001/11/16">
+                <short>
+			Swing example to JRuby added.
+		</short>
+		<long>
+			Add a Swing example to JRuby 0.2.2. You should also view the new Java support <link href="docs_javasupport.html" name="documentation"/>.
+		</long>
+        </message>
+</news>

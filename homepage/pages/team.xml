@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<page title="The JRuby team" id="team.html" section="general">
+  <path>
+    <entry name="General" link="general.html"/>
+  </path>
+  <content>
+    <left>
+      <layout type="vertical">
+        <entry>
+          <team-index/>
+        </entry>
+      </layout>
+    </left>
+    <center width="60%">
+      <text>
+      <p>
+      Lots of thanks are due to the following people for their various
+      contributions to the JRuby project.
+      </p>
+      </text>
+      <team-list/>
+      <text>
+        <small>If we have missed someone or details have changed, please accept our apologies and let us know. Contact <a href="mailto:jpetersen@uni-bonn.de">jpetersen@uni-bonn.de</a>.
+        </small>
+      </text>
+    </center>
+    <right/>
+  </content>
+</page>

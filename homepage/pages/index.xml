@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+
+<page title="Home" id="index.html" section="general">
+  <path/>
+  <content>
+    <left>
+      <layout type="vertical">
+        <entry>
+          <sectionindex name="general"/>
+	</entry><entry>
+	  <sectionindex name="user"/>
+	  </entry><entry>
+	  <sectionindex name="development"/>
+	</entry>
+      </layout>
+    </left>
+    <center width="60%">
+      <text>
+        <p>
+		<b>JRuby</b> is a pure Java implementation of the <a href="http://www.ruby-lang.org">Ruby</a> interpreter, being developed by <a href="mailto:jpetersen@uni-bonn.de">Jan Arne Petersen</a> and <a href="team.html">others</a>.
+	</p><p>
+	<b>JRuby</b> is free software released under the GNU General Public License.
+        </p><p>
+	  <b>JRuby</b> is tightly integrated with Java to allow both to script any Java class and to embed the interpreter into any Java application.
+        </p><p><h3>Features</h3>
+          <ul>
+            <li>Ruby 1.6.7 compatible interpreter. (Not all builtin classes are supported yet!)</li>
+            <li>Support for scripting Java classes and interfaces in JRuby.</li>
+            <li>Bean Scripting Framework (BSF) support.</li>
+	  </ul>
+	</p>
+      </text>
+    </center>
+    <right>
+      <layout type="vertical">
+        <entry>
+          <actual-releases/>
+        </entry><entry>
+	  <news-titles index="0" length="3">
+            <header>
+	      <h2>Latest News:</h2>
+            </header>
+	    <footer>
+              <p>
+                <align-right>
+                  <link href="news.html" name="Old News"/>
+	        </align-right>
+              </p>
+	    </footer>
+	  </news-titles>
+        </entry>
+      </layout>
+    </right>
+  </content>
+</page>

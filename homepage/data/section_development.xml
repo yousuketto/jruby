@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+
+<section>
+  <title>Development</title>
+  <link>development.html</link>
+  <entry>
+	  <link name="Build JRuby" link="build_instruction.html"/>
+  </entry>
+</section>

@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+
+<page title="News" section="general">
+  <path>
+    <entry name="General" link="general.html"/>
+  </path>
+  <content>
+    <left/>
+    <center width="60%">
+      <layout type="vertical">
+        <entry>
+          <news-titles index="0" length="-1">
+            <header>
+              <h2>News:</h2>
+            </header>
+            <footer/>
+          </news-titles>
+        </entry>
+      </layout>
+    </center>
+    <right>
+      <layout type="vertical">
+        <entry>
+          <actual-releases/>
+        </entry>
+      </layout>
+    </right>
+  </content>
+</page>

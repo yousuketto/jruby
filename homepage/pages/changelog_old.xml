@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+
+<page title="Old Changelogs" section="user">
+  <path>
+    <entry name="User" link="user.html"/>
+  </path>
+  <content>
+    <left>
+      <text>
+        <p name="Releases">
+          <ul>
+            <li><a href="#0_3_0">0.2.3 beta</a></li>
+            <li><a href="#0_2_4">0.2.4 beta</a></li>
+	  </ul>
+	</p>
+      </text>
+    </left>
+    <center width="60%">
+      <text>
+	<anchor name="0_3_0"/>
+	<h3>0.3.0 beta</h3>      
+	<p>
+          <ul>
+            <li>Remove org.jruby.core.Rb* classes</li>
+            <li>Rename m* methods</li>
+            <li>Remove org.jruby.core package</li>
+            <li>Remove RubyId class</li>
+            <li>Add some new methods to Object and Module class</li>
+            <li>Improve Kernel.require method</li>
+            <li>Add support for a lot of global variables ($:, $-I, $LOAD_PATH, $")</li>
+            <li>Improve command line args</li>
+            <li>Improve exception handling</li>
+            <li>Fix a lot of bugs</li>
+	  </ul>
+        </p>
+	<anchor name="0_2_4"/>
+	<h3>0.2.4 beta</h3>
+	<p>
+          <ul>
+            <li>Add support for Proc class</li>
+            <li>Add support for Method class</li>
+            <li>Add support for Bignum class</li>
+            <li>Add support for JavaInterface class</li>
+            <li>Add support for Math module</li>
+            <li>Improve support for Module, Array and Hash class</li>
+            <li>Add support for Unit test with JUnit</li>
+            <li>Fix a lot of bugs</li>
+	  </ul>
+	</p>
+      </text>
+    </center>
+    <right/>
+  </content>
+</page>

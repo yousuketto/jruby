@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+
+<team>
+	<version-split>1.6/0.3.1</version-split>
+	<person name="Jan Arne Petersen" email="jpetersen@uni-bonn.de" type="admin" comment="is the Lead developer."/>
+	<person name="Benoit Cerrina" email="b.cerrina@wanadoo.fr" type="admin"/>
+	<person name="Anders Bengtsson" email="ndrsbngtssn@yahoo.se" type="admin"/>
+	<person name="Jason Voegele" email="jason@jvoegele.com" type="developer*"/>
+	
+	<person name="Stefan Matthias Aust" email="sma@3plus4.de" type="developer" comment="ported the Ruby parser from C to Java."/>
+	<person name="Alan Moore" email="alan_moore@gmx.net" type="developer"/>
+	<person name="Ed Sinjiashvili" email="slimb@vlinkmail.com" type="developer"/>
+	<person name="Chad Fowler" email="chadfowler@yahoo.com" type="developer"/>
+	
+	<person name="Russ Freeman" email="russ@freesoft.co.uk" type="other" comment="created the JRuby logo."/>
+	<person name="Tobias Reif" email="tobiasreif@pinkjuice.com" type="other" comment="created the XML/XSL example."/>
+
+	<person name="Johannes Brodwall" email="jhannes@users.sf.net" type="bug"/>
+	<person name="Matthias Veit" email="matthias_veit@users.sf.net" type="bug"/>
+	<person name="Kelvin Liu" email="kliuless@users.sf.net" type="bug"/>
+	<person name="Akinori MUSHA" email="knu@iDaemons.org" type="bug"/>
+	<person name="Robert Feldt" email="feldt@ce.chalmers.se" type="bug"/>
+	<person name="Wyss Clemens" email="WYS@helbling.ch" type="bug"/>
+	<person name="Xandy Johnson" email="xandy@fgm.com" type="bug"/>
+
+	<person name="Daiki Ueno" email="ueno@unixuser.org" type="developer" comment="created the first BSF support."/>
+	<person name="David Saff" email="dsaff@users.sf.net" type="developer" comment="fixed a bug in the ORO Regexp adapter."/>
+	<person name="Rocky Burt" email="rocky@atlas.nh.bricsnet.com" type="developer" comment="fixed some bugs"/>
+	<person name="Takashi Okamoto" email="tora@debian.org" type="developer" comment="wroted the ORO Regexp adapter."/>
+	<person name="Paul Butcher" email="" type="developer*" comment="created some Java 1.3 compatibility patches."/>
+</team>
