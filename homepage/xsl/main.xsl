@@ -47,27 +47,29 @@
 	      <a href="mailto:jpetersen@uni-bonn.de">Jan Arne Petersen</a>
 	    </div></small>
 	    <xsl:apply-templates select="content/left"/>
-	    <div valign="top"><small>Hosted by:
-              <a href="http://sourceforge.net">
-                <img src="http://sourceforge.net/sflogo.php?group_id=35413&amp;type=4" width="125" height="37" border="0" alt="SourceForge.net Logo"/>
-              </a>
-	    </small></div>
-	    <div valign="top">
-	      <a href="http://validator.w3.org/check/referer">
-	        <img border="0" src="http://www.w3.org/Icons/valid-html401" alt="Valid HTML 4.01!" height="31" width="88"/>
-              </a>
-	      <a href="http://jigsaw.w3.org/css-validator/">
-	        <img style="border:0;width:88px;height:31px"
-                     src="http://jigsaw.w3.org/css-validator/images/vcss" 
-                     alt="Valid CSS!"/>
-              </a>
-	    </div>
 	  </td><td valign="top" width="50%">
 	    <xsl:apply-templates select="content/center"/>
 	  </td><td valign="top" width="*">
 	    <xsl:apply-templates select="content/right"/>
+	  </td></tr><tr>
+          <td colspan="3" align="right">
+	    <xsl:apply-templates select="content/bottom"/>
+	    <a href="http://sourceforge.net">
+            <img src="http://sourceforge.net/sflogo.php?group_id=35413&amp;type=4"
+	         width="125" height="37" border="0"
+		 alt="SourceForge.net Logo"/>
+            </a>
+	    <a href="http://validator.w3.org/check/referer">
+              <img border="0" src="http://www.w3.org/Icons/valid-html401"
+	           alt="Valid HTML 4.01!" height="31" width="88"/>
+            </a>
+            <a href="http://jigsaw.w3.org/css-validator/">
+              <img border="0" width="88" height="31"
+                   src="http://jigsaw.w3.org/css-validator/images/vcss" 
+                   alt="Valid CSS!"/>
+            </a>
 	  </td></tr>
-	</tbody>
+        </tbody>
         </table>
       </body>
     </html>
