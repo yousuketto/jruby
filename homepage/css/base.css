@@ -1,0 +1,50 @@
+.top { 
+  background-color: #bfe4ff;
+}
+
+.tagline {
+  font-size: 1.5em;
+}
+
+.navigation {
+  margin-left: 1.5em;
+  margin-bottom: 1.5em;
+  margin-top: 1.5em;
+  padding: 1em;
+  float: right;
+  background-color: #80c9ff;
+  border: 2px outset;
+}
+
+.title { 
+  padding-top: 0.5em;
+  padding-left: 0.5em;
+}
+
+h2 {
+  font-size: 1.5em;
+}
+
+.content {
+}
+
+.method { 
+  padding: 0.25em;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  margin-right: 13em;
+}
+
+.method-title {
+  font-weight: bold;
+}
+
+.code { 
+  margin-left: 1em;
+  border-left: 1px solid;
+  padding-left: 1em;
+}
+
+.indent { 
+  margin-left: 1em;
+}

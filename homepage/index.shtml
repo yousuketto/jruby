@@ -1,50 +1,33 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <!--#set var="title" value="About JRuby"-->
-  <!--#include file="_header.shtml"-->
-  <body>
-    <!--#include file="_sidebar.shtml"-->
-    <div id="body">
-      <h1>About JRuby</h1>
-      <p>
-        JRuby is a pure Java implementation of the <a href="http://ruby-lang.org">Ruby</a>
-        interpreter, being developed by the <a href="credits.shtml">JRuby team</a>.
-      </p>
-      <p>
-        JRuby is free software released under a dual GPL/LGPL license.
-      </p>
-      <p>
-        JRuby is tightly integrated with Java to allow both to script
-        any Java class and to embed the interpreter into any Java application.
-      </p>
+<!--#include file="_header.shtml"-->
 
-      <div id="box_left">
-      <h1>Latest News</h1>
-      <!--#set var="display_news" value="latest"-->
-      <!--#include virtual="_news.shtml"-->
-        <div class="more-info">
-          <a href="news.shtml">More News...</a>
-        </div>
-      </div>
+<div class="content">
+<h2>Features</h2>
+<ul>
+<li>A 1.8.2 compatible <a href="http://www.ruby-lang.org/en/">Ruby</a> interpreter written in 100% pure Java</li>
+<li>Most builtin Ruby classes provided</li>
+<li>Support for interacting with and defining java classes from within ruby</li>
+<li>Bean Scripting Framework (<a href="http://jakarta.apache.org/bsf/">BSF</a>) support</li>
+<li>Distributed under a tri-license (CPL/GPL/LGPL)
+</ul>
+<h2>News</h2>
+<h3>2005-09-12: Redesigned web-site</h3>
 
-      <div id="box_right">
-      <!--#include virtual="releases/_release.shtml"-->
-      <h1>Latest Release (<!--#echo var="release"-->)</h1>
-      <div class="release-description">
-        <!--#include virtual="releases/${release}/_release-overview"-->
-      </div>
-      <div class="more-info">
-        <a href="release-announcement.shtml?<!--#echo var="release"-->">Full Announcement...</a> 
-      </div>
-      <p class="release-download">
-        Download JRuby <!--#echo var="release"-->:
-      </p>
-      <ul>
-        <li><a href="http://prdownloads.sourceforge.net/jruby/jruby-bin-<!--#echo var="release"-->.tar.gz?download">Binary Distribution</a></li>
-        <li><a href="http://prdownloads.sourceforge.net/jruby/jruby-src-<!--#echo var="release"-->.tar.gz?download">Source Distribution</a></li>
-      </ul>
-      </div>
-    </div>
-    <!--#include file="_footer.html"-->
+In anticipation of the 0.8.2 release, the website has been revamped.  We have a new logo and hopefully an easier to update set of web pages.
+
+<h3>2005-04-11: JRuby 0.8.1 released</h3>
+
+This release fixes many small problems and adds a couple of new features to Java integration...See the <a href="http://sourceforge.net/project/shownotes.php?release_id=319521">release notes</a> for more information and download it <a href="http://sourceforge.net/project/showfiles.php?group_id=35413">here</a>.
+
+<h3>2005-01-23: JRuby 0.8.0 released</h3>
+
+JRuby has hit its next milestone
+
+<h3>2004-03-12: JRuby 0.7.0 released</h3>
+
+After a long nap JRuby is under development again
+
+</div>
+  
+  <!--#include file="_footer.shtml"-->
   </body>
 </html>
