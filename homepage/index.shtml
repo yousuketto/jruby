@@ -10,6 +10,10 @@
 <li>Distributed under a tri-license (CPL/GPL/LGPL)
 </ul>
 <h2>News</h2>
+<h3>2005-09-29: JRuby 0.8.2 released</h3>
+
+This release fixes many problems.   It also allows embedders to see Arrays and Hashes as java.util.List and java.util.Maps.  See the <a href="http://sourceforge.net/project/shownotes.php?release_id=360006">release notes</a> for more information and download it <a href="http://sourceforge.net/project/showfiles.php?group_id=35413">here</a>.
+
 <h3>2005-09-12: Redesigned web-site</h3>
 
 In anticipation of the 0.8.2 release, the website has been revamped.  We have a new logo and hopefully an easier to update set of web pages.
