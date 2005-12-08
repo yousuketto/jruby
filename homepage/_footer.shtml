@@ -1,6 +1,6 @@
 <div id="footer">
   <p>
-    Copyright &copy; 2005, <a href="index.shtml">The JRuby Project</a>
+    Copyright &copy; 2005, <a href="<!--#echo var="D"-->index.shtml">The JRuby Project</a>
   </p>
 </div>
 </body>
