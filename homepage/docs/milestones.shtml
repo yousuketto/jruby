@@ -59,7 +59,7 @@ future release.</p>
    <li>Squash remaining block passing problems</li>
    </ul> 
 
-   <h3>JRuby 0.8.3 (late December 2005)</h3>
+   <h3>JRuby 0.8.3 (Released March 27, 2006)</h3>
    <ul>
    <li>Java included classes/modules are much faster</li>
    <li>Merge TOM_RDT_POSITION branch to trunk</li>
