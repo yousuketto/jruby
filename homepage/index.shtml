@@ -10,6 +10,10 @@
 <li>Distributed under a tri-license (CPL/GPL/LGPL)
 </ul>
 <h2>News</h2>
+<h3>2006-03-27: JRuby 0.8.3 released</h3>
+
+This is a huge release.  Besides making irb (bin/jirb) work, we are almost to the point of having Ruby on Rails and RubyGems working.  On top of that, java integration support is much much faster.  In a simple swing demo we have reduced startup time from 2 minutes down to 5 seconds.  Many fixes across the boards.  The iterative evaluator has also made great progress.  See the <a href="http://sourceforge.net/project/shownotes.php?release_id=405255">release notes</a> for more information and download it <a href="http://sourceforge.net/project/showfiles.php?group_id=35413">here</a>.
+
 <h3>2005-09-29: JRuby 0.8.2 released</h3>
 
 This release fixes many problems.   It also allows embedders to see Arrays and Hashes as java.util.List and java.util.Maps.  See the <a href="http://sourceforge.net/project/shownotes.php?release_id=360006">release notes</a> for more information and download it <a href="http://sourceforge.net/project/showfiles.php?group_id=35413">here</a>.

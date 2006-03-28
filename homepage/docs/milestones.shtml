@@ -49,7 +49,7 @@ future release.</p>
      jar).</li>
    </ul>
 
-   <h3>JRuby 0.8.2 (mid September 2005)</h3>
+   <h3>JRuby 0.8.2 (Released September 29, 2005)</h3>
    <ul>
    <li>RubyArray implements java.util.List</li>
    <li>RubyHash implements java.util.Map</li>
@@ -61,34 +61,44 @@ future release.</p>
 
    <h3>JRuby 0.8.3 (late December 2005)</h3>
    <ul>
-   <li>Java included classes/modules will lazily create proxy methods as used (dramatically speeds up swing examples) [<a href="http://sourceforge.net/tracker/index.php?func=detail&aid=1305012&group_id=35413&atid=413912">1305012</a>]</li>
-   <li>Ruby classes which extend Java one can override methods in a way that Java consumers can see</li>
+   <li>Java included classes/modules are much faster</li>
    <li>Merge TOM_RDT_POSITION branch to trunk</li>
    <li>Fix constant scoping problem [<a href="http://sourceforge.net/tracker/index.php?func=detail&aid=1303983&group_id=35413&atid=413912">1303983</a>]</li>
    <li>Create an extended Java File type to deal with cwd changing and forward-slash versus backslash semantics [<a href="http://sourceforge.net/tracker/index.php?func=detail&aid=1280905&group_id=35413&atid=413912">1280905</a>]</li>
    <li>Make sure arbitrary java threads have a way of using BSF returned values[<a href="http://sourceforge.net/tracker/index.php?func=detail&aid=1305005&group_id=35413&atid=413912">1305005</a>]</li>
    <li>More parts of socket.rb working</li>
    <li>Support Bindings</li>
+   <li>irb working (jirb)</li>
    <ul>
      <li>Make all stacks obey java.util.Stack semantics</li>
    </ul>
    <li>Ability for multiple java native threads to call methods on a ruby object concurrently</li>
-   <li>More conversion to having class have its own MetaClass</li>
    <li>Merge RDT Position branch with head</li>
    <li>Make parser more accessible for JRuby hackers/embedders</li>
    <li>yaml</li>
    <li>zlib</li>
-   <li>Make JDBC connector for RoR ActiveRecord</li>
    <li>updated evalautor</li>
    </ul>
 
-   <h3>JRuby 0.8.4 (late March 2006)</h3>
+   <h3>JRuby 0.8.4 (early May 2006)</h3>
    <ul>
+   <li>Remaining block issues</li>
    <li>Proc#arity problems</li>
    <li>Rubygems working</li>
-   <li>Webrick working</li>
-   <li>Ruby on Rails working</li>
+   <li>Ruby on Rails working (generate and dispatch)</li>
+   <li>Make JDBC connector for RoR ActiveRecord</li>
+   <li>More conversion to having class have its own MetaClass</li>
+   <li>More socket improvements
    </ul>
+
+   <h3>JRuby 0.8.5 (end of June 2006)</h3>
+   <ul>
+   <li>Change IO/File to use NIO to support select and locking</li>
+   <li>Ruby classes which extend Java one can override methods in a way that Java consumers can see</li>
+   <li>More migration of interpreter to being stackless</li>
+   <li>Webrick working</li>
+   </ul>
+
 
    <h2>JRuby 0.9 (????)</h2>
    <ul>
@@ -117,10 +127,6 @@ future release.</p>
      performance (IMHO).  This is not to say we will not positively affect
      performance on the way to 1.0.  I just would rather have us reach a
      full implementation as fast as we can.</li>
-   <li> Change to a pure-java grammar tool (like Antlr), this can also kill
-     our hand-crafted lexer</li>
-   <li>Less stack happy evaluation engine (make things more iterative or
-     at least implement tail recursion)</li>
    </ul>
 
 <!--#include virtual="../_footer.shtml" -->

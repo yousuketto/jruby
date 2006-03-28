@@ -29,6 +29,8 @@ If you know of any other links please submit them to the project administrator o
 
 <h2>Interesting JRuby sightings on the web</h2>
 
+<p><a href="http://headius.blogspot.com/">Headius</a> - JRuby developer Charles Nutter's blog.</p>
+
 <p><a href="http://www.jroller.com/page/habuma?entry=ruby_meet_spring">Ruby, meet Spring</a> - Example of using JRuby's java integration to access <a href="http://www.springframework.org/">Spring</a>.</p>
 
 <p><a href="http://www.tbray.org/ongoing/When/200x/2005/08/31/Ruby-Rome">Ruby on Rome</a> - Tim Bray's blog entry showing an example (by JRuby hacker Tom Enebo) using Java's <a href="https://rome.dev.java.net/">Rome</a> package to aggregate multiple RSS feeds into one.</p>
