@@ -35,23 +35,119 @@ module Opcodes
   @insn_map[:MULTIANEWARRAY] = :visitMultiANewArrayInsn
 end
 
+module GenUtils
+  def method_desc(retval, *params)
+    m_desc = "("
+    if params && params != [nil]
+      params.each do |param|
+        m_desc << desc(param)
+      end
+    end
+    m_desc << ")"
+    m_desc << desc(retval)
+
+    m_desc
+  end
+  
+  
+  def desc(retval)
+    desc = ""
+    case retval
+    when :void
+      desc << "V"
+    when :int
+      desc << "I"
+    when :float
+      desc << "F"
+    when :double
+      desc << "D"
+    else
+          if retval.to_s[0..1] == '[L'
+            desc << retval
+          else
+            desc << "L#{cls(retval).gsub('.', '/')};"
+          end
+    end
+
+    desc
+  end
+  
+  def cls(type)
+    return imports[type].gsub(".", "/") if imports.include? type
+    type.to_s.gsub(".", "/")
+  end
+  
+  def array_cls(type)
+    return type if (type.to_s[0] == "[") # if already array, return
+    return "[L#{imports[type]};" if imports.include? type
+    
+    case type
+    when :int
+      return "[I"
+    when :float
+      return "[F"
+    when :double
+      return "[D"
+    when :void
+      raise ArgumentError, "array of void is illegal"
+    else
+      # if type passed in is already array, don't re-array it (no nesting array types here)
+      if type[0] == "["
+        return type
+      else
+        return "[L#{cls(type).gsub(".", "/")};"
+      end
+    end
+  end
+
+  def vis(vis)
+    new_vis = 0
+    
+    case vis
+    when Array
+      vis.each {|v| new_vis |= eval("Opcodes::ACC_#{v.to_s.upcase}")}
+    else
+      new_vis = eval("Opcodes::ACC_#{vis.to_s.upcase}")
+    end
+
+    new_vis
+  end
+end
+
 class ClassBuilder
   include Opcodes
+  include GenUtils
 
   attr_accessor :class_visitor
   attr_accessor :classname
   attr_accessor :parentname
   attr_accessor :interfaces
+  attr_accessor :imports
   
-  def self.def_class(vis, classname, parentname=GenUtils.cls("java.lang.Object"), ifcs=nil, sig=nil, &b)
+  def initialize
+  	@imports = {
+      :string => "java/lang/String",
+      :object => "java/lang/Object",
+      :stringbuffer => "java/lang/StringBuffer",
+      :exception => "java/lang/Exception",
+      :thread => "java/lang/Thread",
+      :throwable => "java/lang/Throwable" }
+  end
+  
+  def self.def_class(visiblility, classname, parentname=nil, ifcs=nil, sig=nil, &b)
     cc = ClassBuilder.new()    
-    cc.start_class(GenUtils.vis(vis), classname, parentname, ifcs, sig)
+    parentname ||= cc.cls("java.lang.Object");
+    cc.start_class cc.vis(visiblility), cc.cls(classname), cc.cls(parentname), ifcs, sig
     
-    cc.instance_eval(&b)
+    yield cc
     
     cc.end_class
     
     cc.class_visitor.to_byte_array
+  end
+  
+  def import(classname, sym)
+  	@imports[sym] = classname.gsub(".", "/")
   end
   
   def def_constructor(vis, params=nil, excepts=nil, signature=nil, &b)
@@ -61,23 +157,23 @@ class ClassBuilder
   def def_method(vis, retval, name, params=nil, excepts=nil, signature=nil, &b)
     unless excepts.nil?
       excepts_arr = JString[].new(excepts.size)
-      excepts = excepts.each_index {|i| excepts_arr[i] = GenUtils.cls(excepts[i])}
+      excepts = excepts.each_index {|i| excepts_arr[i] = cls(excepts[i])}
     end
   
     mc = MethodBuilder.new(self)
-    mc.start_method(GenUtils.vis(vis), name, GenUtils.desc(retval, *params), excepts_arr, signature)
+    mc.start_method(vis(vis), name, method_desc(retval, *params), excepts_arr, signature)
     
-    mc.instance_eval(&b)
+	yield mc
     
     mc.end_method()
   end
 
   def start_class(vis, classname, parentname, ifcs, signature)  
-    @classname = GenUtils.cls(classname)
-    @parentname = GenUtils.cls(parentname)
+    @classname = cls(classname)
+    @parentname = cls(parentname)
     if ifcs then
 	  str_ifcs = JString[].new(ifcs.size)
-      ifcs.each_index {|i| str_ifcs[i] = GenUtils.cls(ifcs[i])}
+      ifcs.each_index {|i| str_ifcs[i] = cls(ifcs[i])}
       @interfaces = str_ifcs
 	end
 	
@@ -92,24 +188,26 @@ end
 
 class MethodBuilder
   include Opcodes
+  include GenUtils
   
   attr_accessor :methodname
   attr_accessor :methoddesc
   attr_accessor :method_visitor
+  attr_accessor :class_builder
 
-  def initialize(cc)
-    @cc = cc
+  def initialize(class_builder)
+    @class_builder = class_builder
     # need better way to do calculation of stack size
     @stack_size = 10
   end
   
   # defaults to calling super.<methodname>(<methoddesc>)
   def call_super(retval=:void, name=methodname, params=nil)
-    call_method(retval, name, params, @cc.parentname, invoke_type=:super)
+    call_method(retval, name, params, class_builder.parentname, invoke_type=:super)
   end
   
   def call_this(retval, name, params=nil)
-    call_method(retval, name, params, @cc.classname, invoke_type=:this)
+    call_method(retval, name, params, class_builder.classname, invoke_type=:this)
   end
   
   def return_void
@@ -126,10 +224,10 @@ class MethodBuilder
     end
   end
   
-  def call_method(retval, name, params=nil, cls=@cc.classname, invoke_type=:virtual, &b)
+  def call_method(retval, name, params=nil, cls=class_builder.classname, invoke_type=:virtual)
     if block_given?
       raise ArgumentError, "cannot yield for values with nil params" if params.nil?
-      ParamBuilder.new(self, params).instance_eval(&b)
+      yield self
     end 
   
     if invoke_type == :virtual
@@ -146,19 +244,19 @@ class MethodBuilder
       raise ArgumentError, "invalue invocation type #{invoke_type}, expected one of :virtual, :interface, :super, :this, or :construct"
     end
     
-    @method_visitor.visitMethodInsn(invoke_type, GenUtils.cls(cls), name, GenUtils.desc(retval, *params))
+    @method_visitor.visitMethodInsn(invoke_type, class_builder.cls(cls), name, class_builder.method_desc(retval, *params))
   end
   
   def constant(c)
     @method_visitor.visitLdcInsn(c)
   end
   
-  def construct_obj(type, params=nil, &b)
+  def construct_obj(type, params=nil)
     new_obj type
     dup
     if block_given?
       raise ArgumentError, "cannot yield for values with nil params" if params.nil?
-      ParamBuilder.new(self, params).instance_eval(&b)
+      yield self
     end
     call_constructor(type, params)
   end
@@ -173,18 +271,18 @@ class MethodBuilder
     when :int
       @method_visitor.visitIntInsn(NEWARRAY, T_INT)
     else
-      @method_visitor.visitTypeInsn(ANEWARRAY, GenUtils.cls(type))
+      @method_visitor.visitTypeInsn(ANEWARRAY, class_builder.cls(type))
     end
     
     if block_given?
       for i in 0...size
-        array_set(i, type) {yield i}
+        array_set(i, type) {|mb| yield i}
       end
     end
   end
   
   def new_obj(type)
-    type = GenUtils.cls(type)
+    type = cls(type)
     
     @method_visitor.visitTypeInsn(NEW, type)
   end
@@ -193,19 +291,36 @@ class MethodBuilder
     @method_visitor.visitInsn(DUP)
   end
   
+  def swap()
+  	@method_visitor.visitInsn(SWAP)
+  end
+  
+  def local(index, type=:ref)
+  	case type
+  	when :int
+	  	@method_visitor.visitVarInsn(ILOAD, index)
+	when :ref
+		@method_visitor.visitVarInsn(ALOAD, index)
+	end
+  end
+  
+  def field(container, name, type)
+    @method_visitor.visitFieldInsn(GETFIELD, class_builder.cls(container), "runtime", class_builder.desc(type))
+  end
+  
   def call_constructor(type, params, &b)
     call_method(:void, "<init>", params, type, :construct, &b)
   end
   
   # expects array on stack, block to provide value
-  def array_set(index, type=:ref, &b)
+  def array_set(index, type=:ref)
     dup
     # push index
     @method_visitor.visitLdcInsn(index)
     # hack to get around us always using long
     @method_visitor.visitInsn(L2I)
     
-    ParamBuilder.new(self, type).instance_eval(&b)# yield to client to allow setting up value
+    yield self # yield to client to allow setting up value
     
     # put into array
     @method_visitor.visitInsn(AASTORE)
@@ -214,7 +329,7 @@ class MethodBuilder
   def start_method(vis, name, desc, excepts, signature)
     @methodname = name
     @methoddesc = desc
-    @method_visitor = @cc.class_visitor.visitMethod(vis, name, desc, signature, excepts)
+    @method_visitor = class_builder.class_visitor.visitMethod(vis, name, desc, signature, excepts)
   end
   
   def end_method
@@ -224,6 +339,8 @@ class MethodBuilder
 end
 
 class ParamBuilder
+  include GenUtils
+
   def initialize(method_builder, params)
     @method_builder = method_builder
     @params = params
@@ -231,100 +348,5 @@ class ParamBuilder
   
   def constant(const)
     @method_builder.constant(const)
-  end
-end
-
-module GenUtils
-  @class_table = {
-    :string => "java/lang/String",
-    :object => "java/lang/Object",
-    :stringbuffer => "java/lang/StringBuffer",
-    :exception => "java/lang/Exception",
-    :thread => "java/lang/Thread",
-    :throwable => "java/lang/Throwable" }
-
-  def GenUtils.desc(retval, *params)
-    desc = ""
-    desc << "("
-    if params && params != [nil]
-      params.each do |param|
-        case param
-        when :int
-          desc << "I"
-        when :float
-          desc << "F"
-        when :double
-          desc << "D"
-        when :void
-          # do nothing
-        else
-          if param.to_s[0] == "["
-            desc << param
-          else
-            desc << "L#{GenUtils.cls(param)};"
-          end
-        end
-      end
-    end
-    desc << ")"
-    case retval
-    when :void
-      desc << "V"
-    when :int
-      desc << "I"
-    when :float
-      desc << "F"
-    when :double
-      desc << "D"
-    else
-          if retval.to_s[0..1] == '[L'
-            desc << retval
-          else
-            desc << "L#{GenUtils.cls(retval)};"
-          end
-    end
-
-    desc
-  end
-  
-  def GenUtils.cls(type)
-    return @class_table[type] if @class_table.include? type
-    type.to_s.gsub(".", "/")
-  end
-  
-  def GenUtils.array_cls(type)
-    return type if (type.to_s[0] == "[") # if already array, return
-    return "[L#{@class_table[type]};" if @class_table.include? type
-    
-    case type
-    when :int
-      return "[I"
-    when :float
-      return "[F"
-    when :double
-      return "[D"
-    when :void
-      raise ArgumentError, "array of void is illegal"
-    else
-      # if type passed in is already array, don't re-array it (no nesting array types here)
-      if param[0] == "["
-        return param
-      else
-        return "[L#{GenUtils.cls(param)};"
-      end
-    end
-  end
-
-  def GenUtils.vis(vis)
-    new_vis = 0
-    
-    case vis
-    when Array
-      vis.each {|v| new_vis |= eval("Opcodes::ACC_#{v.to_s.upcase}")}
-    else
-      new_vis = eval("Opcodes::ACC_#{vis.to_s.upcase}")
-    end
-
-    new_vis
   end
 end
