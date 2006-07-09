@@ -41,7 +41,9 @@ class MyVisitor < NodeVisitor
   
   def visitArgsNode(iVisited)
     puts iVisited.to_s
+    indent
     iVisited.args.child_nodes.each {|n| puts n.name} unless iVisited.args == nil
+    undent
     iVisited.opt_args.child_nodes.each {|n| visit(n)} unless iVisited.opt_args == nil
     visit(iVisited.block_arg_node) unless iVisited.block_arg_node == nil
   end
@@ -77,7 +79,7 @@ class MyVisitor < NodeVisitor
   
   def visitBlockNode(iVisited)
     puts iVisited.to_s
-    iVisited.child_nodes.each {|n| n.accept(self.to_java_object)}
+    iVisited.child_nodes.each {|n| visit(n)}
     nil
   end
   
