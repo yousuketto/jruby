@@ -152,6 +152,7 @@ class MyVisitor < NodeVisitor
   def visitDStrNode(iVisited)
     puts iVisited.to_s
     iVisited.child_nodes.each {|n| n.accept(self.to_java_object) unless n.nil?}
+    nil
   end
   
   def visitDSymbolNode(iVisited)
@@ -200,7 +201,7 @@ class MyVisitor < NodeVisitor
   
   def visitEvStrNode(iVisited)
     puts iVisited.to_s
-    visit(iVisited.body_node)
+    visit(iVisited.body)
   end
   
   def visitFCallNode(iVisited)
@@ -214,7 +215,7 @@ class MyVisitor < NodeVisitor
   end
   
   def visitFixnumNode(iVisited)
-    puts iVisited.to_s + " " + iVisited.value
+    puts iVisited.to_s + " " + iVisited.value.to_s
   end
   
   def visitFlipNode(iVisited)
@@ -224,7 +225,7 @@ class MyVisitor < NodeVisitor
   end
   
   def visitFloatNode(iVisited)
-    puts iVisited.to_s + " " + iVisited.value
+    puts iVisited.to_s + " " + iVisited.value.to_s
   end
   
   def visitForNode(iVisited)
