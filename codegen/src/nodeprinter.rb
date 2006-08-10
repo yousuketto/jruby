@@ -113,6 +113,7 @@ class MyVisitor < NodeVisitor
   def visitCallNode(iVisited)
     puts iVisited.to_s + " #{iVisited.name}"
     visit(iVisited.receiver_node)
+    visit(iVisited.args_node)
   end
   
   def visitCaseNode(iVisited)
@@ -206,8 +207,7 @@ class MyVisitor < NodeVisitor
   
   def visitFCallNode(iVisited)
     puts iVisited.to_s + " " + iVisited.name
-    iVisited.child_nodes.each {|n| visit(n)}
-    nil
+    visit(iVisited.args_node)
   end
   
   def visitFalseNode(iVisited)
