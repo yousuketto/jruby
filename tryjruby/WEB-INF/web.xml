@@ -1,0 +1,21 @@
+
+<!DOCTYPE web-app
+    PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+    "http://java.sun.com/dtd/web-app_2_3.dtd">
+
+<web-app>
+    <servlet>
+        <servlet-name>TryJRuby</servlet-name>
+        <servlet-class>org.jruby.promo.TryJRubyServlet</servlet-class>
+        
+        <init-param>
+        	<param-name>JRUBY_HOME</param-name>
+        	<param-value>/home/headius/workspace/jruby</param-value>
+        </init-param>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>TryJRuby</servlet-name>
+        <url-pattern>/irb</url-pattern>
+    </servlet-mapping>
+</web-app>
