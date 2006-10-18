@@ -184,7 +184,7 @@ public class ParserSupport {
                 if (localNames.isInBlock() && blockNames.isDefined(id)) {
                     return new DVarNode(position, id);
                 } else if (localNames.isLocalRegistered(id)) {
-                    return new LocalVarNode(position, localNames.getLocalIndex(id));
+                    return new LocalVarNode(position, localNames.getLocalIndex(id), id);
                 }
                 return new VCallNode(position, id); // RubyMethod call without arguments.
             case IdUtil.CONSTANT:
