@@ -240,10 +240,6 @@ public class LexerSource {
     	return positionFactory.getPosition(null, false);
     }
     
-    public ISourcePosition getDummyPosition() {
-        return positionFactory.getDummyPosition();
-    }
-    
     public ISourcePositionFactory getPositionFactory() {
         return positionFactory;
     }
