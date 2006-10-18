@@ -34,6 +34,7 @@ package org.jruby;
 import java.util.Iterator;
 
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RubyObjectSpace {
@@ -75,9 +76,11 @@ public class RubyObjectSpace {
         }
         int count = 0;
         Iterator iter = recv.getRuntime().getObjectSpace().iterator(rubyClass);
-        while (iter.hasNext()) {
+        IRubyObject obj = null;
+        ThreadContext context = recv.getRuntime().getCurrentContext();
+        while ((obj = (IRubyObject)iter.next()) != null) {
             count++;
-            recv.getRuntime().getCurrentContext().yield(((IRubyObject) iter.next()));
+            context.yield(obj);
         }
         return recv.getRuntime().newFixnum(count);
     }

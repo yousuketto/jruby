@@ -41,6 +41,7 @@ import java.io.OutputStream;
 import java.lang.ref.WeakReference;
 import java.nio.channels.Channel;
 
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.IOHandler;
 import org.jruby.util.IOHandlerJavaIO;
@@ -332,13 +333,13 @@ public class RubyIO extends RubyObject {
 
             // Update fileno list with our new handler
             registerIOHandler(handler);
-        } else if (args[0].isKindOf(getRuntime().getClass("String"))) {
+        } else if (args[0].isKindOf(getRuntime().getString())) {
             String path = ((RubyString) args[0]).toString();
             IOModes newModes = null;
 
             if (args.length > 1) {
-                if (!args[1].isKindOf(getRuntime().getClass("String"))) {
-                    throw getRuntime().newTypeError(args[1], getRuntime().getClass("String"));
+                if (!args[1].isKindOf(getRuntime().getString())) {
+                    throw getRuntime().newTypeError(args[1], getRuntime().getString());
                 }
                     
                 newModes = new IOModes(getRuntime(), ((RubyString) args[1]).toString());
@@ -621,7 +622,7 @@ public class RubyIO extends RubyObject {
     public IRubyObject putc(IRubyObject object) {
         int c;
         
-        if (object.isKindOf(getRuntime().getClass("String"))) {
+        if (object.isKindOf(getRuntime().getString())) {
             String value = ((RubyString) object).toString();
             
             if (value.length() > 0) {
@@ -630,7 +631,7 @@ public class RubyIO extends RubyObject {
                 throw getRuntime().newTypeError(
                         "Cannot convert String to Integer");
             }
-        } else if (object.isKindOf(getRuntime().getClass("Fixnum"))){
+        } else if (object.isKindOf(getRuntime().getFixnum())){
             c = RubyNumeric.fix2int(object);
         } else { // What case will this work for?
             c = RubyNumeric.fix2int(object.callMethod("to_i"));
@@ -877,10 +878,8 @@ public class RubyIO extends RubyObject {
             } else {
                 line = args[i].toString();
             }
-            callMethod("write", getRuntime().newString(line));
-            if (!line.endsWith("\n")) {
-                callMethod("write", getRuntime().newString("\n"));
-            }
+            callMethod("write", getRuntime().newString(line+
+            		(line.endsWith("\n") ? "" : "\n")));
         }
         return getRuntime().getNil();
     }
@@ -928,6 +927,29 @@ public class RubyIO extends RubyObject {
         return getRuntime().getNil();
     }
     
+    public IRubyObject readpartial(IRubyObject[] args) {
+        if(!(handler instanceof IOHandlerNio)) {
+            // cryptic for the uninitiated...
+            throw getRuntime().newNotImplementedError("readpartial only works with Nio based handlers");
+        }
+    	try {
+            String buf = ((IOHandlerNio)handler).readpartial(RubyNumeric.fix2int(args[0]));
+            IRubyObject strbuf = getRuntime().newString((buf == null ? "" : buf));
+            if(args.length > 1) {
+                args[1].callMethod("<<",strbuf);
+                return args[1];
+            } 
+
+            return strbuf;
+        } catch (IOHandler.BadDescriptorException e) {
+            throw getRuntime().newErrnoEBADFError();
+        } catch (EOFException e) {
+            return getRuntime().getNil();
+        } catch (IOException e) {
+            throw getRuntime().newIOError(e.getMessage());
+        }
+    }
+
     public IRubyObject sysread(IRubyObject number) {
         try {
             String buf = handler.sysread(RubyNumeric.fix2int(number));
@@ -998,9 +1020,10 @@ public class RubyIO extends RubyObject {
      */
     public IRubyObject each_byte() {
     	try {
+            ThreadContext context = getRuntime().getCurrentContext();
             for (int c = handler.getc(); c != -1; c = handler.getc()) {
                 assert c < 256;
-                getRuntime().getCurrentContext().yield(getRuntime().newFixnum(c));
+                context.yield(getRuntime().newFixnum(c));
             }
 
             return getRuntime().getNil();
@@ -1017,9 +1040,10 @@ public class RubyIO extends RubyObject {
      * <p>Invoke a block for each line.</p>
      */
     public RubyIO each_line(IRubyObject[] args) {
+        ThreadContext context = getRuntime().getCurrentContext();
         for (IRubyObject line = internalGets(args); !line.isNil(); 
         	line = internalGets(args)) {
-            getRuntime().getCurrentContext().yield(line);
+            context.yield(line);
         }
         
         return this;
@@ -1029,10 +1053,10 @@ public class RubyIO extends RubyObject {
     public RubyArray readlines(IRubyObject[] args) {
         IRubyObject[] separatorArgument;
         if (args.length > 0) {
-            if (!args[0].isKindOf(getRuntime().getClass("NilClass")) &&
-                !args[0].isKindOf(getRuntime().getClass("String"))) {
+            if (!args[0].isKindOf(getRuntime().getNilClass()) &&
+                !args[0].isKindOf(getRuntime().getString())) {
                 throw getRuntime().newTypeError(args[0], 
-                        getRuntime().getClass("String"));
+                        getRuntime().getString());
             } 
             separatorArgument = new IRubyObject[] { args[0] };
         } else {

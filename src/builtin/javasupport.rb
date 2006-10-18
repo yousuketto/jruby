@@ -223,6 +223,17 @@ class InterfaceJavaProxy < JavaProxy
       Java.ruby_to_java(send(method.name, *args))
     }
   end
+    
+  def self.impl(*meths, &block)
+    block = lambda {|*args| send(:method_missing, *args) } unless block
+
+    Class.new(self) do
+      define_method(:method_missing) do |name, *args|
+        return block.call(name, *args) if meths.empty? || meths.include?(name)
+        super
+      end
+    end.new
+  end
 end
 
 class ConcreteJavaProxy < JavaProxy
@@ -309,22 +320,42 @@ module JavaUtilities
     get_proxy_class(java_object.java_class).new_instance_for(java_object)
   end
 
+  def JavaUtilities.primitive_match(t1,t2)
+    if t1.primitive?
+      return case t1.inspect
+             when 'int': ['java.lang.Integer','java.lang.Long','java.lang.Short','java.lang.Character'].include?(t2.inspect)
+             when 'long': ['java.lang.Integer','java.lang.Long','java.lang.Short','java.lang.Character'].include?(t2.inspect)
+             when 'short': ['java.lang.Integer','java.lang.Long','java.lang.Short','java.lang.Character'].include?(t2.inspect)
+             when 'char': ['java.lang.Integer','java.lang.Long','java.lang.Short','java.lang.Character'].include?(t2.inspect)
+             when 'float': ['java.lang.Float','java.lang.Double'].include?(t2.inspect)
+             when 'double': ['java.lang.Float','java.lang.Double'].include?(t2.inspect)
+             when 'boolean': ['java.lang.Boolean'].include?(t2.inspect)
+             else false
+             end
+    end
+    return true
+  end
+  
   def JavaUtilities.matching_method(methods, args)
     arg_types = args.collect {|a| a.java_class }
-    methods.each do |method|
-      types = method.argument_types
+    notfirst = false
+    2.times do
+      methods.each do |method|
+        types = method.argument_types
 
-      # Exact match
-      return method if types == arg_types
+        # Exact match
+        return method if types == arg_types
       
-      # Compatible (by inheritance)
-      if (types.length == arg_types.length)
-        match = true
-        0.upto(types.length - 1) do |i|
-          match = false unless types[i].assignable_from?(arg_types[i])
+        # Compatible (by inheritance)
+        if (types.length == arg_types.length)
+          match = true
+          0.upto(types.length - 1) do |i|
+            match = false unless types[i].assignable_from?(arg_types[i]) && (notfirst || primitive_match(types[i],arg_types[i]))
+          end
+          return method if match
         end
-        return method if match
       end
+      notfirst = true
     end
 
     name = methods.first.kind_of?(Java::JavaConstructor) ? 
@@ -417,6 +448,49 @@ class JavaInterfaceExtender
     proxy_class.class_eval &@block if @java_class.assignable_from? proxy_class.java_class
   end
 end
+
+module Java
+ class << self
+   def const_missing(sym)
+      JavaUtilities.get_proxy_class "#{sym}"
+   end
+
+   def method_missing(sym, *args)
+     if sym.to_s.downcase[0] == sym.to_s[0]
+       Package.create_package sym, sym
+     else
+       JavaUtilities.get_proxy_class "#{sym}"
+     end
+   end
+ end
+
+ class Package
+   def initialize(name)
+     @name = name
+   end
+
+   def method_missing(sym, *args)
+     if sym.to_s.downcase[0] == sym.to_s[0]
+       self.class.create_package sym, "#{@name}.#{sym}"
+     else
+       JavaUtilities.get_proxy_class "#{@name}.#{sym}"
+     end
+   end
+
+   class << self
+     def create_package(sym, package_name, cls=self)
+       package = Java::Package.new package_name
+       cls.send(:define_method, sym) { package }
+       package
+     end
+   end
+ end
+end
+
+Java::Package.create_package(:java, :java, Kernel)
+Java::Package.create_package(:javax, :javax, Kernel)
+Java::Package.create_package(:org, :org, Kernel)
+Java::Package.create_package(:com, :com, Kernel)
 
 require 'builtin/java/exceptions'
 require 'builtin/java/collections'

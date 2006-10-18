@@ -18,6 +18,7 @@
  * Copyright (C) 2004 Joey Gibson <joey@joeygibson.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Derek Berner <derek.berner@state.nm.us>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -33,8 +34,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -128,7 +127,8 @@ public class RubySymbol extends RubyObject {
     }
 
     public IRubyObject inspect() {
-        return getRuntime().newString(":" + symbol);
+        return getRuntime().newString(":" + 
+            (isSymbolName(symbol) ? symbol : getRuntime().newString(symbol).dump().toString())); 
     }
 
     public IRubyObject to_s() {
@@ -161,6 +161,129 @@ public class RubySymbol extends RubyObject {
         output.write(':');
         output.dumpString(symbol);
     }
+    
+    private static boolean isIdentStart(char c) {
+        return ((c >= 'a' && c <= 'z')|| (c >= 'A' && c <= 'Z')
+                || c == '_');
+    }
+    private static boolean isIdentChar(char c) {
+        return ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')
+                || c == '_');
+    }
+    
+    private static boolean isIdentifier(String s) {
+        if (s == null || s.length() <= 0) {
+            return false;
+        } 
+        
+        if (!isIdentStart(s.charAt(0))) {
+            return false;
+        }
+        for (int i = 1; i < s.length(); i++) {
+            if (!isIdentChar(s.charAt(i))) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * is_special_global_name from parse.c.  
+     * @param s
+     * @return
+     */
+    private static boolean isSpecialGlobalName(String s) {
+        if (s == null || s.length() <= 0) {
+            return false;
+        }
+
+        int length = s.length();
+           
+        switch (s.charAt(0)) {        
+        case '~': case '*': case '$': case '?': case '!': case '@': case '/': case '\\':        
+        case ';': case ',': case '.': case '=': case ':': case '<': case '>': case '\"':        
+        case '&': case '`': case '\'': case '+': case '0':
+            return length == 1;            
+        case '-':
+            return (length == 1 || (length == 2 && isIdentChar(s.charAt(1))));
+            
+        default:
+            // we already confirmed above that length > 0
+            for (int i = 0; i < length; i++) {
+                if (!Character.isDigit(s.charAt(i))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    
+    private static boolean isSymbolName(String s) {
+        if (s == null || s.length() < 1) {
+            return false;
+        }
+
+        int length = s.length();
+
+        char c = s.charAt(0);
+        switch (c) {
+        case '$':
+            return length > 1 && isSpecialGlobalName(s.substring(1));
+        case '@':
+            int offset = 1;
+            if (length >= 2 && s.charAt(1) == '@') {
+                offset++;
+            }
+
+            return isIdentifier(s.substring(offset));
+        case '<':
+            return (length == 1 || (length == 2 && (s.equals("<<") || s.equals("<="))) || 
+                    (length == 3 && s.equals("<=>")));
+        case '>':
+            return (length == 1) || (length == 2 && (s.equals(">>") || s.equals(">=")));
+        case '=':
+            return ((length == 2 && (s.equals("==") || s.equals("=~"))) || 
+                    (length == 3 && s.equals("===")));
+        case '*':
+            return (length == 1 || (length == 2 && s.equals("**")));
+        case '+':
+            return (length == 1 || (length == 2 && s.equals("+@")));
+        case '-':
+            return (length == 1 || (length == 2 && s.equals("-@")));
+        case '|': case '^': case '&': case '/': case '%': case '~': case '`':
+            return length == 1;
+        case '[':
+            return s.equals("[]") || s.equals("[]=");
+        }
+        
+        if (!isIdentStart(c)) {
+            return false;
+        }
+
+        boolean localID = (c >= 'a' && c <= 'z');
+        int last = 1;
+        
+        for (; last < length; last++) {
+            char d = s.charAt(last);
+            
+            if (!isIdentChar(d)) {
+                break;
+            }
+        }
+                    
+        if (last == length) {
+            return true;
+        } else if (localID && last == length - 1) {
+            char d = s.charAt(last);
+            
+            return d == '!' || d == '?' || d == '=';
+        }
+        
+        return false;
+    }
+    
+ 
 
     public static RubySymbol unmarshalFrom(UnmarshalStream input) throws java.io.IOException {
         RubySymbol result = RubySymbol.newSymbol(input.getRuntime(), input.unmarshalString());
@@ -169,24 +292,20 @@ public class RubySymbol extends RubyObject {
     }
 
     public static class SymbolTable {
-        /* Using Java's GC to keep the table free from unused symbols. */
-        private ReferenceQueue unusedSymbols = new ReferenceQueue();
+       
         private Map table = new HashMap();
-
-        public RubySymbol lookup(String name) {
-            clean();
-            WeakSymbolEntry ref = (WeakSymbolEntry) table.get(name);
-            if (ref == null) {
-                return null;
-            }
-            return (RubySymbol) ref.get();
+        
+        public IRubyObject[] all_symbols() {
+            int length = table.size();
+            IRubyObject[] array = new IRubyObject[length];
+            System.arraycopy(table.values().toArray(), 0, array, 0, length);
+            return array;
         }
-
+        
         public RubySymbol lookup(long symbolId) {
             Iterator iter = table.values().iterator();
             while (iter.hasNext()) {
-                WeakSymbolEntry entry = (WeakSymbolEntry) iter.next();
-                RubySymbol symbol = (RubySymbol) entry.get();
+                RubySymbol symbol = (RubySymbol) iter.next();
                 if (symbol != null) {
                     if (symbol.id == symbolId) {
                         return symbol;
@@ -195,31 +314,15 @@ public class RubySymbol extends RubyObject {
             }
             return null;
         }
-
+        
+        public RubySymbol lookup(String name) {
+            return (RubySymbol) table.get(name);
+        }
+        
         public void store(RubySymbol symbol) {
-            clean();
-            table.put(symbol.asSymbol(), new WeakSymbolEntry(symbol, unusedSymbols));
+            table.put(symbol.asSymbol(), symbol);
         }
-
-        private void clean() {
-            WeakSymbolEntry ref;
-            while ((ref = (WeakSymbolEntry) unusedSymbols.poll()) != null) {
-                table.remove(ref.name());
-            }
-        }
-
-        private class WeakSymbolEntry extends WeakReference {
-            private final String name;
-
-            public WeakSymbolEntry(RubySymbol symbol, ReferenceQueue queue) {
-                super(symbol, queue);
-                this.name = symbol.asSymbol();
-            }
-
-            public String name() {
-                return name;
-            }
-        }
+        
     }
     
 }

@@ -21,3 +21,27 @@ test_equal("-1.0", -1.0.to_s)
 test_equal(nil, 0.0.infinite?)
 test_equal(-1, (-1.0/0.0).infinite?)
 test_equal(1, (+1.0/0.0).infinite?)
+
+# a few added tests for MRI compatibility now that we override relops
+# from Comparable
+
+class Smallest
+  include Comparable
+  def <=> (other)
+    -1
+  end
+end
+
+class Different
+  include Comparable
+  def <=> (other)
+    nil
+  end
+end
+
+s = Smallest.new
+d = Different.new
+test_equal(nil, 3.0 <=> s)
+test_equal(nil, 3.0 <=> d)
+test_exception(ArgumentError) { 3.0 < s }
+test_exception(ArgumentError) { 3.0 < d }

@@ -239,4 +239,17 @@ if defined? Java
   
   include_class 'java.math.BigDecimal'
   test_equal(BigDecimal, BigDecimal.new("1.23").add(BigDecimal.new("2.34")).class)
+  
+  a = java.util.ArrayList.new
+  test_equal(0, a.size)
+  
+  Properties = Java::java.util.Properties
+  p = Properties.new
+  p.setProperty("a", "b")
+  test_equal("b", p.getProperty("a"))
+  
+  class MyBadActionListener < java.awt.event.ActionListener
+  end
+  
+  test_exception(NoMethodError) { MyBadActionListener.new.actionPerformed }
 end

@@ -47,4 +47,10 @@ public class TestLoadService extends TestRubyBase {
     public void testRequireSocket() {
         runtime.evalScript("require 'socket'");
     }
+
+    public void testExtensionLoader() {
+        BasicLibraryTestService.counter = 0;
+        runtime.evalScript("require 'org/jruby/test/basic_library_test'");
+        assertEquals("The library should've have been loaded", BasicLibraryTestService.counter, 1);
+    }
 }

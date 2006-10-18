@@ -53,7 +53,7 @@ public class RegexpNode extends Node implements ILiteralNode {
     private final int options;
     
     public RegexpNode(ISourcePosition position, String value, int options) {
-        super(position);
+        super(position, NodeTypes.REGEXPNODE);
         
         this.value = value;
         this.options = options;
@@ -81,7 +81,7 @@ public class RegexpNode extends Node implements ILiteralNode {
     
     public Pattern getPattern() {
         if (pattern == null) {
-            pattern = translator.translate(value, options, 0);
+            pattern = translator.translate(value, options, Pattern.UNIX_LINES);
         }
         return pattern;
     }

@@ -32,7 +32,6 @@ package org.jruby.parser;
 
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.Iterator;
 import java.util.List;
 
 import org.jruby.IRuby;
@@ -41,6 +40,7 @@ import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.runtime.Iter;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.util.collections.SinglyLinkedList;
 
 /**
@@ -68,12 +68,16 @@ public class Parser {
 
     private Node parse(String file, Reader content, RubyParserConfiguration config, 
         SinglyLinkedList cref) {
-        config.setLocalVariables(runtime.getCurrentContext().getCurrentScope().getLocalNames());
+        ThreadContext tc = runtime.getCurrentContext();
+        config.setLocalVariables(tc.getFrameScope().getLocalNames());
         
-        // search for an ITER_CUR; this lets us know we're parsing from within a block and should bring dvars along
-        for (Iterator iter = runtime.getCurrentContext().getIterStack().iterator(); iter.hasNext();) {
-            if ((Iter)iter.next() == Iter.ITER_CUR) {
-                config.setDynamicVariables(runtime.getCurrentContext().getCurrentDynamicVars().names());
+        // FIXME: hack; search for an ITER_CUR; this lets us know we're parsing from within a block and should bring dvars along
+        Iter[] iters = tc.getIterStack();
+        for (int i = 0; i < iters.length; i++) {
+            Iter iter = iters[i];
+            
+            if (iter == Iter.ITER_CUR) {
+                config.setDynamicVariables(tc.getCurrentDynamicVars().names());
                 break;
             }
         }
@@ -84,7 +88,7 @@ public class Parser {
             parser = RubyParserPool.getInstance().borrowParser();
             parser.setWarnings(runtime.getWarnings());
             parser.init(config);
-            runtime.getCurrentContext().setCRef(cref);
+            tc.setCRef(cref);
             LexerSource lexerSource = LexerSource.getSource(file, content);
             result = parser.parse(lexerSource);
             if (result.isEndSeen()) {
@@ -99,7 +103,7 @@ public class Parser {
             throw runtime.newSyntaxError(buffer.toString());
         } finally {
             RubyParserPool.getInstance().returnParser(parser);
-            runtime.getCurrentContext().unsetCRef();
+            tc.unsetCRef();
         }
 
         if (hasNewLocalVariables(result)) {
@@ -111,23 +115,26 @@ public class Parser {
 
     private void expandLocalVariables(List localVariables) {
         int oldSize = 0;
-        if (runtime.getCurrentContext().getCurrentScope().getLocalNames() != null) {
-            oldSize = runtime.getCurrentContext().getCurrentScope().getLocalNames().length;
+        ThreadContext tc = runtime.getCurrentContext();
+        if (tc.getFrameScope().getLocalNames() != null) {
+            oldSize = tc.getFrameScope().getLocalNames().length;
         }
         List newNames = localVariables.subList(oldSize, localVariables.size());
         String[] newNamesArray = new String[newNames.size()];
         newNames.toArray(newNamesArray);
-        runtime.getCurrentContext().getCurrentScope().addLocalVariables(newNamesArray);
+        tc.getFrameScope().addLocalVariables(newNamesArray);
     }
 
     private boolean hasNewLocalVariables(RubyParserResult result) {
-       int newSize = 0;
+        int newSize = 0;
+        ThreadContext tc = runtime.getCurrentContext();
+       
         if (result.getLocalVariables() != null) {
             newSize = result.getLocalVariables().size();
         }
         int oldSize = 0;
-        if (runtime.getCurrentContext().getCurrentScope().hasLocalVariables()) {
-            oldSize = runtime.getCurrentContext().getCurrentScope().getLocalNames().length;
+        if (tc.getFrameScope().hasLocalVariables()) {
+            oldSize = tc.getFrameScope().getLocalNames().length;
         }
         return newSize > oldSize;
     }

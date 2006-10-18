@@ -12,6 +12,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2006 Ola Bini <ola@ologix.com>
+ * Copyright (C) 2006 Ryan Bell <ryan.l.bell@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 import org.jruby.util.IOHandler;
@@ -112,9 +114,11 @@ public class RubyStringIO extends RubyObject {
         }
         RubyStringIO strio = (RubyStringIO)newInstance(recv,new IRubyObject[]{str,mode});
         IRubyObject val = strio;
-        if (recv.getRuntime().getCurrentContext().isBlockGiven()) {
+        ThreadContext tc = recv.getRuntime().getCurrentContext();
+        
+        if (tc.isBlockGiven()) {
             try {
-                val = recv.getRuntime().getCurrentContext().yield(strio);
+                val = tc.yield(strio);
             } finally {
                 strio.close();
             }
@@ -183,8 +187,9 @@ public class RubyStringIO extends RubyObject {
 
    public IRubyObject each(IRubyObject[] args) {
        IRubyObject line = gets(args);
+       ThreadContext context = getRuntime().getCurrentContext();
        while (!line.isNil()) {
-           getRuntime().getCurrentContext().yield(line);
+           context.yield(line);
            line = gets(args);
        }
        return this;
@@ -327,6 +332,10 @@ public class RubyStringIO extends RubyObject {
     }
 
     public IRubyObject puts(IRubyObject[] obj) {
+        if (obj.length == 0) {
+            append(getRuntime().newString("\n"));
+        }
+        
         for (int i=0,j=obj.length;i<j;i++) {
             append(obj[i]);
             internal.replace((int)pos,(int)(++pos),("\n"));

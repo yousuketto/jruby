@@ -76,8 +76,28 @@ test_equal([1, 1], arr)
 test_no_exception { [].unshift(*[]) }
 test_no_exception { [].unshift() }
 
+##### Array#[] #####
+
+test_equal([1], Array[1])
+test_equal([], Array[])
+test_equal([1,2], Array[1,2])
+
 ##### == #####
 class AryTest
   def to_ary; [1,2]; end
 end
 test_equal([1,2], AryTest.new)
+
+# test that extensions of the base classes are typed correctly
+class ArrayExt < Array
+end
+test_equal(ArrayExt, ArrayExt.new.class)
+test_equal(ArrayExt, ArrayExt[:foo, :bar].class)
+
+##### splat test #####
+class ATest
+  def to_a; 1; end
+end
+
+proc { |a| test_equal(1, a) }.call(*1)
+test_exception(TypeError) { proc { |a| }.call(*ATest.new) }

@@ -20,6 +20,7 @@
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -37,6 +38,7 @@ package org.jruby;
 
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -73,7 +75,6 @@ public class RubyRange extends RubyObject {
         result.includeModule(runtime.getModule("Enumerable"));
 
         result.defineMethod("==", callbackFactory.getMethod("equal", IRubyObject.class));
-        result.defineMethod("===", callbackFactory.getMethod("op_eqq", IRubyObject.class));
         result.defineMethod("begin", callbackFactory.getMethod("first"));
         result.defineMethod("each", callbackFactory.getMethod("each"));
         result.defineMethod("end", callbackFactory.getMethod("last"));
@@ -92,6 +93,7 @@ public class RubyRange extends RubyObject {
         result.defineMethod("include?", callbackFactory.getMethod("include_p", IRubyObject.class));
 		// We override Enumerable#member? since ranges in 1.8.1 are continuous.
 		result.defineAlias("member?", "include?");
+        result.defineAlias("===", "include?");
 		
 		result.defineSingletonMethod("new", callbackFactory.getOptSingletonMethod("newInstance"));
         
@@ -118,6 +120,11 @@ public class RubyRange extends RubyObject {
     public long[] getBeginLength(long limit, boolean truncate, boolean isStrict) {
         long beginLong = RubyNumeric.num2long(begin);
         long endLong = RubyNumeric.num2long(end);
+        
+        // Apparent legend for MRI 'err' param to JRuby 'truncate' and 'isStrict':
+        // 0 =>  truncate && !strict
+        // 1 => !truncate &&  strict
+        // 2 =>  truncate &&  strict
 
         if (! isExclusive) {
             endLong++;
@@ -154,14 +161,7 @@ public class RubyRange extends RubyObject {
 			}
 		}
 
-        if (beginLong > endLong) {
-            if (isStrict) {
-                throw getRuntime().newRangeError(inspect().toString() + " out of range.");
-            }
-			return null;
-        }
-
-        return new long[] { beginLong, endLong - beginLong };
+        return new long[] { beginLong, Math.max(endLong - beginLong, 0L) };
     }
 
     // public Range methods
@@ -270,42 +270,9 @@ public class RubyRange extends RubyObject {
         return getRuntime().newBoolean(result);
     }
 
-    public RubyBoolean op_eqq(IRubyObject obj) {
-    	if (!(obj instanceof RubyNumeric)) {//FIXME should be anything that doesn't responds to <=??
-    		return getRuntime().getFalse();
-    	}
-        if (begin instanceof RubyFixnum && obj instanceof RubyFixnum && end instanceof RubyFixnum) {
-            long b = RubyNumeric.fix2long(begin);
-            long o = RubyNumeric.fix2long(obj);
-
-            if (b <= o) {
-                long e =  RubyNumeric.fix2long(end);
-                if (isExclusive) {
-                    if (o < e) {
-                        return getRuntime().getTrue();
-                    }
-                } else {
-                    if (o <= e) {
-                        return getRuntime().getTrue();
-                    }
-                }
-            }
-            return getRuntime().getFalse();
-        } else if (begin.callMethod("<=", obj).isTrue()) {
-            if (isExclusive) {
-                if (end.callMethod(">", obj).isTrue()) {
-                    return getRuntime().getTrue();
-                }
-            } else {
-                if (end.callMethod(">=", obj).isTrue()) {
-                    return getRuntime().getTrue();
-                }
-            }
-        }
-        return getRuntime().getFalse();
-    }
-
     public IRubyObject each() {
+        ThreadContext tc = getRuntime().getCurrentContext();
+        
         if (begin instanceof RubyFixnum && end instanceof RubyFixnum) {
             long endLong = ((RubyNumeric) end).getLongValue();
             long i = ((RubyNumeric) begin).getLongValue();
@@ -315,7 +282,7 @@ public class RubyRange extends RubyObject {
             }
 
             for (; i < endLong; i++) {
-                getRuntime().getCurrentContext().yield(getRuntime().newFixnum(i));
+                tc.yield(getRuntime().newFixnum(i));
             }
         } else if (begin instanceof RubyString) {
             ((RubyString) begin).upto(end, isExclusive);
@@ -324,7 +291,7 @@ public class RubyRange extends RubyObject {
                 end = end.callMethod("+", RubyFixnum.one(getRuntime()));
             }
             while (begin.callMethod("<", end).isTrue()) {
-                getRuntime().getCurrentContext().yield(begin);
+                tc.yield(begin);
                 begin = begin.callMethod("+", RubyFixnum.one(getRuntime()));
             }
         } else {
@@ -335,12 +302,12 @@ public class RubyRange extends RubyObject {
                     if (v.equals(end)) {
                         break;
                     }
-                    getRuntime().getCurrentContext().yield(v);
+                    tc.yield(v);
                     v = v.callMethod("succ");
                 }
             } else {
                 while (v.callMethod("<=", end).isTrue()) {
-                    getRuntime().getCurrentContext().yield(v);
+                    tc.yield(v);
                     if (v.equals(end)) {
                         break;
                     }
@@ -362,16 +329,17 @@ public class RubyRange extends RubyObject {
         if (stepSize <= 0) {
             throw getRuntime().newArgumentError("step can't be negative");
         }
-        
+
+        ThreadContext context = getRuntime().getCurrentContext();
         if (begin instanceof RubyNumeric && end instanceof RubyNumeric) {
             RubyFixnum stepNum = getRuntime().newFixnum(stepSize);
             while (currentObject.callMethod(compareMethod, end).isTrue()) {
-                getRuntime().getCurrentContext().yield(currentObject);
+                context.yield(currentObject);
                 currentObject = currentObject.callMethod("+", stepNum);
             }
         } else {
             while (currentObject.callMethod(compareMethod, end).isTrue()) {
-                getRuntime().getCurrentContext().yield(currentObject);
+                context.yield(currentObject);
                 
                 for (int i = 0; i < stepSize; i++) {
                     currentObject = currentObject.callMethod("succ");

@@ -34,6 +34,7 @@ package org.jruby.util;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -62,6 +63,7 @@ public class CommandlineParser {
     private boolean showVersion = false;
     private String[] scriptArguments = null;
     private boolean shouldRunInterpreter = true;
+    private boolean objectSpaceEnabled = true;
 
     public int argumentIndex = 0;
     public int characterIndex = 0;
@@ -116,6 +118,9 @@ public class CommandlineParser {
                 case 'p' :
                     assumePrinting = true;
                     assumeLoop = true;
+                    break;
+                case 'O' :
+                    objectSpaceEnabled = false;
                     break;
                 case 'n' :
                     assumeLoop = true;
@@ -191,17 +196,17 @@ public class CommandlineParser {
     }
 
     public Reader getScriptSource() {
-        if (hasInlineScript()) {
-            return new StringReader(inlineScript());
-        } else if (isSourceFromStdin()) {
-            return new InputStreamReader(System.in);
-        } else {
-            File file = new File(getScriptFileName());
-            try {
-                return new BufferedReader(new FileReader(file));
-            } catch (IOException e) {
-            	throw new MainExitException(1, "Error opening script file: " + e.getMessage());
+        try {
+            if (hasInlineScript()) {
+                return new StringReader(inlineScript());
+            } else if (isSourceFromStdin()) {
+                return new InputStreamReader(System.in, "ISO8859_1");
+            } else {
+                File file = new File(getScriptFileName());
+                return new BufferedReader(new InputStreamReader(new FileInputStream(file), "ISO8859_1"));
             }
+        } catch (IOException e) {
+            throw new MainExitException(1, "Error opening script file: " + e.getMessage());
         }
     }
 
@@ -262,5 +267,9 @@ public class CommandlineParser {
 
     public boolean isShouldRunInterpreter() {
         return shouldRunInterpreter;
+    }
+    
+    public boolean isObjectSpaceEnabled() {
+        return objectSpaceEnabled;
     }
 }

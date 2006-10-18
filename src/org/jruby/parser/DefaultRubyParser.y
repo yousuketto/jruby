@@ -19,6 +19,7 @@
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -1167,7 +1168,7 @@ primary       : literal
                     $$ = new BeginNode(support.union($1, $3), $2);
 		}
               | tLPAREN_ARG expr { lexer.setState(LexState.EXPR_ENDARG); } opt_nl ')' {
-		    warnings.warn(getPosition($<ISourcePositionHolder>1), "(...) interpreted as grouped expression");
+		    warnings.warning(getPosition($<ISourcePositionHolder>1), "(...) interpreted as grouped expression");
                     $$ = $2;
 		}
               | tLPAREN compstmt ')' {
@@ -1683,11 +1684,18 @@ sym           : fname
 dsym	      : tSYMBEG xstring_contents tSTRING_END {
                     lexer.setState(LexState.EXPR_END);
 
-		    // In ruby, it seems to be possible to get a
-		    // StrNode (NODE_STR) among other node type.  This 
-		    // is not possible for us.  We will always have a 
-		    // DStrNode (NODE_DSTR).
-		    $$ = new DSymbolNode(getPosition($<ISourcePositionHolder>1), $<DStrNode>2);
+		    // DStrNode: :"some text #{some expression}"
+                    // StrNode: :"some text"
+		    // EvStrNode :"#{some expression}"
+		    DStrNode node;
+
+		    if ($2 instanceof DStrNode) {
+		        node = (DStrNode) $2;
+		    } else {
+		      node = new DStrNode(getPosition($<ISourcePositionHolder>2));
+		      node.add(new ArrayNode(getPosition($<ISourcePositionHolder>2)).add($2));
+                    }
+		    $$ = new DSymbolNode(getPosition($<ISourcePositionHolder>1), node);
 		}
 
 numeric       : tINTEGER {

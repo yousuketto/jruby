@@ -43,7 +43,7 @@ public class RubyProcess {
         
         RubyModule process_status = process.defineClassUnder("Status", runtime.getObject()); 
 
-        CallbackFactory processCallbackFactory = runtime.callbackFactory(RubyProcess.class);
+        //CallbackFactory processCallbackFactory = runtime.callbackFactory(RubyProcess.class);
         CallbackFactory process_statusCallbackFactory = runtime.callbackFactory(RubyProcess.RubyStatus.class);
 
 //        process.defineModuleFunction("fork", processCallbackFactory.getSingletonMethod("fork"));
@@ -94,7 +94,7 @@ public class RubyProcess {
         // Process::Status methods  
 //        process_status.defineMethod("==", process_statusCallbackFactory.getMethod("op_eq"));
 //        process_status.defineMethod("&", process_statusCallbackFactory.getMethod("op_and"));
-//        process_status.defineMethod(">>", process_statusCallbackFactory.getMethod("rightshift_op"));
+        process_status.defineMethod(">>", process_statusCallbackFactory.getMethod("rightshift_op", IRubyObject.class));
         process_status.defineMethod("to_i", process_statusCallbackFactory.getMethod("to_i"));
 //        process_status.defineMethod("to_int", process_statusCallbackFactory.getMethod("to_int"));
         process_status.defineMethod("to_s", process_statusCallbackFactory.getMethod("to_s"));
@@ -128,6 +128,13 @@ public class RubyProcess {
         
         public IRubyObject exitstatus() {
             return getRuntime().newFixnum(status);
+        }
+        
+        public IRubyObject rightshift_op(IRubyObject other) {
+            long shiftValue = other.convertToInteger().getLongValue();
+            
+            
+            return getRuntime().newFixnum(status >> shiftValue);
         }
         
         public IRubyObject to_i() {

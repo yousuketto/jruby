@@ -12,6 +12,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
+ * Copyright (C) 2006 Dave Brosius <dbrosius@mebigfatguy.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -57,7 +58,7 @@ public class ZlibInflate {
     }
 
     public void append(IRubyObject obj) {
-        append(obj.convertToString());
+        append(obj.convertToString().toString());
     }
 
     public void append(String obj) {
@@ -69,7 +70,7 @@ public class ZlibInflate {
     }
 
     public IRubyObject set_dictionary(IRubyObject str) throws UnsupportedEncodingException {
-        flater.setDictionary(str.convertToString().toString().getBytes("ISO-8859-1"));
+        flater.setDictionary(str.convertToString().toString().getBytes("ISO8859_1"));
         
         return str;
     }
@@ -80,13 +81,13 @@ public class ZlibInflate {
         }
         StringBuffer result = new StringBuffer();
         byte[] outp = new byte[1024];
-        byte[] buf = collected.toString().getBytes("ISO-8859-1");
+        byte[] buf = collected.toString().getBytes("ISO8859_1");
         collected = new StringBuffer();
         flater.setInput(buf);
         int resultLength = -1;
         while (!flater.finished() && resultLength != 0) {
             resultLength = flater.inflate(outp);
-            result.append(new String(outp, 0, resultLength, "ISO-8859-1"));
+            result.append(new String(outp, 0, resultLength, "ISO8859_1"));
         }
         return runtime.newString(result.toString());       
     }

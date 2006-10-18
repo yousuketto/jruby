@@ -12,6 +12,8 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
+ * Copyright (C) 2006 Dave Brosius <dbrosius@mebigfatguy.com>
+ * Copyright (C) 2006 Peter K Chan <peter@oaktop.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -60,7 +62,7 @@ public class ZlibDeflate {
 
     public static IRubyObject s_deflate(IRubyObject caller, String str, int level) 
     	throws UnsupportedEncodingException, DataFormatException, IOException {
-        ZlibDeflate zstream = new ZlibDeflate(caller, level, Deflater.DEFAULT_STRATEGY, MAX_WBITS, DEF_MEM_LEVEL);
+        ZlibDeflate zstream = new ZlibDeflate(caller, level, MAX_WBITS, DEF_MEM_LEVEL, Deflater.DEFAULT_STRATEGY);
         IRubyObject result = zstream.deflate(str, new Long(FINISH));
         zstream.close();
         
@@ -68,7 +70,7 @@ public class ZlibDeflate {
     }
 
     public void append(IRubyObject obj) throws IOException, UnsupportedEncodingException {
-        append(obj.convertToString());
+        append(obj.convertToString().toString());
     }
 
     public void append(String obj) throws IOException, UnsupportedEncodingException {
@@ -81,7 +83,7 @@ public class ZlibDeflate {
     }
 
     public IRubyObject set_dictionary(IRubyObject str) throws UnsupportedEncodingException {
-        flater.setDictionary(str.convertToString().toString().getBytes("ISO-8859-1"));
+        flater.setDictionary(str.convertToString().toString().getBytes("ISO8859_1"));
         
         return str;
     }
@@ -96,7 +98,7 @@ public class ZlibDeflate {
         if (null == str) {
             StringBuffer result = new StringBuffer();
             byte[] outp = new byte[1024];
-            byte[] buf = collected.toString().getBytes("ISO-8859-1");
+            byte[] buf = collected.toString().getBytes("ISO8859_1");
             collected = new StringBuffer();
             flater.setInput(buf);
             flater.finish();
@@ -112,7 +114,7 @@ public class ZlibDeflate {
             if (flush == FINISH) {
                 StringBuffer result = new StringBuffer();
                 byte[] outp = new byte[1024];
-                byte[] buf = collected.toString().getBytes("ISO-8859-1");
+                byte[] buf = collected.toString().getBytes("ISO8859_1");
                 collected = new StringBuffer();
                 flater.setInput(buf);
                 flater.finish();

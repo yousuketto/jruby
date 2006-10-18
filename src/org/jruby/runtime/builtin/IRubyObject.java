@@ -16,6 +16,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -72,6 +73,7 @@ public interface IRubyObject {
     IRubyObject setInstanceVariable(String string, IRubyObject rubyObject);
     
     Map getInstanceVariables();
+    Map getInstanceVariablesSnapshot();
 
     IRubyObject callMethod(RubyModule context, String name, IRubyObject[] args, CallType callType);
     
@@ -172,14 +174,23 @@ public interface IRubyObject {
     IRubyObject eval(Node iNode);
 
     /**
-     * RubyMethod eval.
-     * @param iRubyObject
-     * @param rubyObject
-     * @param string
-     * @param i
-     * @return IRubyObject
+     * Evaluate the given string under the specified binding object. If the binding is not a Proc or Binding object
+     * (RubyProc or RubyBinding) throw an appropriate type error.
+     * @param evalString The string containing the text to be evaluated
+     * @param binding The binding object under which to perform the evaluation
+     * @param file The filename to use when reporting errors during the evaluation
+     * @return An IRubyObject result from the evaluation
      */
-    IRubyObject eval(IRubyObject iRubyObject, IRubyObject rubyObject, String string, int i);
+    IRubyObject evalWithBinding(IRubyObject evalString, IRubyObject binding, String file);
+
+    /**
+     * Evaluate the given string.
+     * @param evalString The string containing the text to be evaluated
+     * @param binding The binding object under which to perform the evaluation
+     * @param file The filename to use when reporting errors during the evaluation
+     * @return An IRubyObject result from the evaluation
+     */
+    IRubyObject evalSimple(IRubyObject evalString, String file);
 
     /**
      * RubyMethod extendObject.
@@ -203,14 +214,24 @@ public interface IRubyObject {
     RubyString convertToString();
 
     /**
-     * Converts this object to type 'targetType' using 'convertMethod' method.
+     * Converts this object to type 'targetType' using 'convertMethod' method (MRI: convert_type).
      * 
      * @param targetType is the type we are trying to convert to
      * @param convertMethod is the method to be called to try and convert to targeType
      * @param raiseOnError will throw an Error if conversion does not work
+     * @return the converted value
      */
     IRubyObject convertToType(String targetType, String convertMethod, boolean raiseOnError);
 
+    /**
+     * Higher level conversion utility similiar to convertToType but it can throw an
+     * additional TypeError during conversion (MRI: rb_check_convert_type).
+     * 
+     * @param targetType is the type we are trying to convert to
+     * @param convertMethod is the method to be called to try and convert to targeType
+     * @return the converted value
+     */
+    IRubyObject convertToTypeWithCheck(String targetType, String convertMethod);
 
 
     /**

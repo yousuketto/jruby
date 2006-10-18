@@ -1,6 +1,14 @@
 require 'test/minirunit'
 require 'zlib'
 
+s = "test comression string"
+[Zlib::NO_COMPRESSION,
+ Zlib::BEST_SPEED,
+ Zlib::BEST_COMPRESSION,
+ Zlib::DEFAULT_COMPRESSION].each do |level|
+  test_equal(s, Zlib::Inflate.inflate(Zlib::Deflate.deflate(s, level)))
+end
+
 filename = "____temp_zlib_file"
 
 Zlib::GzipWriter.open(filename) { |z| z.puts 'HEH' }
@@ -17,4 +25,6 @@ test_equal("foo|", z.gets("|"))
 test_equal("bar\n", z.gets)
 z.close
 
-File.unlink(filename)
+require 'fileutils'
+
+FileUtils.rm_f(filename)

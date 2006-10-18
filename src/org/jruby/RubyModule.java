@@ -19,6 +19,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004-2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -37,6 +38,7 @@ package org.jruby;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.jruby.internal.runtime.methods.AliasMethod;
@@ -97,7 +99,6 @@ public class RubyModule extends RubyObject {
                 parentCRef = runtime.getObject().getCRef();
             }
         }
-        
         this.cref = new SinglyLinkedList(this, parentCRef);
     }
     
@@ -118,6 +119,10 @@ public class RubyModule extends RubyObject {
         }
 
         return (RubyModule)cref.getNext().getValue();
+    }
+
+    public void setParent(RubyModule p) {
+        cref.setNext(p.getCRef());
     }
 
     public Map getMethods() {
@@ -141,6 +146,10 @@ public class RubyModule extends RubyObject {
      */
     public boolean isIncluded() {
         return false;
+    }
+    
+    public RubyModule getNonIncludedClass() {
+        return this;
     }
  
     public String getBaseName() {
@@ -278,6 +287,7 @@ public class RubyModule extends RubyObject {
             RubyModule module = (RubyModule)value;
             if (module.getBaseName() == null) {
                 module.setBaseName(name);
+                module.setParent(this);
             }
         }
         return result;
@@ -316,38 +326,75 @@ public class RubyModule extends RubyObject {
      * @param arg The module to include
      */
     public synchronized void includeModule(IRubyObject arg) {
+        assert arg != null;
+        
         testFrozen("module");
         if (!isTaint()) {
             getRuntime().secure(4);
         }
 
         if (!(arg instanceof RubyModule)) {
-            throw getRuntime().newTypeError("Wrong argument type " + arg.getMetaClass().getName() + " (expected Module).");
+            throw getRuntime().newTypeError("Wrong argument type " + arg.getMetaClass().getName() +
+                    " (expected Module).");
         }
-
+        
         RubyModule module = (RubyModule) arg;
-        Map moduleMethods = module.getMethods();
 
         // Make sure the module we include does not already exist
-        // FIXME: Enebo - Lame equality check (cause: IncludedModule?)
-    	if (getMethods() == moduleMethods) {
+        if (isSame(module)) {
     		return;
     	}
         
-        // Invalidate cache for all methods in the new included module in case a base class method
-        // of the same name has already been cached.
-        for (Iterator iter = moduleMethods.keySet().iterator(); iter.hasNext();) {
-        	String methodName = (String) iter.next();
-            getRuntime().getCacheMap().remove(methodName, searchMethod(methodName));
+        infectBy(module);
+        
+        RubyModule p, c;
+        boolean changed = false;
+        boolean skip = false;
+        
+        c = this;
+        while (module != null) {
+            if (getNonIncludedClass() == module.getNonIncludedClass()) {
+                throw getRuntime().newArgumentError("cyclic include detected");
+            }
+            
+            boolean superclassSeen = false;            
+            for (p = getSuperClass(); p != null; p = p.getSuperClass()) {
+                if (p instanceof IncludedModuleWrapper) {
+                    if (p.getNonIncludedClass() == module.getNonIncludedClass()) {
+                        if (!superclassSeen) {
+                            c = p;
+                        }
+                        skip = true;
+                        break;
+                    }
+                } else {
+                    superclassSeen = true;
+                }
+            }
+            if (!skip) {
+                // In the current logic, if we get here we know that module is not an 
+                // IncludedModuleWrapper, so there's no need to fish out the delegate. But just 
+                // in case the logic should change later, let's do it anyway:
+                c.setSuperClass(new IncludedModuleWrapper(getRuntime(), c.getSuperClass(), 
+                        module.getNonIncludedClass()));
+                c = c.getSuperClass();
+                changed = true;
+            }
+
+            module = module.getSuperClass();
+            skip = false;
         }
-        
-        // Include new module
-        setSuperClass(module.newIncludeClass(getSuperClass()));
-        
-        // cnutter: removed iterative inclusion of module's superclasses, because it included them in reverse order
-        // see RubyModule.newIncludeClass for replacement
-        
-        module.callMethod("included", this);
+
+        if (changed) {
+            // MRI seems to blow away its cache completely after an include; is
+            // what we're doing here really safe?
+            for (Iterator iter = ((RubyModule) arg).getMethods().keySet().iterator(); 
+                 iter.hasNext();) {
+                String methodName = (String) iter.next();
+                getRuntime().getCacheMap().remove(methodName, searchMethod(methodName));
+            }
+        }
+ 
     }
 
     public void defineMethod(String name, Callback method) {
@@ -501,21 +548,21 @@ public class RubyModule extends RubyObject {
      * @param name The name of the method to search for
      * @return The method, or UndefinedMethod if not found
      */
-    public RubyModule findImplementer(String name) {
+    public RubyModule findImplementer(RubyModule clazz) {
         for (RubyModule searchModule = this; searchModule != null; searchModule = searchModule.getSuperClass()) {
-            // included modules use delegates methods for we need to synchronize on result of getMethods
-            synchronized(searchModule.getMethods()) {
-                // See if current class has method or if it has been cached here already
-                ICallable method = (ICallable) searchModule.retrieveMethod(name);
-                if (method != null) {
-                    return searchModule;
-                }
+            if (searchModule.isSame(clazz)) {
+                return searchModule;
             }
         }
 
         return null;
     }
     
+    public void addModuleFunction(String name, ICallable method) {
+        addMethod(name, method);
+        addSingletonMethod(name, method);
+    }   
+
     /** rb_define_module_function
      *
      */
@@ -707,8 +754,10 @@ public class RubyModule extends RubyObject {
     }
 
     private void addAccessor(String name, boolean readable, boolean writeable) {
+        ThreadContext tc = getRuntime().getCurrentContext();
+        
         // Check the visibility of the previous frame, which will be the frame in which the class is being eval'ed
-        Visibility attributeScope = getRuntime().getCurrentContext().getCurrentVisibility();
+        Visibility attributeScope = tc.getCurrentVisibility();
         if (attributeScope.isPrivate()) {
             //FIXME warning
         } else if (attributeScope.isModuleFunction()) {
@@ -737,7 +786,7 @@ public class RubyModule extends RubyObject {
             name = name + "=";
             defineMethod(name, new Callback() {
                 public IRubyObject execute(IRubyObject self, IRubyObject[] args) {
-					IRubyObject[] fargs = runtime.getCurrentContext().getCurrentFrame().getArgs();
+					IRubyObject[] fargs = runtime.getCurrentContext().getFrameArgs();
 					
 			        if (fargs.length != 1) {
 			            throw runtime.newArgumentError("wrong # of arguments(" + fargs.length + "for 1)");
@@ -789,7 +838,7 @@ public class RubyModule extends RubyObject {
                 final ThreadContext context = getRuntime().getCurrentContext();
                 addMethod(name, new CallbackMethod(this, new Callback() {
 	                public IRubyObject execute(IRubyObject self, IRubyObject[] args) {
-				        return context.callSuper(context.getCurrentFrame().getArgs());
+				        return context.callSuper(context.getFrameArgs());
 	                }
 
 	                public Arity getArity() {
@@ -836,26 +885,32 @@ public class RubyModule extends RubyObject {
             throw getRuntime().newArgumentError("wrong # of arguments(" + args.length + " for 1)");
         }
 
-        String name = args[0].asSymbol();
         IRubyObject body;
-        ICallable newMethod;
-        Visibility visibility = getRuntime().getCurrentContext().getCurrentVisibility();
+        String name = args[0].asSymbol();
+        ICallable newMethod = null;
+        ThreadContext tc = getRuntime().getCurrentContext();
+        Visibility visibility = tc.getCurrentVisibility();
 
         if (visibility.isModuleFunction()) {
             visibility = Visibility.PRIVATE;
         }
         
-        if (args.length == 1) {
-            body = getRuntime().newProc();
-            ((RubyProc)body).getBlock().isLambda = true;
-            newMethod = new ProcMethod(this, (RubyProc)body, visibility);
+        
+        if (args.length == 1 || args[1].isKindOf(getRuntime().getClass("Proc"))) {
+            // double-testing args.length here, but it avoids duplicating the proc-setup code in two places
+            RubyProc proc = (args.length == 1) ? getRuntime().newProc() : (RubyProc)args[1];
+            body = proc;
+            
+            proc.getBlock().isLambda = true;
+            proc.getBlock().getFrame().setLastClass(this);
+            proc.getBlock().getFrame().setLastFunc(name);
+            
+            newMethod = new ProcMethod(this, proc, visibility);
         } else if (args[1].isKindOf(getRuntime().getClass("Method"))) {
-            body = args[1];
-            newMethod = new MethodMethod(this, ((RubyMethod)body).unbind(), visibility);
-        } else if (args[1].isKindOf(getRuntime().getClass("Proc"))) {
-            body = args[1];
-            ((RubyProc)body).getBlock().isLambda = true;
-            newMethod = new ProcMethod(this, (RubyProc)body, visibility);
+            RubyMethod method = (RubyMethod)args[1];
+            body = method;
+            
+            newMethod = new MethodMethod(this, method.unbind(), visibility);
         } else {
             throw getRuntime().newTypeError("wrong argument type " + args[0].getType().getName() + " (expected Proc/Method)");
         }
@@ -863,7 +918,7 @@ public class RubyModule extends RubyObject {
         addMethod(name, newMethod);
 
         RubySymbol symbol = RubySymbol.newSymbol(getRuntime(), name);
-        if (getRuntime().getCurrentContext().getPreviousVisibility().isModuleFunction()) {
+        if (tc.getPreviousVisibility().isModuleFunction()) {
             getSingletonClass().addMethod(name, new WrapperCallable(getSingletonClass(), newMethod, Visibility.PUBLIC));
             callMethod("singleton_method_added", symbol);
         }
@@ -931,7 +986,7 @@ public class RubyModule extends RubyObject {
     }
     
     protected IRubyObject cloneMethods(RubyModule clone) {
-    	RubyModule realType = isIncluded() ? ((IncludedModuleWrapper) this).getDelegate() : this;
+    	RubyModule realType = this.getNonIncludedClass();
         for (Iterator iter = getMethods().entrySet().iterator(); iter.hasNext(); ) {
             Map.Entry entry = (Map.Entry) iter.next();
             ICallable method = (ICallable) entry.getValue();
@@ -975,7 +1030,7 @@ public class RubyModule extends RubyObject {
 
         for (RubyModule p = getSuperClass(); p != null; p = p.getSuperClass()) {
             if (p.isIncluded()) {
-                ary.append(((IncludedModuleWrapper) p).getDelegate());
+                ary.append(p.getNonIncludedClass());
             }
         }
 
@@ -986,17 +1041,31 @@ public class RubyModule extends RubyObject {
      *
      */
     public RubyArray ancestors() {
-        RubyArray ary = getRuntime().newArray();
-
-        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
-            if (p.isIncluded()) {
-                ary.append(((IncludedModuleWrapper) p).getDelegate());
-            } else {
-                ary.append(p);
-            }
-        }
+        RubyArray ary = getRuntime().newArray(getAncestorList());
 
         return ary;
+    }
+    
+    public List getAncestorList() {
+        ArrayList list = new ArrayList();
+        
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            list.add(p.getNonIncludedClass());
+        }
+        
+        return list;
+    }
+    
+    public boolean hasModuleInHierarchy(RubyModule type) {
+        // XXX: This check previously used callMethod("==") to check for equality between classes
+        // when scanning the hierarchy. However the == check may be safe; we should only ever have
+        // one instance bound to a given type/constant. If it's found to be unsafe, examine ways
+        // to avoid the == call.
+        for (RubyModule p = this; p != null; p = p.getSuperClass()) {
+            if (p.getNonIncludedClass() == type) return true;
+        }
+        
+        return false;
     }
 
     /** rb_mod_to_s
@@ -1081,13 +1150,16 @@ public class RubyModule extends RubyObject {
 
    public boolean isKindOfModule(RubyModule type) {
        for (RubyModule p = this; p != null; p = p.getSuperClass()) { 
-           // FIXME: this equality check is totally lame; isKindOf should be enough
-           if (p.getMethods() == type.getMethods()) {
+           if (p.isSame(type)) {
                return true;
            }
        }
        
        return false;
+   }
+   
+   public boolean isSame(RubyModule module) {
+       return this == module;
    }
 
     /** rb_mod_initialize
@@ -1187,7 +1259,7 @@ public class RubyModule extends RubyObject {
         HashMap undefinedMethods = new HashMap();
 
         for (RubyModule type = this; type != null; type = type.getSuperClass()) {
-        	RubyModule realType = type.isIncluded() ? ((IncludedModuleWrapper) type).getDelegate() : type;
+        	RubyModule realType = type.getNonIncludedClass();
             for (Iterator iter = type.getMethods().entrySet().iterator(); iter.hasNext();) {
                 Map.Entry entry = (Map.Entry) iter.next();
                 ICallable method = (ICallable) entry.getValue();
@@ -1353,8 +1425,9 @@ public class RubyModule extends RubyObject {
      *
      */
     public RubyModule include(IRubyObject[] modules) {
-        for (int i = 0; i < modules.length; i++) {
+        for (int i = modules.length - 1; i >= 0; i--) {
             modules[i].callMethod("append_features", this);
+            modules[i].callMethod("included", this);
         }
 
         return this;
@@ -1483,5 +1556,9 @@ public class RubyModule extends RubyObject {
 
     public SinglyLinkedList getCRef() {
         return cref;
+    }
+
+    public IRubyObject inspect() {
+        return callMethod("to_s");
     }
 }

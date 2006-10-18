@@ -20,6 +20,7 @@
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -42,6 +43,7 @@ import java.util.TimeZone;
 
 import org.jruby.IRuby;
 import org.jruby.RubyClass;
+import org.jruby.RubyFloat;
 import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
 import org.jruby.RubyTime;
@@ -79,8 +81,6 @@ public class TimeMetaClass extends ObjectMetaClass {
             defineSingletonMethod("gm", Arity.optional(), "new_utc"); 
             defineSingletonMethod("_load", Arity.singleArgument(), "s_load"); 
                     
-            // Missing getgm, getlocal, getutc (alias of getgm), gmt_offset, gmtoff (alias of
-            // gmt_offset), utc_offset (alias of gmt_offset)
             defineMethod("===", Arity.singleArgument(), "same2");
             defineMethod("+", Arity.singleArgument(), "op_plus"); 
             defineMethod("-", Arity.singleArgument(), "op_minus"); 
@@ -119,7 +119,11 @@ public class TimeMetaClass extends ObjectMetaClass {
             defineMethod("initialize_copy", Arity.singleArgument()); 
             defineMethod("_dump", Arity.optional(),"dump"); 
             defineMethod("gmt_offset", Arity.noArguments());
+            defineAlias("gmtoff", "gmt_offset");
             defineAlias("utc_offset", "gmt_offset");
+            defineMethod("getgm", Arity.noArguments());
+            defineMethod("getlocal", Arity.noArguments());
+            defineAlias("getutc", "getgm");
         }
     };
     
@@ -157,9 +161,27 @@ public class TimeMetaClass extends ObjectMetaClass {
             ((RubyTime) args[0]).updateCal(cal);
         } else {
             long seconds = RubyNumeric.num2long(args[0]);
-            long usec = len > 1 ? RubyNumeric.num2long(args[1]) / 1000 : 0;
-            time.setUSec(len > 1 ? RubyNumeric.num2long(args[1]) % 1000 : 0);
-            cal.setTimeInMillis(seconds * 1000 + usec);
+            long millisecs = 0;
+            long microsecs = 0;
+            if (len > 1) {
+                long tmp = RubyNumeric.num2long(args[1]);
+                millisecs = tmp / 1000;
+                microsecs = tmp % 1000;
+            }
+            else {
+                // In the case of two arguments, MRI will discard the portion of
+                // the first argument after a decimal point (i.e., "floor").
+                // However in the case of a single argument, any portion after
+                // the decimal point is honored.
+                if (args[0] instanceof RubyFloat) {
+                    double dbl = ((RubyFloat) args[0]).getDoubleValue();
+                    long micro = (long) ((dbl - seconds) * 1000000);
+                    millisecs = micro / 1000;
+                    microsecs = micro % 1000;
+                }
+            }
+            time.setUSec(microsecs);
+            cal.setTimeInMillis(seconds * 1000 + millisecs);
         }
 
         time.callInit(args);
@@ -185,7 +207,7 @@ public class TimeMetaClass extends ObjectMetaClass {
         calendar.setTimeZone(TimeZone.getTimeZone(RubyTime.UTC));
         byte[] fromAsBytes = null;
         try {
-            fromAsBytes = from.toString().getBytes("iso8859-1");
+            fromAsBytes = from.toString().getBytes("ISO8859_1");
         } catch(final java.io.UnsupportedEncodingException uee) {
             throw getRuntime().newTypeError("marshaled time format differ");
         }

@@ -35,7 +35,6 @@ package org.jruby;
 
 import org.jruby.exceptions.JumpException;
 import org.jruby.runtime.Block;
-import org.jruby.runtime.Iter;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -61,15 +60,17 @@ public class RubyProc extends RubyObject {
     // Proc class
 
     public static RubyProc newProc(IRuby runtime, boolean isLambda) {
-        if (!runtime.getCurrentContext().isBlockGiven() && !runtime.getCurrentContext().isFBlockGiven()) {
+        ThreadContext tc = runtime.getCurrentContext();
+        
+        if (!tc.isBlockGiven() && !tc.isFBlockGiven()) {
             throw runtime.newArgumentError("tried to create Proc object without a block");
         }
         
-        if (isLambda && !runtime.getCurrentContext().isBlockGiven()) {
+        if (isLambda && !tc.isBlockGiven()) {
         	// TODO: warn "tried to create Proc object without a block"
         }
         
-        Block block = (Block) runtime.getCurrentContext().getCurrentBlock();
+        Block block = (Block) tc.getCurrentBlock();
         
         if (!isLambda && block.getBlockObject() instanceof RubyProc) {
         	return (RubyProc) block.getBlockObject();
@@ -78,8 +79,7 @@ public class RubyProc extends RubyObject {
         RubyProc newProc = new RubyProc(runtime, runtime.getClass("Proc"));
 
         newProc.block = block.cloneBlock();
-        newProc.wrapper = runtime.getCurrentContext().getWrapper();
-        newProc.block.setIter(newProc.block.getNext() != null ? Iter.ITER_PRE : Iter.ITER_NOT);
+        newProc.wrapper = tc.getWrapper();
         newProc.block.isLambda = isLambda;
         block.setBlockObject(newProc);
 

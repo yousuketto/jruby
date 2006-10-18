@@ -15,9 +15,10 @@
  * Copyright (C) 2001-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
- * Copyright (C) 2002-2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2002-2006 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 David Corbin <dcorbin@users.sourceforge.net>
+ * Copyright (C) 2006 Antti Karanta <antti.karanta@napa.fi>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -33,6 +34,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
@@ -53,7 +55,7 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public RubyFixnum(IRuby runtime, long value) {
-        super(runtime, runtime.getClass("Fixnum"));
+        super(runtime, runtime.getFixnum());
         this.value = value;
     }
     
@@ -74,15 +76,15 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public static RubyFixnum zero(IRuby runtime) {
-        return runtime.newFixnum(0);
+        return newFixnum(runtime, 0);
     }
 
     public static RubyFixnum one(IRuby runtime) {
-        return runtime.newFixnum(1);
+        return newFixnum(runtime, 1);
     }
 
     public static RubyFixnum minus_one(IRuby runtime) {
-        return runtime.newFixnum(-1);
+        return newFixnum(runtime, -1);
     }
 
     protected int compareValue(RubyNumeric other) {
@@ -91,10 +93,11 @@ public class RubyFixnum extends RubyInteger {
         } else if (other instanceof RubyFloat) {
             final double otherVal = other.getDoubleValue();
             return value > otherVal ? 1 : value < otherVal ? -1 : 0;
-        } else {
-            final long otherVal = other.getLongValue();
-            return value > otherVal ? 1 : value < otherVal ? -1 : 0;
-        }
+        } 
+          
+        long otherVal = other.getLongValue();
+        
+        return value > otherVal ? 1 : value < otherVal ? -1 : 0;
     }
 
     public RubyFixnum hash() {
@@ -105,11 +108,13 @@ public class RubyFixnum extends RubyInteger {
 
     public static RubyFixnum newFixnum(IRuby runtime, long value) {
         RubyFixnum fixnum;
-        if (value >= 0 && value < runtime.getFixnumCache().length) {
-            fixnum = runtime.getFixnumCache()[(int) value];
+        RubyFixnum[] fixnumCache = runtime.getFixnumCache();
+        
+        if (value >= 0 && value < fixnumCache.length) {
+            fixnum = fixnumCache[(int) value];
             if (fixnum == null) {
                 fixnum = new RubyFixnum(runtime, value);
-                runtime.getFixnumCache()[(int) value] = fixnum;
+                fixnumCache[(int) value] = fixnum;
             }
         } else {
             fixnum = new RubyFixnum(runtime, value);
@@ -118,7 +123,7 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public RubyFixnum newFixnum(long newValue) {
-        return getRuntime().newFixnum(newValue);
+        return newFixnum(getRuntime(), newValue);
     }
 
     public boolean singletonMethodsAllowed() {
@@ -217,15 +222,19 @@ public class RubyFixnum extends RubyInteger {
             return RubyFloat.newFloat(getRuntime(), getDoubleValue()).op_minus(other);
         } else if (other instanceof RubyBignum) {
             return RubyBignum.newBignum(getRuntime(), value).op_minus(other);
-        } else {
+        } else if (other instanceof RubyNumeric) {
             long otherValue = ((RubyNumeric) other).getLongValue();
             long result = value - otherValue;
+            
             if ((value <= 0 && otherValue >= 0 && (result > 0 || result < -MAX)) || 
-		(value >= 0 && otherValue <= 0 && (result < 0 || result > MAX))) {
+                (value >= 0 && otherValue <= 0 && (result < 0 || result > MAX))) {
                 return RubyBignum.newBignum(getRuntime(), value).op_minus(other);
             }
+            
             return newFixnum(result);
         }
+
+        return callCoerced("-", other);        
     }
 
     public IRubyObject op_mod(IRubyObject other) {
@@ -295,9 +304,9 @@ public class RubyFixnum extends RubyInteger {
 		        return this;
 		    } else if (longValue > 1) {
 		        return RubyBignum.newBignum(getRuntime(), getLongValue()).op_pow(other);
-		    } else {
-		        return RubyFloat.newFloat(getRuntime(), getDoubleValue()).op_pow(other);
-		    }
+		    } 
+		      
+            return RubyFloat.newFloat(getRuntime(), getDoubleValue()).op_pow(other);
         }
         
         return callCoerced("**", other);
@@ -378,8 +387,10 @@ public class RubyFixnum extends RubyInteger {
     }
 
     public IRubyObject times() {
+        IRuby runtime = getRuntime();
+        ThreadContext context = runtime.getCurrentContext();
         for (long i = 0; i < value; i++) {
-            getRuntime().getCurrentContext().yield(newFixnum(i));
+            context.yield(newFixnum(runtime, i));
         }
         return this;
     }

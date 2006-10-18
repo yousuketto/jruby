@@ -70,7 +70,7 @@ public class JRubyEngine extends BSFEngineImpl {
             String[] names = new String[paramNames.size()];
             paramNames.toArray(names);
             threadContext.preBsfApply(names);
-            Scope scope = threadContext.getCurrentScope();
+            Scope scope = threadContext.getFrameScope();
 
             // set global variables
             for (int i = 0, size = args.size(); i < size; i++) {
@@ -89,7 +89,7 @@ public class JRubyEngine extends BSFEngineImpl {
 
     public Object eval(String file, int line, int col, Object expr) throws BSFException {
         try {
-        	// TODO: [Bug: 1309564] This next line never would have worked correctly as a LexerSource
+        	// TODO: [JRUBY-24] This next line never would have worked correctly as a LexerSource
         	// would have thrown a parsing error with a name of "<script>" and a line
         	// value of whatever line in the string it is in.  Find real way of returning
         	// what is expected.

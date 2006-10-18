@@ -18,6 +18,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004-2006 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -33,6 +34,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -43,6 +45,7 @@ import java.nio.channels.FileLock;
 
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.builtin.meta.FileMetaClass;
 import org.jruby.util.IOHandler;
 import org.jruby.util.IOHandlerNull;
 import org.jruby.util.IOHandlerSeekable;
@@ -63,6 +66,7 @@ public class RubyFile extends RubyIO {
 	public static final int LOCK_UN = 8;
 	
     protected String path;
+    private FileLock currentLock;
     
 	public RubyFile(IRuby runtime, RubyClass type) {
 	    super(runtime, type);
@@ -124,8 +128,18 @@ public class RubyFile extends RubyIO {
 		}
     }
     
-    private FileLock currentLock;
-	
+    public IRubyObject close() {
+        // Make sure any existing lock is released before we try and close the file
+        if (currentLock != null) {
+            try {
+                currentLock.release();
+            } catch (IOException e) {
+                throw getRuntime().newIOError(e.getMessage());
+            }
+        }
+        return super.close();
+    }
+
 	public IRubyObject flock(IRubyObject lockingConstant) {
         FileChannel fileChannel = handler.getFileChannel();
         int lockMode = (int) ((RubyFixnum) lockingConstant.convertToType("Fixnum", "to_int", 
@@ -198,6 +212,47 @@ public class RubyFile extends RubyIO {
 	    }
 	    return this;
 	}
+
+    public IRubyObject chmod(IRubyObject[] args) {
+        checkArgumentCount(args, 1, 1);
+        
+        RubyInteger mode = args[0].convertToInteger();
+        System.out.println(mode);
+        if (!new File(path).exists()) {
+            throw getRuntime().newErrnoENOENTError("No such file or directory - " + path);
+        }
+            
+        try {
+            Process chown = Runtime.getRuntime().exec("chmod " + FileMetaClass.OCTAL_FORMATTER.sprintf(mode.getLongValue()) + " " + path);
+            chown.waitFor();
+        } catch (IOException ioe) {
+            // FIXME: ignore?
+        } catch (InterruptedException ie) {
+            // FIXME: ignore?
+        }
+        
+        return getRuntime().newFixnum(0);
+    }
+
+    public IRubyObject chown(IRubyObject[] args) {
+        checkArgumentCount(args, 1, 1);
+        
+        RubyInteger owner = args[0].convertToInteger();
+        if (!new File(path).exists()) {
+            throw getRuntime().newErrnoENOENTError("No such file or directory - " + path);
+        }
+            
+        try {
+            Process chown = Runtime.getRuntime().exec("chown " + owner + " " + path);
+            chown.waitFor();
+        } catch (IOException ioe) {
+            // FIXME: ignore?
+        } catch (InterruptedException ie) {
+            // FIXME: ignore?
+        }
+        
+        return getRuntime().newFixnum(0);
+    }
 	
 	public RubyString path() {
 		return getRuntime().newString(path);
@@ -234,4 +289,14 @@ public class RubyFile extends RubyIO {
 
 		throw getRuntime().newTypeError("Invalid type for modes");
 	}
+
+    public IRubyObject inspect() {
+        StringBuffer val = new StringBuffer();
+        val.append("#<File:").append(path);
+        if(!isOpen()) {
+            val.append(" (closed)");
+        }
+        val.append(">");
+        return getRuntime().newString(val.toString());
+    }
 }

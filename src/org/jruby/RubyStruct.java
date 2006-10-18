@@ -35,6 +35,7 @@ package org.jruby;
 import java.util.List;
 
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
@@ -244,7 +245,7 @@ public class RubyStruct extends RubyObject {
     }
 
     public IRubyObject set(IRubyObject value) {
-        String name = getRuntime().getCurrentContext().getCurrentFrame().getLastFunc();
+        String name = getRuntime().getCurrentContext().getFrameLastFunc();
         if (name.endsWith("=")) {
             name = name.substring(0, name.length() - 1);
         }
@@ -265,7 +266,7 @@ public class RubyStruct extends RubyObject {
     }
 
     public IRubyObject get() {
-        String name = getRuntime().getCurrentContext().getCurrentFrame().getLastFunc();
+        String name = getRuntime().getCurrentContext().getFrameLastFunc();
 
         RubyArray member = (RubyArray) getInstanceVariable(classOf(), "__member__");
 
@@ -310,7 +311,7 @@ public class RubyStruct extends RubyObject {
     }
 
     public IRubyObject to_s() {
-        return getRuntime().newString("#<" + getMetaClass().getName() + ">");
+        return inspect();
     }
 
     public IRubyObject inspect() {
@@ -320,7 +321,7 @@ public class RubyStruct extends RubyObject {
 
         StringBuffer sb = new StringBuffer(100);
 
-        sb.append("#<").append(getMetaClass().getName()).append(' ');
+        sb.append("#<struct ").append(getMetaClass().getName()).append(' ');
 
         for (int i = 0; i < member.getLength(); i++) {
             if (i > 0) {
@@ -345,8 +346,9 @@ public class RubyStruct extends RubyObject {
     }
 
     public IRubyObject each() {
+        ThreadContext context = getRuntime().getCurrentContext();
         for (int i = 0; i < values.length; i++) {
-            getRuntime().getCurrentContext().yield(values[i]);
+            context.yield(values[i]);
         }
 
         return this;

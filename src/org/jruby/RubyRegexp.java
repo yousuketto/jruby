@@ -19,6 +19,7 @@
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 David Corbin <dcorbin@users.sourceforge.net>
  * Copyright (C) 2006 Nick Sieger <nicksieger@gmail.com>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -49,7 +50,10 @@ import org.jruby.util.PrintfFormat;
  */
 public class RubyRegexp extends RubyObject implements ReOptions {
     private static final RegexpTranslator REGEXP_TRANSLATOR = new RegexpTranslator();
-    private static final Pattern SPECIAL_CHARS = Pattern.compile("([\\+\\[\\]\\.\\?\\*\\(\\)\\{\\}\\|\\\\\\^\\$])");    
+
+    // \013 is a vertical tab. Java does not support the \v notation used by
+    // Ruby.
+    private static final Pattern SPECIAL_CHARS = Pattern.compile("([\\\t\\\n\\\f\\\r\\ \\#\\\013\\+\\[\\]\\.\\?\\*\\(\\)\\{\\}\\|\\\\\\^\\$])");    
 
 	/** Class which represents the multibyte character set code.
 	 * (should be an enum in Java 5.0).
@@ -91,10 +95,13 @@ public class RubyRegexp extends RubyObject implements ReOptions {
 		}
 
 		public int flags() {
+            int flags = 0;
 			if (this == UTF8) {
-				return Pattern.UNICODE_CASE;
+				flags |= Pattern.UNICODE_CASE;
 			}
-			return 0;
+            flags |= Pattern.UNIX_LINES;
+            
+			return flags;
 		}
 	}
 	
@@ -324,7 +331,24 @@ public class RubyRegexp extends RubyObject implements ReOptions {
      *
      */
     public static IRubyObject nth_match(int n, IRubyObject match) {
-        return match.isNil() ? match : ((RubyMatchData) match).group(n);
+        IRubyObject nil = match.getRuntime().getNil();
+        if (match.isNil()) {
+            return nil;
+        }
+        
+        RubyMatchData rmd = (RubyMatchData) match;
+        
+        if (n > rmd.getSize()) {
+            return nil;
+        }
+        
+        if (n < 0) {
+            n += rmd.getSize();
+            if (n <= 0) {
+                return nil;
+            }
+        }
+        return rmd.group(n);
     }
 
     /** rb_reg_last_match
@@ -644,4 +668,8 @@ public class RubyRegexp extends RubyObject implements ReOptions {
         }
         output.dumpInt(flags);
     }
+	
+	public Pattern getPattern() {
+		return this.pattern;
+	}
 }

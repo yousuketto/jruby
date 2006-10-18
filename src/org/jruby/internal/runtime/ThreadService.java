@@ -14,6 +14,7 @@
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -40,8 +41,8 @@ import org.jruby.runtime.ThreadContext;
 
 public class ThreadService {
     private IRuby runtime;
-    private ThreadContext mainContext = new ThreadContext(runtime);
-    private ThreadContextLocal localContext = new ThreadContextLocal(mainContext);
+    private ThreadContext mainContext;
+    private ThreadLocal localContext;
     private ThreadGroup rubyThreadGroup;
     private List rubyThreadList;
     private Thread mainThread;
@@ -50,23 +51,24 @@ public class ThreadService {
     public ThreadService(IRuby runtime) {
         this.runtime = runtime;
         this.mainContext = new ThreadContext(runtime);
-        this.localContext = new ThreadContextLocal(mainContext);
+        this.localContext = new ThreadLocal();
         this.rubyThreadGroup = new ThreadGroup("Ruby Threads#" + runtime.hashCode());
         this.rubyThreadList = Collections.synchronizedList(new ArrayList());
         
         // Must be called from main thread (it is currently, but this bothers me)
         mainThread = Thread.currentThread();
+        localContext.set(mainContext);
         rubyThreadList.add(mainThread);
     }
 
     public void disposeCurrentThread() {
-        localContext.dispose();
+        localContext.set(null);
     }
 
     public ThreadContext getCurrentContext() {
         ThreadContext tc = (ThreadContext) localContext.get();
         
-        if (tc == mainContext && Thread.currentThread() != mainThread) {
+        if (tc == null) {
             tc = adoptCurrentThread();
         }
         
@@ -167,26 +169,6 @@ public class ThreadService {
 
 	public RubyThread getCriticalThread() {
     	return criticalThread;
-    }
-
-    private static class ThreadContextLocal extends ThreadLocal {
-        private ThreadContext mainContext;
-
-        public ThreadContextLocal(ThreadContext mainContext) {
-            this.mainContext = mainContext;
-        }
-
-        /**
-         * @see java.lang.ThreadLocal#initialValue()
-         */
-        protected Object initialValue() {
-            return this.mainContext;
-        }
-
-        public void dispose() {
-            this.mainContext = null;
-            set(null);
-        }
     }
 
 }

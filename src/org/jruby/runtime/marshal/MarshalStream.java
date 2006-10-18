@@ -36,6 +36,7 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.jruby.IRuby;
 import org.jruby.RubyBoolean;
@@ -111,23 +112,19 @@ public class MarshalStream extends FilterOutputStream {
     	
     	// w_symbol
     	// TODO: handle symlink?
-    	RubySymbol.newSymbol(obj.getRuntime(), obj.getMetaClass().getName()).marshalTo(output);
+    	output.dumpObject(RubySymbol.newSymbol(obj.getRuntime(), obj.getMetaClass().getName()));
     }
     
     public void writeInstanceVars(IRubyObject obj, MarshalStream output) throws IOException {
     	IRuby runtime = obj.getRuntime();
-        output.dumpInt(obj.getInstanceVariables().size());
-        
-        for (Iterator iter = obj.instanceVariableNames(); iter.hasNext();) {
+        Map iVars = obj.getInstanceVariablesSnapshot();
+        output.dumpInt(iVars.size());
+        for (Iterator iter = iVars.keySet().iterator(); iter.hasNext();) {
             String name = (String) iter.next();
-            IRubyObject value = obj.getInstanceVariable(name);
-
-            // Between getting name and retrieving value the instance variable could have been
-            // removed
-            if (value != null) {
-            	output.dumpObject(runtime.newSymbol(name));
-            	output.dumpObject(value);
-            }
+            IRubyObject value = (IRubyObject)iVars.get(name);
+            
+            output.dumpObject(runtime.newSymbol(name));
+            output.dumpObject(value);
         }
     }
 

@@ -41,15 +41,19 @@ import org.jruby.RubyClass;
 import org.jruby.RubyDir;
 import org.jruby.RubyFile;
 import org.jruby.RubyFileStat;
+import org.jruby.RubyFileTest;
 import org.jruby.RubyFixnum;
+import org.jruby.RubyInteger;
 import org.jruby.RubyModule;
 import org.jruby.RubyNumeric;
 import org.jruby.RubyString;
 import org.jruby.RubyTime;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.IOModes;
 import org.jruby.util.JRubyFile;
+import org.jruby.util.PrintfFormat;
 import org.jruby.util.collections.SinglyLinkedList;
 
 public class FileMetaClass extends IOMetaClass {
@@ -57,6 +61,8 @@ public class FileMetaClass extends IOMetaClass {
     private static final int FNM_PATHNAME = 2;
     private static final int FNM_DOTMATCH = 4;
     private static final int FNM_CASEFOLD = 8;
+
+    public static final PrintfFormat OCTAL_FORMATTER = new PrintfFormat("%o"); 
     
     public FileMetaClass(IRuby runtime) {
         super("File", RubyFile.class, runtime.getClass("IO"));
@@ -142,7 +148,8 @@ public class FileMetaClass extends IOMetaClass {
 	        extendObject(runtime.getModule("FileTest"));
 	        
 			defineSingletonMethod("basename", Arity.optional());
-	        defineSingletonMethod("chmod", Arity.twoArguments());
+            defineSingletonMethod("chmod", Arity.required(2));
+            defineSingletonMethod("chown", Arity.required(2));
 	        defineSingletonMethod("delete", Arity.optional(), "unlink");
 			defineSingletonMethod("dirname", Arity.singleArgument());
 	        defineSingletonMethod("expand_path", Arity.optional());
@@ -163,6 +170,8 @@ public class FileMetaClass extends IOMetaClass {
 			
 	        // TODO: Define instance methods: atime, chmod, chown, ctime, lchmod, lchown, lstat, mtime
 			//defineMethod("flock", Arity.singleArgument());
+            defineMethod("chmod", Arity.required(1));
+            defineMethod("chown", Arity.required(1));
 			defineMethod("initialize", Arity.optional());
 			defineMethod("path", Arity.noArguments());
 	        defineMethod("stat", Arity.noArguments());
@@ -231,12 +240,62 @@ public class FileMetaClass extends IOMetaClass {
 		return getRuntime().newString(name).infectBy(args[0]);
 	}
 
-    public IRubyObject chmod(IRubyObject file, IRubyObject value) {
-        // Java has no ability to chmod directly.  Once popen support
-        // is added, we can create a ruby script to perform chmod and then
-        // put it in our base distribution.  It could also be some embedded
-        // eval? 
-        return getRuntime().newFixnum(0);
+    public IRubyObject chmod(IRubyObject[] args) {
+        checkArgumentCount(args, 2, -1);
+        
+        int count = 0;
+        RubyInteger mode = args[0].convertToInteger();
+        for (int i = 1; i < args.length; i++) {
+            IRubyObject filename = args[i];
+            
+            if (!RubyFileTest.exist_p(filename, filename.convertToString()).isTrue()) {
+                throw getRuntime().newErrnoENOENTError("No such file or directory - " + filename);
+            }
+            
+            try {
+                Process chmod = Runtime.getRuntime().exec("chmod " + OCTAL_FORMATTER.sprintf(mode.getLongValue()) + " " + filename);
+                chmod.waitFor();
+                int result = chmod.exitValue();
+                if (result == 0) {
+                    count++;
+                }
+            } catch (IOException ioe) {
+                // FIXME: ignore?
+            } catch (InterruptedException ie) {
+                // FIXME: ignore?
+            }
+        }
+        
+        return getRuntime().newFixnum(count);
+    }
+
+    public IRubyObject chown(IRubyObject[] args) {
+        checkArgumentCount(args, 2, -1);
+        
+        int count = 0;
+        RubyInteger owner = args[0].convertToInteger();
+        for (int i = 1; i < args.length; i++) {
+            IRubyObject filename = args[i];
+            
+            if (!RubyFileTest.exist_p(filename, filename.convertToString()).isTrue()) {
+                throw getRuntime().newErrnoENOENTError("No such file or directory - " + filename);
+            }
+            
+            try {
+                Process chown = Runtime.getRuntime().exec("chown " + owner + " " + filename);
+                chown.waitFor();
+                int result = chown.exitValue();
+                if (result == 0) {
+                    count++;
+                }
+            } catch (IOException ioe) {
+                // FIXME: ignore?
+            } catch (InterruptedException ie) {
+                // FIXME: ignore?
+            }
+        }
+        
+        return getRuntime().newFixnum(count);
     }
     
 	public IRubyObject dirname(IRubyObject arg) {
@@ -421,6 +480,7 @@ public class FileMetaClass extends IOMetaClass {
 	public IRubyObject open(IRubyObject[] args, boolean tryToYield) {
         checkArgumentCount(args, 1, -1);
         IRuby runtime = getRuntime();
+        ThreadContext tc = runtime.getCurrentContext();
         
         RubyString pathString = RubyString.stringValue(args[0]);
 	    pathString.checkSafeString();
@@ -429,16 +489,23 @@ public class FileMetaClass extends IOMetaClass {
 	    IOModes modes = 
 	    	args.length >= 2 ? getModes(args[1]) : new IOModes(runtime, IOModes.RDONLY);
 	    RubyFile file = new RubyFile(runtime, this);
+        
+        RubyInteger fileMode =
+            args.length >= 3 ? args[2].convertToInteger() : null;
 
 	    file.openInternal(path, modes);
 
-	    if (tryToYield && getRuntime().getCurrentContext().isBlockGiven()) {
+	    if (tryToYield && tc.isBlockGiven()) {
             IRubyObject value = getRuntime().getNil();
 	        try {
-	            value = getRuntime().getCurrentContext().yield(file);
+	            value = tc.yield(file);
 	        } finally {
 	            file.close();
 	        }
+            
+            if (fileMode != null) {
+                chmod(new IRubyObject[] {fileMode, pathString});
+            }
 	        
 	        return value;
 	    }

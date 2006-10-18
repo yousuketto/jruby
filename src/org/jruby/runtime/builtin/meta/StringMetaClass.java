@@ -13,6 +13,8 @@
  *
  * Copyright (C) 2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2005 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
+ * Copyright (C) 2006 Ola Bini <ola@ologix.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -33,6 +35,7 @@ import java.util.Locale;
 import org.jruby.IRuby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyInteger;
 import org.jruby.RubyString;
 import org.jruby.RubyString.StringMethod;
@@ -64,10 +67,23 @@ public class StringMetaClass extends ObjectMetaClass {
         }
     };
     
+    /* rb_str_cmp_m */
     public StringMethod op_cmp = new StringMethod(this, Arity.singleArgument(), Visibility.PUBLIC) {
         public IRubyObject invoke(RubyString self, IRubyObject[] args) {
-            IRubyObject other = args[0];
-            return self.getRuntime().newFixnum(self.cmp(RubyString.stringValue(other)));
+            if (args[0] instanceof RubyString) {
+                return getRuntime().newFixnum(self.cmp((RubyString) args[0]));
+            }
+                
+            if (args[0].respondsTo("to_str") && args[0].respondsTo("<=>")) {
+                IRubyObject tmp = args[0].callMethod("<=>", self);
+
+                if (!tmp.isNil()) {
+                    return tmp instanceof RubyFixnum ? tmp.callMethod("-") :
+                        getRuntime().newFixnum(0).callMethod("-", tmp);
+                }
+            }
+            
+            return getRuntime().getNil();
         }
     };
 
@@ -176,6 +192,7 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineMethod("clone", Arity.noArguments(), "rbClone");
 	        defineMethod("concat", Arity.singleArgument());
 	        defineMethod("count", Arity.optional());
+	        defineMethod("crypt", Arity.singleArgument());
 	        defineMethod("delete", Arity.optional());
 	        defineMethod("delete!", Arity.optional(), "delete_bang");
 	        defineMethod("downcase", Arity.noArguments());
@@ -195,7 +212,7 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineMethod("insert", Arity.twoArguments());
 	        defineMethod("inspect", Arity.noArguments());
 	        defineMethod("length", Arity.noArguments());
-	        defineMethod("ljust", Arity.singleArgument());
+	        defineMethod("ljust", Arity.optional());
 	        defineMethod("lstrip", Arity.noArguments());
 	        defineMethod("lstrip!", Arity.noArguments(), "lstrip_bang");
 	        defineMethod("match", Arity.singleArgument(), "match3");
@@ -204,7 +221,7 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineMethod("reverse", Arity.noArguments());
 	        defineMethod("reverse!", Arity.noArguments(), "reverse_bang");
 	        defineMethod("rindex", Arity.optional());
-	        defineMethod("rjust", Arity.singleArgument());
+	        defineMethod("rjust", Arity.optional());
 	        defineMethod("rstrip", Arity.noArguments());
 	        defineMethod("rstrip!", Arity.noArguments(), "rstrip_bang");
 	        defineMethod("scan", Arity.singleArgument());

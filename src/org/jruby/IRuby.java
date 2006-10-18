@@ -47,7 +47,11 @@ public interface IRuby {
 
 	public RubyClass getObject();
     
+    public RubyModule getKernel();
+    
     public RubyClass getString();
+    
+    public RubyClass getFixnum();
 
 	/** Returns the "true" instance from the instance pool.
 	 * @return The "true" instance.
@@ -63,6 +67,11 @@ public interface IRuby {
 	 * @return "nil"
 	 */
 	public IRubyObject getNil();
+    
+    /**
+     * @return The NilClass class
+     */
+    public RubyClass getNilClass();
 
 	public RubyModule getModule(String name);
 
@@ -124,6 +133,8 @@ public interface IRuby {
 
 	public boolean isClassDefined(String name);
 
+    public boolean isObjectSpaceEnabled();
+    
 	/** Getter for property rubyTopSelf.
 	 * @return Value of property rubyTopSelf.
 	 */
@@ -359,4 +370,7 @@ public interface IRuby {
 	public boolean isDoNotReverseLookupEnabled();
 
 	public void setDoNotReverseLookupEnabled(boolean b);
+
+    public boolean registerInspecting(Object obj);
+    public void unregisterInspecting(Object obj);
 }

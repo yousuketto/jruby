@@ -19,6 +19,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004-2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -49,6 +50,7 @@ import java.util.Stack;
 
 import org.jruby.ast.Node;
 import org.jruby.common.RubyWarnings;
+import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.internal.runtime.GlobalVariables;
@@ -61,12 +63,12 @@ import org.jruby.libraries.JRubyLibrary;
 import org.jruby.libraries.RbConfigLibrary;
 import org.jruby.libraries.SocketLibrary;
 import org.jruby.libraries.StringIOLibrary;
+import org.jruby.libraries.StringScannerLibrary;
 import org.jruby.libraries.ZlibLibrary;
 import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
-import org.jruby.runtime.Frame;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.IAccessor;
 import org.jruby.runtime.ObjectSpace;
@@ -88,7 +90,6 @@ import org.jruby.runtime.builtin.meta.ProcMetaClass;
 import org.jruby.runtime.builtin.meta.StringMetaClass;
 import org.jruby.runtime.builtin.meta.SymbolMetaClass;
 import org.jruby.runtime.builtin.meta.TimeMetaClass;
-import org.jruby.runtime.load.IAutoloadMethod;
 import org.jruby.runtime.load.LoadService;
 import org.jruby.util.BuiltinScript;
 import org.jruby.util.JRubyFile;
@@ -98,7 +99,7 @@ import org.jruby.util.collections.SinglyLinkedList;
  * The jruby runtime.
  */
 public final class Ruby implements IRuby {
-	private static String[] BUILTIN_LIBRARIES = {"fcntl", "yaml", "etc", "nkf", "strscan"};
+	private static String[] BUILTIN_LIBRARIES = {"fcntl", "yaml", "etc", "nkf" };
     
 	private CacheMap cacheMap = new CacheMap();
     private ThreadService threadService = new ThreadService(this);
@@ -118,6 +119,7 @@ public final class Ruby implements IRuby {
     private boolean isWithinTrace = false;
     private boolean globalAbortOnExceptionEnabled = false;
     private boolean doNotReverseLookupEnabled = false;
+    private final boolean objectSpaceEnabled;
 
     /** safe-level:
     		0 - strings from streams/environment/ARGV are tainted (default)
@@ -159,26 +161,33 @@ public final class Ruby implements IRuby {
     // the runtime environment exits.
     private Stack atExitBlocks = new Stack();
 
+    private RubyModule kernelModule;
+
+    private RubyClass nilClass;
+
+    private FixnumMetaClass fixnumClass;
+
     /**
      * Create and initialize a new jruby Runtime.
      */
     private Ruby(InputStream in, PrintStream out, PrintStream err) {
-    	this.in = in;
-    	this.out = out;
-    	this.err = err;
-    	init();
+        this.in = in;
+        this.out = out;
+        this.err = err;
+        
+        objectSpaceEnabled = true;
     }
-    
+
     /**
-     * Retrieve mappings of cached methods to where they have been cached.  When a cached
-     * method needs to be invalidated this map can be used to remove all places it has been
-     * cached.
-     * 
-     * @return the mappings of where cached methods have been stored
+     * Create and initialize a new jruby Runtime.
      */
-	public CacheMap getCacheMap() {
-		return cacheMap;
-	}
+    private Ruby(InputStream in, PrintStream out, PrintStream err, boolean osEnabled) {
+        this.in = in;
+        this.out = out;
+        this.err = err;
+        
+        objectSpaceEnabled = osEnabled;
+    }
 
     /**
      * Returns a default instance of the JRuby runtime.
@@ -186,7 +195,22 @@ public final class Ruby implements IRuby {
      * @return the JRuby runtime
      */
     public static IRuby getDefaultInstance() {
-        return new Ruby(System.in, System.out, System.err);
+        Ruby ruby = new Ruby(System.in, System.out, System.err);
+        ruby.init();
+        
+        return ruby;
+    }
+
+    /**
+     * Returns a default instance of the JRuby runtime.
+     *
+     * @return the JRuby runtime
+     */
+    public static IRuby newInstance(InputStream in, PrintStream out, PrintStream err, boolean osEnabled) {
+        Ruby ruby = new Ruby(in, out, err, osEnabled);
+        ruby.init();
+        
+        return ruby;
     }
 
     /**
@@ -195,7 +219,7 @@ public final class Ruby implements IRuby {
      * @return the JRuby runtime
      */
     public static IRuby newInstance(InputStream in, PrintStream out, PrintStream err) {
-        return new Ruby(in, out, err);
+        return newInstance(in, out, err, true);
     }
 
     /**
@@ -207,9 +231,8 @@ public final class Ruby implements IRuby {
 
     public IRubyObject eval(Node node) {
         try {
-            // in all cases where this is called, Ruby() and init() will have prepared an EvalState to use in the frame
-            //return new EvaluationState(this, topSelf).begin(node);
-            return getCurrentContext().getCurrentFrame().getEvalState().begin(node);
+            ThreadContext tc = getCurrentContext();
+            return EvaluationState.eval(tc, node, tc.getFrameSelf());
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            return (IRubyObject)je.getSecondaryData();
@@ -223,8 +246,16 @@ public final class Ruby implements IRuby {
     	return objectClass;
     }
     
+    public RubyModule getKernel() {
+        return kernelModule;
+    }
+    
     public RubyClass getString() {
         return stringClass;
+    }
+    
+    public RubyClass getFixnum() {
+        return fixnumClass;
     }
 
     /** Returns the "true" instance from the instance pool.
@@ -246,6 +277,10 @@ public final class Ruby implements IRuby {
      */
     public IRubyObject getNil() {
         return nilObject;
+    }
+    
+    public RubyClass getNilClass() {
+        return nilClass;
     }
 
     public RubyModule getModule(String name) {
@@ -302,18 +337,19 @@ public final class Ruby implements IRuby {
      * new module is created.
      */
     public RubyModule getOrCreateModule(String name) {
-        RubyModule module = (RubyModule) getCurrentContext().getRubyClass().getConstantAt(name);
+        ThreadContext tc = getCurrentContext();
+        RubyModule module = (RubyModule) tc.getRubyClass().getConstantAt(name);
         
         if (module == null) {
-            module = (RubyModule) getCurrentContext().getRubyClass().setConstant(name, 
+            module = (RubyModule) tc.getRubyClass().setConstant(name, 
             		defineModule(name)); 
         } else if (getSafeLevel() >= 4) {
         	throw newSecurityError("Extending module prohibited.");
         }
 
-        if (getCurrentContext().getWrapper() != null) {
-            module.getSingletonClass().includeModule(getCurrentContext().getWrapper());
-            module.includeModule(getCurrentContext().getWrapper());
+        if (tc.getWrapper() != null) {
+            module.getSingletonClass().includeModule(tc.getWrapper());
+            module.includeModule(tc.getWrapper());
         }
         return module;
     }
@@ -335,8 +371,19 @@ public final class Ruby implements IRuby {
 
     public void secure(int level) {
         if (level <= safeLevel) {
-            throw newSecurityError("Insecure operation '" + getCurrentContext().getCurrentFrame().getLastFunc() + "' at level " + safeLevel);
+            throw newSecurityError("Insecure operation '" + getCurrentContext().getFrameLastFunc() + "' at level " + safeLevel);
         }
+    }
+    
+    /**
+     * Retrieve mappings of cached methods to where they have been cached.  When a cached
+     * method needs to be invalidated this map can be used to remove all places it has been
+     * cached.
+     * 
+     * @return the mappings of where cached methods have been stored
+     */
+    public CacheMap getCacheMap() {
+        return cacheMap;
     }
 
     /** rb_define_global_const
@@ -378,6 +425,7 @@ public final class Ruby implements IRuby {
      */
     // TODO: Figure out real dependencies between vars and reorder/refactor into better methods
     private void init() {
+        ThreadContext tc = getCurrentContext();
         nilObject = new RubyNil(this);
         trueObject = new RubyBoolean(this, true);
         falseObject = new RubyBoolean(this, false);
@@ -388,9 +436,7 @@ public final class Ruby implements IRuby {
         
         initLibraries();
         
-        getCurrentContext().preInit();
-
-        getCurrentContext().setCurrentVisibility(Visibility.PRIVATE);
+        tc.preInitCoreClasses();
 
         initCoreClasses();
 
@@ -398,16 +444,11 @@ public final class Ruby implements IRuby {
 
         topSelf = TopSelfFactory.createTopSelf(this);
 
-        getCurrentContext().pushRubyClass(objectClass);
-        getCurrentContext().setCRef(getObject().getCRef());
-        
-        Frame frame = getCurrentContext().getCurrentFrame();
-        frame.setSelf(topSelf);
-        frame.getEvalState().setSelf(topSelf);
-        
-        getObject().defineConstant("TOPLEVEL_BINDING", newBinding());
+        tc.preInitBuiltinClasses(objectClass, topSelf);
 
         initBuiltinClasses();
+        
+        getObject().defineConstant("TOPLEVEL_BINDING", newBinding());
         
         // Load additional definitions and hacks from etc.rb
         getLoadService().smartLoad("builtin/etc.rb");
@@ -426,6 +467,7 @@ public final class Ruby implements IRuby {
         
         loadService.registerBuiltin("jruby.rb", new JRubyLibrary());
         loadService.registerBuiltin("stringio.rb", new StringIOLibrary());
+        loadService.registerBuiltin("strscan.rb", new StringScannerLibrary());
         loadService.registerBuiltin("zlib.rb", new ZlibLibrary());
     }
 
@@ -447,11 +489,12 @@ public final class Ruby implements IRuby {
 
         ((ObjectMetaClass) moduleClass).initializeBootstrapClass();
         
-        objectClass.includeModule(RubyKernel.createKernelModule(this));
+        kernelModule = RubyKernel.createKernelModule(this);
+        objectClass.includeModule(kernelModule);
 
         RubyClass.createClassClass(classClass);
 
-        RubyNil.createNilClass(this);
+        nilClass = RubyNil.createNilClass(this);
 
         // We cannot define this constant until nil itself was made
         objectClass.defineConstant("NIL", getNil());
@@ -460,7 +503,7 @@ public final class Ruby implements IRuby {
         RubyBoolean.createFalseClass(this);
         RubyBoolean.createTrueClass(this);
         RubyComparable.createComparable(this);
-        defineModule("Enumerable"); // Impl: src/builtin/enumerable.rb
+        RubyEnumerable.createEnumerableModule(this);
         stringClass = new StringMetaClass(this);
         stringClass.initializeClass();
         new SymbolMetaClass(this).initializeClass();
@@ -471,7 +514,8 @@ public final class Ruby implements IRuby {
         RubyPrecision.createPrecisionModule(this);
         new NumericMetaClass(this).initializeClass();
         new IntegerMetaClass(this).initializeClass();        
-        new FixnumMetaClass(this).initializeClass();
+        fixnumClass = new FixnumMetaClass(this);
+        fixnumClass.initializeClass();
         new HashMetaClass(this).initializeClass();
         new IOMetaClass(this).initializeClass();
         new ArrayMetaClass(this).initializeClass();
@@ -535,19 +579,12 @@ public final class Ruby implements IRuby {
         errnoModule = defineModule("Errno");
         
         initErrnoErrors();
-
-        getLoadService().addAutoload("UnboundMethod", new IAutoloadMethod() {
-            public IRubyObject load(IRuby ruby, String name) {
-                return RubyUnboundMethod.defineUnboundMethodClass(ruby);
-            }
-        });
     }
 
     private void initBuiltinClasses() {
     	try {
 	        new BuiltinScript("FalseClass").load(this);
 	        new BuiltinScript("TrueClass").load(this);
-	        new BuiltinScript("Enumerable").load(this);
     	} catch (IOException e) {
     		throw new Error("builtin scripts are missing", e);
     	}
@@ -599,6 +636,7 @@ public final class Ruby implements IRuby {
         createSysErr(IErrno.ENOEXEC, "ENOEXEC");             
         createSysErr(IErrno.ESRCH, "ESRCH");       
         createSysErr(IErrno.ECONNREFUSED, "ECONNREFUSED");
+        createSysErr(IErrno.ECONNRESET, "ECONNRESET");
     }
 
     /**
@@ -718,10 +756,12 @@ public final class Ruby implements IRuby {
 
         PrintStream errorStream = getErrorStream();
 		if (backtrace.isNil()) {
-            if (getCurrentContext().getSourceFile() != null) {
-                errorStream.print(getCurrentContext().getPosition());
+            ThreadContext tc = getCurrentContext();
+            
+            if (tc.getSourceFile() != null) {
+                errorStream.print(tc.getPosition());
             } else {
-                errorStream.print(getCurrentContext().getSourceLine());
+                errorStream.print(tc.getSourceLine());
             }
         } else if (backtrace.getLength() == 0) {
             printErrorPos(errorStream);
@@ -774,14 +814,15 @@ public final class Ruby implements IRuby {
 	}
 
 	private void printErrorPos(PrintStream errorStream) {
-        if (getCurrentContext().getSourceFile() != null) {
-            if (getCurrentContext().getCurrentFrame().getLastFunc() != null) {
-            	errorStream.print(getCurrentContext().getPosition());
-            	errorStream.print(":in '" + getCurrentContext().getCurrentFrame().getLastFunc() + '\'');
-            } else if (getCurrentContext().getSourceLine() != 0) {
-                errorStream.print(getCurrentContext().getPosition());
+        ThreadContext tc = getCurrentContext();
+        if (tc.getSourceFile() != null) {
+            if (tc.getFrameLastFunc() != null) {
+            	errorStream.print(tc.getPosition());
+            	errorStream.print(":in '" + tc.getFrameLastFunc() + '\'');
+            } else if (tc.getSourceLine() != 0) {
+                errorStream.print(tc.getPosition());
             } else {
-            	errorStream.print(getCurrentContext().getSourceFile());
+            	errorStream.print(tc.getSourceFile());
             }
         }
     }
@@ -816,7 +857,7 @@ public final class Ruby implements IRuby {
             }
 
             /* default visibility is private at loading toplevel */
-            getCurrentContext().setCurrentVisibility(Visibility.PRIVATE);
+            context.setCurrentVisibility(Visibility.PRIVATE);
 
         	Node node = parse(source, scriptName);
             self.eval(node);
@@ -852,7 +893,7 @@ public final class Ruby implements IRuby {
             }
             
             /* default visibility is private at loading toplevel */
-            getCurrentContext().setCurrentVisibility(Visibility.PRIVATE);
+            context.setCurrentVisibility(Visibility.PRIVATE);
             
             self.eval(node);
         } catch (JumpException je) {
@@ -895,9 +936,10 @@ public final class Ruby implements IRuby {
         String name,
         IRubyObject type) {
         if (!isWithinTrace && traceFunction != null) {
+            ThreadContext tc = getCurrentContext();
             isWithinTrace = true;
 
-            ISourcePosition savePosition = getCurrentContext().getPosition();
+            ISourcePosition savePosition = tc.getPosition();
             String file = position.getFile();
 
             if (file == null) {
@@ -906,7 +948,7 @@ public final class Ruby implements IRuby {
             if (type == null) {
 				type = getFalse();
 			}
-            getCurrentContext().preTrace();
+            tc.preTrace();
 
             try {
                 traceFunction
@@ -918,8 +960,8 @@ public final class Ruby implements IRuby {
                         self != null ? self: getNil(),
                         type });
             } finally {
-                getCurrentContext().postTrace();
-                getCurrentContext().setPosition(savePosition);
+                tc.postTrace();
+                tc.setPosition(savePosition);
                 isWithinTrace = false;
             }
         }
@@ -1248,4 +1290,27 @@ public final class Ruby implements IRuby {
 	public void setDoNotReverseLookupEnabled(boolean b) {
 		doNotReverseLookupEnabled = b;
 	}
+
+    private ThreadLocal inspect = new ThreadLocal();
+    public boolean registerInspecting(Object obj) {
+        java.util.Map val = (java.util.Map)inspect.get();
+        if(null == val) {
+            val = new java.util.IdentityHashMap();
+            inspect.set(val);
+        }
+        if(val.containsKey(obj)) {
+            return false;
+        }
+        val.put(obj,null);
+        return true;
+    }
+
+    public void unregisterInspecting(Object obj) {
+        java.util.Map val = (java.util.Map)inspect.get();
+        val.remove(obj);
+    }
+
+    public boolean isObjectSpaceEnabled() {
+        return objectSpaceEnabled;
+    }
 }

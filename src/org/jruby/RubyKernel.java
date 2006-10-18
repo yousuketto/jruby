@@ -21,6 +21,7 @@
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 Kiel Hodges <jruby-devel@selfsosoft.com>
  * Copyright (C) 2006 Evan Buswell <evan@heron.sytes.net>
+ * Copyright (C) 2006 Ola Bini <ola@ologix.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -52,6 +53,8 @@ import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ICallable;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.builtin.meta.FileMetaClass;
@@ -92,7 +95,6 @@ public class RubyKernel {
         module.defineModuleFunction("chop", callbackFactory.getSingletonMethod("chop"));
         module.defineModuleFunction("chop!", callbackFactory.getSingletonMethod("chop_bang"));
         module.defineModuleFunction("eval", callbackFactory.getOptSingletonMethod("eval"));
-        // TODO: Implement Kernel#exec
         module.defineModuleFunction("exit", callbackFactory.getOptSingletonMethod("exit"));
         module.defineModuleFunction("exit!", callbackFactory.getOptSingletonMethod("exit_bang"));
         module.defineModuleFunction("fail", callbackFactory.getOptSingletonMethod("raise"));
@@ -133,6 +135,8 @@ public class RubyKernel {
         module.defineModuleFunction("sub!", callbackFactory.getOptSingletonMethod("sub_bang"));
         // Skipping: Kernel#syscall (too system dependent)
         module.defineModuleFunction("system", callbackFactory.getOptSingletonMethod("system"));
+        // TODO: Implement Kernel#exec differently?
+        module.defineAlias("exec", "system");
         // TODO: Implement Kernel#test (partial impl)
         module.defineModuleFunction("throw", callbackFactory.getOptSingletonMethod("rbThrow"));
         // TODO: Implement Kernel#trace_var
@@ -149,7 +153,7 @@ public class RubyKernel {
         module.defineAlias("eql?", "==");
         module.definePublicModuleFunction("to_s", objectCallbackFactory.getMethod("to_s"));
         module.definePublicModuleFunction("nil?", objectCallbackFactory.getMethod("nil_p"));
-        module.definePublicModuleFunction("to_a", objectCallbackFactory.getMethod("to_a"));
+        module.definePublicModuleFunction("to_a", callbackFactory.getSingletonMethod("to_a"));
         module.definePublicModuleFunction("hash", objectCallbackFactory.getMethod("hash"));
         module.definePublicModuleFunction("id", objectCallbackFactory.getMethod("id"));
         module.defineAlias("__id__", "id");
@@ -178,7 +182,7 @@ public class RubyKernel {
         module.definePublicModuleFunction("private_methods", objectCallbackFactory.getMethod("private_methods"));
         module.definePublicModuleFunction("protected_methods", objectCallbackFactory.getMethod("protected_methods"));
         module.definePublicModuleFunction("public_methods", objectCallbackFactory.getOptMethod("public_methods"));
-        module.definePublicModuleFunction("remove_instance_variable", objectCallbackFactory.getMethod("remove_instance_variable", IRubyObject.class));
+        module.defineModuleFunction("remove_instance_variable", objectCallbackFactory.getMethod("remove_instance_variable", IRubyObject.class));
         module.definePublicModuleFunction("respond_to?", objectCallbackFactory.getOptMethod("respond_to"));
         module.definePublicModuleFunction("send", objectCallbackFactory.getOptMethod("send"));
         module.defineAlias("__send__", "send");
@@ -217,8 +221,9 @@ public class RubyKernel {
         String name = args[0].asSymbol();
         String description = recv.callMethod("inspect").toString();
         boolean noClass = description.length() > 0 && description.charAt(0) == '#';
-        Visibility lastVis = runtime.getCurrentContext().getLastVisibility();
-        CallType lastCallType = runtime.getCurrentContext().getLastCallType();
+        ThreadContext tc = runtime.getCurrentContext();
+        Visibility lastVis = tc.getLastVisibility();
+        CallType lastCallType = tc.getLastCallType();
         String format = lastVis.errorMessageFormat(lastCallType, name);
         String msg = new PrintfFormat(format).sprintf(new Object[] { name, description, 
             noClass ? "" : ":", noClass ? "" : recv.getType().getName()});
@@ -237,10 +242,11 @@ public class RubyKernel {
                 // TODO: may need to part cli parms out ourself?
                 Process p = Runtime.getRuntime().exec(command);
                 RubyIO io = new RubyIO(recv.getRuntime(), p);
+                ThreadContext tc = recv.getRuntime().getCurrentContext();
         		
-        	    if (recv.getRuntime().getCurrentContext().isBlockGiven()) {
+        	    if (tc.isBlockGiven()) {
         	        try {
-        	            recv.getRuntime().getCurrentContext().yield(io);
+        	            tc.yield(io);
         	            
             	        return recv.getRuntime().getNil();
         	        } finally {
@@ -268,7 +274,24 @@ public class RubyKernel {
     }
 
     public static IRubyObject new_array(IRubyObject recv, IRubyObject object) {
-        return object.callMethod("to_a");
+        IRubyObject value = object.convertToTypeWithCheck("Array", "to_ary");
+        
+        if (value.isNil()) {
+            ICallable method = object.getMetaClass().searchMethod("to_a");
+            
+            if (method.getImplementationClass() == recv.getRuntime().getKernel()) {
+                return recv.getRuntime().newArray(object);
+            }
+            
+            // Strange that Ruby has custom code here and not convertToTypeWithCheck equivalent.
+            value = object.callMethod("to_a");
+            if (value.getMetaClass() != recv.getRuntime().getClass("Array")) {
+                throw recv.getRuntime().newTypeError("`to_a' did not return Array");
+               
+            }
+        }
+        
+        return value;
     }
     
     public static IRubyObject new_float(IRubyObject recv, IRubyObject object) {
@@ -276,6 +299,20 @@ public class RubyKernel {
     }
     
     public static IRubyObject new_integer(IRubyObject recv, IRubyObject object) {
+        if(object instanceof RubyString) {
+            String val = object.toString();
+            if(val.length() > 0 && val.charAt(0) == '0') {
+                if(val.length() > 1) {
+                    if(val.charAt(1) == 'x') {
+                        return recv.getRuntime().newString(val.substring(2)).callMethod("to_i",recv.getRuntime().newFixnum(16));
+                    } else if(val.charAt(1) == 'b') {
+                        return recv.getRuntime().newString(val.substring(2)).callMethod("to_i",recv.getRuntime().newFixnum(2));
+                    } else {
+                        return recv.getRuntime().newString(val.substring(1)).callMethod("to_i",recv.getRuntime().newFixnum(8));
+                    }
+                }
+            }
+        }
         return object.callMethod("to_i");
     }
     
@@ -499,17 +536,18 @@ public class RubyKernel {
     public static RubyArray local_variables(IRubyObject recv) {
         final IRuby runtime = recv.getRuntime();
         RubyArray localVariables = runtime.newArray();
+        ThreadContext tc = runtime.getCurrentContext();
 
-        if (runtime.getCurrentContext().getCurrentScope().getLocalNames() != null) {
-            for (int i = 2; i < runtime.getCurrentContext().getCurrentScope().getLocalNames().length; i++) {
-				String variableName = (String) runtime.getCurrentContext().getCurrentScope().getLocalNames()[i];
+        if (tc.getFrameScope().getLocalNames() != null) {
+            for (int i = 2; i < tc.getFrameScope().getLocalNames().length; i++) {
+				String variableName = (String) tc.getFrameScope().getLocalNames()[i];
                 if (variableName != null) {
                     localVariables.append(runtime.newString(variableName));
                 }
             }
         }
 
-        Iterator dynamicNames = runtime.getCurrentContext().getCurrentDynamicVars().names().iterator();
+        Iterator dynamicNames = tc.getCurrentDynamicVars().names().iterator();
         while (dynamicNames.hasNext()) {
             String name = (String) dynamicNames.next();
             localVariables.append(runtime.newString(name));
@@ -603,21 +641,33 @@ public class RubyKernel {
     public static IRubyObject eval(IRubyObject recv, IRubyObject[] args) {
         IRuby runtime = recv.getRuntime();
         RubyString src = (RubyString) args[0];
-        IRubyObject scope = args.length > 1 ? args[1] : runtime.getNil();
-        String file = args.length > 2 ? args[2].toString() : "(eval)";
-        int line = args.length > 3 ? RubyNumeric.fix2int(args[3]) : 1;
-
-        src.checkSafeString();
-
-        if (scope.isNil() && runtime.getCurrentContext().getPreviousFrame() != null) {
-            try {
-                runtime.getCurrentContext().preKernelEval();
-                return recv.eval(src, scope, file, line);
-            } finally {
-                runtime.getCurrentContext().postKernelEval();
+        IRubyObject scope = null;
+        String file = "(eval)";
+        
+        if (args.length > 1) {
+            if (!args[1].isNil()) {
+                scope = args[1];
+            }
+            
+            if (args.length > 2) {
+                file = args[2].toString();
             }
         }
-        return recv.eval(src, scope, file, line);
+        // FIXME: line number is not supported yet
+        //int line = args.length > 3 ? RubyNumeric.fix2int(args[3]) : 1;
+
+        src.checkSafeString();
+        ThreadContext tc = runtime.getCurrentContext();
+
+        if (scope == null && tc.getPreviousFrame() != null) {
+            try {
+                tc.preKernelEval();
+                return recv.evalSimple(src, file);
+            } finally {
+                tc.postKernelEval();
+            }
+        }
+        return recv.evalWithBinding(src, scope, file);
     }
 
     public static IRubyObject caller(IRubyObject recv, IRubyObject[] args) {
@@ -690,8 +740,9 @@ public class RubyKernel {
     }
 
     public static IRubyObject loop(IRubyObject recv) {
+        ThreadContext context = recv.getRuntime().getCurrentContext();
         while (true) {
-            recv.getRuntime().getCurrentContext().yield(recv.getRuntime().getNil());
+            context.yield(recv.getRuntime().getNil());
 
             Thread.yield();
         }
@@ -825,7 +876,7 @@ public class RubyKernel {
 		}
 		
         public void run() {
-            result = new Main(in, out, out).run(argArray);
+            result = new Main(in, out, err).run(argArray);
         }
     }
 
@@ -963,5 +1014,10 @@ public class RubyKernel {
         int resultCode = runInShell(runtime, args, output);
         recv.getRuntime().getGlobalVariables().set("$?", RubyProcess.RubyStatus.newProcessStatus(runtime, resultCode));
         return runtime.newBoolean(resultCode == 0);
+    }
+    
+    public static RubyArray to_a(IRubyObject recv) {
+        recv.getRuntime().getWarnings().warn("default 'to_a' will be obsolete");
+        return recv.getRuntime().newArray(recv);
     }
 }

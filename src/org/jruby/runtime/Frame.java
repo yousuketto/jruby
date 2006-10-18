@@ -15,6 +15,7 @@
  * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004-2005 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2006 Charles O Nutter <headius@headius.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -32,8 +33,6 @@ package org.jruby.runtime;
 
 import org.jruby.IRuby;
 import org.jruby.RubyModule;
-import org.jruby.ast.Node;
-import org.jruby.evaluator.EvaluationState;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -48,27 +47,22 @@ public class Frame {
     private final ISourcePosition position;
     private Iter iter;
     private IRuby runtime;
-    private boolean javaMethod;
-    private EvaluationState evalState;
+    private Block blockArg;
 
     private Scope scope;
     
-    public Frame(ThreadContext threadContext, boolean javaMethod) {
-        this(threadContext, threadContext.getCurrentIter(), javaMethod);
-    }
-
-    public Frame(ThreadContext threadContext, Iter iter, boolean javaMethod) {
+    public Frame(ThreadContext threadContext, Iter iter, Block blockArg) {
         this(threadContext.getRuntime(), null, IRubyObject.NULL_ARRAY, null, null, threadContext.getPosition(), 
-             iter, javaMethod);   
+             iter, blockArg);   
     }
 
     public Frame(ThreadContext threadContext, IRubyObject self, IRubyObject[] args, 
-    		String lastFunc, RubyModule lastClass, boolean javaMethod) {
-    	this(threadContext.getRuntime(), self, args, lastFunc, lastClass, threadContext.getPosition(), threadContext.getCurrentIter(), javaMethod);
+    		String lastFunc, RubyModule lastClass, ISourcePosition position, Iter iter, Block blockArg) {
+    	this(threadContext.getRuntime(), self, args, lastFunc, lastClass, position, iter, blockArg);
     }
 
     private Frame(IRuby runtime, IRubyObject self, IRubyObject[] args, String lastFunc,
-                 RubyModule lastClass, ISourcePosition position, Iter iter, boolean javaMethod) {
+                 RubyModule lastClass, ISourcePosition position, Iter iter, Block blockArg) {
         this.self = self;
         this.args = args;
         this.lastFunc = lastFunc;
@@ -76,87 +70,81 @@ public class Frame {
         this.position = position;
         this.iter = iter;
         this.runtime = runtime;
-        this.javaMethod = javaMethod;
-        
-        if (!javaMethod) {
-            this.evalState = new EvaluationState(runtime, self);
-        }
-    }
-    
-    public void begin(Node node) {
-        evalState.begin2(node);
-    }
-    
-    public void step() {
-        if (evalState.hasNext()) {
-            evalState.executeNext();
-        }
+        this.blockArg = blockArg;
     }
 
     /** Getter for property args.
      * @return Value of property args.
      */
-    public IRubyObject[] getArgs() {
+    IRubyObject[] getArgs() {
         return args;
     }
 
     /** Setter for property args.
      * @param args New value of property args.
      */
-    public void setArgs(IRubyObject[] args) {
+    void setArgs(IRubyObject[] args) {
         this.args = args;
     }
 
     /**
      * @return the frames current position
      */
-    public ISourcePosition getPosition() {
+    ISourcePosition getPosition() {
         return position;
     }
 
     /** Getter for property iter.
      * @return Value of property iter.
      */
-    public Iter getIter() {
+    Iter getIter() {
         return iter;
     }
 
     /** Setter for property iter.
      * @param iter New value of property iter.
      */
-    public void setIter(Iter iter) {
+    void setIter(Iter iter) {
         this.iter = iter;
     }
 
-    public boolean isBlockGiven() {
+    boolean isBlockGiven() {
         return iter.isBlockGiven();
     }
 
     /** Getter for property lastClass.
      * @return Value of property lastClass.
      */
-    public RubyModule getLastClass() {
+    RubyModule getLastClass() {
         return lastClass;
+    }
+    
+    public void setLastClass(RubyModule lastClass) {
+        this.lastClass = lastClass;
+    }
+    
+    public void setLastFunc(String lastFunc) {
+        this.lastFunc = lastFunc;
     }
 
     /** Getter for property lastFunc.
      * @return Value of property lastFunc.
      */
-    public String getLastFunc() {
+    String getLastFunc() {
         return lastFunc;
     }
 
     /** Getter for property self.
      * @return Value of property self.
      */
-    public IRubyObject getSelf() {
+    IRubyObject getSelf() {
         return self;
     }
 
     /** Setter for property self.
      * @param self New value of property self.
      */
-    public void setSelf(IRubyObject self) {
+    void setSelf(IRubyObject self) {
         this.self = self;
     }
     
@@ -185,7 +173,7 @@ public class Frame {
         	newArgs = args;
         }
 
-        return new Frame(runtime, self, newArgs, lastFunc, lastClass, position, iter, javaMethod);
+        return new Frame(runtime, self, newArgs, lastFunc, lastClass, position, iter, blockArg);
     }
 
     /* (non-Javadoc)
@@ -195,18 +183,15 @@ public class Frame {
         StringBuffer sb = new StringBuffer(50);
         sb.append(position != null ? position.toString() : "-1");
         sb.append(':');
+        sb.append(lastClass + " " + lastFunc);
         if (lastFunc != null) {
             sb.append("in ");
             sb.append(lastFunc);
         }
         return sb.toString();
     }
-
-    public EvaluationState getEvalState() {
-        return evalState;
-    }
-
-    public void setEvalState(EvaluationState evalState) {
-        this.evalState = evalState;
+    
+    Block getBlockArg() {
+        return blockArg;
     }
 }

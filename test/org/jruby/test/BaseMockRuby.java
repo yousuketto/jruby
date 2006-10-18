@@ -58,11 +58,19 @@ public class BaseMockRuby implements IRuby {
 		throw new MockException();
 	}
 
-	public RubyClass getObject() {
-		throw new MockException();
-	}
+    public RubyClass getObject() {
+        throw new MockException();
+    }
+
+    public RubyModule getKernel() {
+        throw new MockException();
+    }
     
     public RubyClass getString() {
+        throw new MockException();
+    }
+    
+    public RubyClass getFixnum() {
         throw new MockException();
     }
 
@@ -77,6 +85,10 @@ public class BaseMockRuby implements IRuby {
 	public IRubyObject getNil() {
 		throw new MockException();
 	}
+
+    public RubyClass getNilClass() {
+        throw new MockException();
+    }
 
 	public RubyModule getModule(String name) {
 		throw new MockException();
@@ -641,4 +653,14 @@ public class BaseMockRuby implements IRuby {
         throw new MockException();
 	}
 
+    public boolean registerInspecting(Object o) {
+        throw new MockException();
+    }
+    public void unregisterInspecting(Object o) {
+        throw new MockException();
+    }
+
+    public boolean isObjectSpaceEnabled() {
+        return true;
+    }
 }
