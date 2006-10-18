@@ -3190,7 +3190,7 @@ case 458:
                   } else if (((LocalNamesElement) support.getLocalNames().peek()).isLocalRegistered(identifier)) {
                       yyerror("duplicate block argument name");
                   }
-                  yyVal = new BlockArgNode(getPosition(((Token)yyVals[-1+yyTop])), ((LocalNamesElement) support.getLocalNames().peek()).getLocalIndex(identifier));
+                  yyVal = new BlockArgNode(getPosition(((Token)yyVals[-1+yyTop])), ((LocalNamesElement) support.getLocalNames().peek()).getLocalIndex(identifier), identifier);
               }
   break;
 case 459:
