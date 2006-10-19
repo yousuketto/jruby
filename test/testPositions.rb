@@ -50,6 +50,15 @@ end
 ########################################################################
 
 list = [
+nil, #['NewlineNode',1,2,2,6],
+  ['VCallNode',1,1,1,5]
+]
+test_tree(list, <<'END', "operation [paren-less no args]")
+
+puts
+END
+
+list = [
 nil, #['NewlineNode',0,1,0,4],
 ['VCallNode',0,0,0,4],
 ]

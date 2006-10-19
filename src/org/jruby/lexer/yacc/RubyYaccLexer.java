@@ -617,8 +617,8 @@ public class RubyYaccLexer {
                 while((c = src.read()) == '\n') {
                     
                 }
-                getPosition();
                 src.unread( c );
+                getPosition();
 
                 if (lex_state == LexState.EXPR_BEG ||
                     lex_state == LexState.EXPR_FNAME ||
