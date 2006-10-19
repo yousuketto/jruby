@@ -762,6 +762,38 @@ end
 EOF
 
 list = [
+nil, #['NewlineNode',0,2,0,18],
+  ['DefnNode',0,1,0,23],
+    ['ArgumentNode',0,0,4,7],
+    ['ArgsNode',0,0,7,19],
+      ['ListNode',0,0,8,11],
+        ['ArgumentNode',0,0,8,11],
+      ['BlockArgNode',0,0,13,18],
+    nil, #['ScopeNode',1,1,23,23]
+]
+
+test_tree(list, <<'EOF', "def foo(bar, &bloc) ... end")
+def foo(bar, &bloc)
+end
+EOF
+
+# Enebo: *rest args do not show up directly in AST?
+list = [
+nil, #['NewlineNode',0,2,0,18],
+  ['DefnNode',0,1,0,23],
+    ['ArgumentNode',0,0,4,7],
+    ['ArgsNode',0,0,7,19],
+      ['ListNode',0,0,8,11],
+        ['ArgumentNode',0,0,8,11],
+    nil, #['ScopeNode',1,1,23,23]
+]
+
+test_tree(list, <<'EOF', "def foo(bar, *rest) ... end")
+def foo(bar, *rest)
+end
+EOF
+
+list = [
 nil, #['NewlineNode',0,5,0,70],
   ['ModuleNode',0,4,0,68],
     ['Colon2Node',0,0,7,10],
@@ -908,6 +940,33 @@ test_tree(list, <<'EOF', "simple assignment from method")
 a = foo()
 EOF
 
+# Enebo: Splat is replacement for array or args cat node so this is ok.
+list = [
+nil, #['NewlineNode,0,1,0,9]
+  ['DAsgnNode',0,0,0,13],
+    ['FCallNode',0,0,4,13],
+      ['SplatNode',0,0,7,13],
+        ['VCallNode',0,0,9,12]
+]
+test_tree(list, <<'EOF', "simple assignment from method")
+a = foo(*bar)
+EOF
+
+list = [
+nil, #['NewlineNode',0,1,0,9],
+  ['DefnNode',0,0,0,25],
+    ['ArgumentNode',0,0,4,5],
+    ['ArgsNode',0,0,5,11],
+    ['ScopeNode',0,0,25,25],
+      nil, #['NewlineNode',0,0,12,25],
+        ['FCallNode',0,0,12,21],
+          ['SplatNode',0,0,15,21],
+            ['LocalVarNode',0,0,17,20]
+]
+test_tree(list, <<'EOF', "simple assignment from method")
+def a(*bar) foo(*bar) end
+EOF
+
 list = [
 nil, #['NewlineNode',0,1,0,9]
   ['DAsgnNode',0,0,0,1],
@@ -921,6 +980,27 @@ nil, #['NewlineNode',0,1,0,9]
 test_tree(list, <<'EOF', "simple assignment from method")
 a = foo() rescue foo()
 EOF
+
+# Fixme:  Same as next() and return() issue
+list = [
+nil, #['NewlineNode',0,1,0,9]
+  ['BeginNode',0,4,0,34],
+    ['RescueNode',2,4,12,34],
+      ['RescueBodyNode',2,4,12,34],
+        ['ArrayNode',2,2,19,24],
+          ['ConstNode',2,2,19,24],
+        ['NewlineNode',3,4,27,31],
+          ['VCallNode',3,3,27,30],
+      ['NewlineNode',1,2,8,12],
+        ['VCallNode',1,1,8,11]
+]
+#test_tree(list, <<'EOF', "simple assignment from method", true)
+#begin
+#  foo
+#rescue Error
+#  bar
+#end
+#EOF
 
 list = [
  nil, #['NewlineNode',0,3,4,21],

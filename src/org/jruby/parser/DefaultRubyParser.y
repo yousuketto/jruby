@@ -1678,7 +1678,7 @@ f_block_arg   : blkarg_mark tIDENTIFIER {
                   } else if (((LocalNamesElement) support.getLocalNames().peek()).isLocalRegistered(identifier)) {
                       yyerror("duplicate block argument name");
                   }
-                  $$ = new BlockArgNode(getPosition($1), ((LocalNamesElement) support.getLocalNames().peek()).getLocalIndex(identifier), identifier);
+                  $$ = new BlockArgNode(support.union($1, $2), ((LocalNamesElement) support.getLocalNames().peek()).getLocalIndex(identifier), identifier);
               }
 
 opt_f_block_arg: ',' f_block_arg {
