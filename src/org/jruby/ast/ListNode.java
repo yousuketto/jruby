@@ -48,6 +48,18 @@ public class ListNode extends Node {
     
     private List list = null;
 
+    /**
+     * Create a new ListNode.
+     * 
+     * @param id type of listnode
+     * @param firstNode first element of the list
+     */
+    public ListNode(ISourcePosition position, int id, Node firstNode) {
+        this(position, id);
+        
+        add(firstNode);
+    }
+    
     public ListNode(ISourcePosition position, int id) {
         super(position, id);
     }
@@ -57,10 +69,12 @@ public class ListNode extends Node {
     }
 	
     public ListNode add(Node node) {
-        if (list == null) {
-            list = new ArrayList();
-        }
+        if (list == null) list = new ArrayList();
+        // Ruby Grammar productions return plenty of nulls.
+        if (node == null) return this;
+        
         list.add(node);
+        setPosition(getPosition().union(node.getPosition()));
         return this;
     }
 
@@ -105,7 +119,7 @@ public class ListNode extends Node {
     }
     
     public List childNodes() {
-    	return list;
+    	return list == null ? EMPTY_LIST : list;
     }
     
     public Instruction accept(NodeVisitor visitor) {

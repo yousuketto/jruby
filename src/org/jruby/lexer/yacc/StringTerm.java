@@ -28,6 +28,7 @@
 package org.jruby.lexer.yacc;
 
 import org.jruby.ast.RegexpNode;
+import org.jruby.ast.StrNode;
 import org.jruby.parser.ReOptions;
 import org.jruby.parser.Tokens;
 
@@ -54,8 +55,10 @@ public class StringTerm extends StrTerm {
         int space = 0;
         StringBuffer buffer = new StringBuffer(100);
 
-        if (func == -1)
+        if (func == -1) {
+            lexer.setValue(new Token("\"", lexer.getPosition()));
             return Tokens.tSTRING_END;
+        }
 
         c = src.read();
         if ((func & RubyYaccLexer.STR_FUNC_QWORDS) != 0
@@ -69,17 +72,19 @@ public class StringTerm extends StrTerm {
         if (c == term && nest == 0) {
             if ((func & RubyYaccLexer.STR_FUNC_QWORDS) != 0) {
                 func = -1;
+                lexer.getPosition();
                 return ' ';
             }
             if ((func & RubyYaccLexer.STR_FUNC_REGEXP) != 0) {
-                lexer.yaccValue = new RegexpNode(src.getPosition(),
-                        buffer.toString(), parseRegexpFlags(src));
+                lexer.setValue(new RegexpNode(src.getPosition(), buffer.toString(), parseRegexpFlags(src)));
                 return Tokens.tREGEXP_END;
             }
+            lexer.setValue(new Token("\"", lexer.getPosition()));
             return Tokens.tSTRING_END;
         }
         if (space != 0) {
             src.unread(c);
+            lexer.getPosition();
             return ' ';
         }
         if ((func & RubyYaccLexer.STR_FUNC_EXPAND) != 0 && c == '#') {
@@ -88,8 +93,10 @@ public class StringTerm extends StrTerm {
             case '$':
             case '@':
                 src.unread(c);
+                lexer.setValue(new Token("#" + c, lexer.getPosition()));
                 return Tokens.tSTRING_DVAR;
             case '{':
+                lexer.setValue(new Token("#" + c, lexer.getPosition())); 
                 return Tokens.tSTRING_DBEG;
             }
             buffer.append('#');
@@ -99,7 +106,7 @@ public class StringTerm extends StrTerm {
             throw new SyntaxException(src.getPosition(), "unterminated string meets end of file");
         }
 
-        lexer.yaccValue = new Token(buffer.toString(), lexer.getPosition(null, false));
+        lexer.setValue(new StrNode(lexer.getPosition(), buffer.toString())); 
         return Tokens.tSTRING_CONTENT;
     }
 
@@ -162,8 +169,7 @@ public class StringTerm extends StrTerm {
                     break;
                 }
                 nest--;
-            } else if ((func & RubyYaccLexer.STR_FUNC_EXPAND) != 0 && c == '#'
-                    && !src.peek('\n')) {
+            } else if ((func & RubyYaccLexer.STR_FUNC_EXPAND) != 0 && c == '#' && !src.peek('\n')) {
                 char c2 = src.read();
 
                 if (c2 == '$' || c2 == '@' || c2 == '{') {
@@ -231,8 +237,7 @@ public class StringTerm extends StrTerm {
             parseEscapeIntoBuffer(src, buffer);
             break;
         case RubyYaccLexer.EOF:
-            throw new SyntaxException(src.getPosition(),
-                    "Invalid escape character syntax");
+            throw new SyntaxException(src.getPosition(), "Invalid escape character syntax");
         default:
             buffer.append(c);
         }
@@ -257,8 +262,7 @@ public class StringTerm extends StrTerm {
             for (int i = 0; i < 2; i++) {
                 c = src.read();
                 if (c == RubyYaccLexer.EOF) {
-                    throw new SyntaxException(src.getPosition(),
-                            "Invalid escape character syntax");
+                    throw new SyntaxException(src.getPosition(), "Invalid escape character syntax");
                 }
                 if (!RubyYaccLexer.isOctChar(c)) {
                     src.unread(c);
@@ -272,8 +276,7 @@ public class StringTerm extends StrTerm {
             buffer.append(c);
             c = src.read();
             if (!RubyYaccLexer.isHexChar(c)) {
-                throw new SyntaxException(src.getPosition(),
-                        "Invalid escape character syntax");
+                throw new SyntaxException(src.getPosition(), "Invalid escape character syntax");
             }
             buffer.append(c);
             c = src.read();
@@ -285,16 +288,14 @@ public class StringTerm extends StrTerm {
             break;
         case 'M':
             if ((c = src.read()) != '-') {
-                throw new SyntaxException(src.getPosition(),
-                        "Invalid escape character syntax");
+                throw new SyntaxException(src.getPosition(), "Invalid escape character syntax");
             }
             buffer.append("\\M-");
             escaped(src, buffer);
             break;
         case 'C':
             if ((c = src.read()) != '-') {
-                throw new SyntaxException(src.getPosition(),
-                        "Invalid escape character syntax");
+                throw new SyntaxException(src.getPosition(), "Invalid escape character syntax");
             }
             buffer.append("\\C-");
             escaped(src, buffer);
@@ -304,8 +305,7 @@ public class StringTerm extends StrTerm {
             escaped(src, buffer);
             break;
         case 0:
-            throw new SyntaxException(src.getPosition(),
-                    "Invalid escape character syntax");
+            throw new SyntaxException(src.getPosition(), "Invalid escape character syntax");
         default:
             if (c != '\\' || c != term) {
                 buffer.append('\\');

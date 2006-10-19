@@ -1107,7 +1107,8 @@ public class EvaluationState {
 
                         // If no exception is thrown execute else block
                         if (iVisited.getElseNode() != null) {
-                            if (iVisited.getRescueNode() == null) {
+                            if (iVisited.getRescueNode() == null ||
+                                    iVisited.getRescueNode().getExceptionNodes().childNodes().isEmpty()) {
                                 runtime.getWarnings().warn(iVisited.getElseNode().getPosition(), "else without rescue is useless");
                             }
                             result = eval(context, iVisited.getElseNode(), self);
@@ -1315,7 +1316,7 @@ public class EvaluationState {
             }
             case NodeTypes.VCALLNODE: {
                 VCallNode iVisited = (VCallNode) node;
-                return self.callMethod(iVisited.getMethodName(), IRubyObject.NULL_ARRAY,
+                return self.callMethod(iVisited.getName(), IRubyObject.NULL_ARRAY,
                         CallType.VARIABLE);
             }
             case NodeTypes.WHENNODE:
