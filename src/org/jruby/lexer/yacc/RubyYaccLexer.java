@@ -131,6 +131,10 @@ public class RubyYaccLexer {
         return token;
     }
 
+    public StringBuffer getTokenBuffer() {
+        return tokenBuffer;
+    }
+    
     /**
      * Value of last token (if it is a token which has a value).
      * 
@@ -1136,7 +1140,7 @@ public class RubyYaccLexer {
                     if (!Character.isWhitespace(c)) {
                         arg_ambiguous();
                         lex_strterm = new StringTerm(str_regexp, '/', '\0');
-                        yaccValue = new Token(Character.toString(c),getPosition());
+                        yaccValue = new Token("/",getPosition());
                         return Tokens.tREGEXP_BEG;
                     }
                 }
@@ -1169,7 +1173,7 @@ public class RubyYaccLexer {
                 commandStart = true;
             case ',':
                 lex_state = LexState.EXPR_BEG;
-                yaccValue = new Token(Character.toString(c), getPosition());
+                yaccValue = new Token(",", getPosition());
                 return c;
 
             case '~':

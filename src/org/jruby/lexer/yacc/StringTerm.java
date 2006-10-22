@@ -53,7 +53,6 @@ public class StringTerm extends StrTerm {
     public int parseString(final RubyYaccLexer lexer, LexerSource src) {
         char c;
         int space = 0;
-        StringBuffer buffer = new StringBuffer(100);
 
         if (func == -1) {
             lexer.setValue(new Token("\"", lexer.getPosition()));
@@ -76,7 +75,7 @@ public class StringTerm extends StrTerm {
                 return ' ';
             }
             if ((func & RubyYaccLexer.STR_FUNC_REGEXP) != 0) {
-                lexer.setValue(new RegexpNode(src.getPosition(), buffer.toString(), parseRegexpFlags(src)));
+                lexer.setValue(new RegexpNode(src.getPosition(), "", parseRegexpFlags(src)));
                 return Tokens.tREGEXP_END;
             }
             lexer.setValue(new Token("\"", lexer.getPosition()));
@@ -87,6 +86,8 @@ public class StringTerm extends StrTerm {
             lexer.getPosition();
             return ' ';
         }
+        StringBuffer buffer = lexer.getTokenBuffer();
+        buffer.setLength(0);
         if ((func & RubyYaccLexer.STR_FUNC_EXPAND) != 0 && c == '#') {
             c = src.read();
             switch (c) {

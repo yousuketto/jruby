@@ -67,12 +67,12 @@ public class ListNode extends Node {
     public ListNode(ISourcePosition position) {
         super(position, NodeTypes.LISTNODE);
     }
-	
+    
     public ListNode add(Node node) {
-        if (list == null) list = new ArrayList();
         // Ruby Grammar productions return plenty of nulls.
         if (node == null) return this;
-        
+        if (list == null) list = new ArrayList();
+
         list.add(node);
         setPosition(getPosition().union(node.getPosition()));
         return this;
@@ -90,13 +90,33 @@ public class ListNode extends Node {
         return list == null ? 0 : list.size();
     }
     
+    
+    /**
+     * Add all elements in other list to this list node.
+     * 
+     * @param other list which has elements
+     * @return this instance for method chaining
+     */
     public ListNode addAll(ListNode other) {
         if (other != null) {
-        	for (Iterator iter = other.iterator(); iter.hasNext();) {
-                add((Node) iter.next());
+            if (list == null) list = new ArrayList();
+            list.addAll(other.list);
+            
+            if (list.size() > 0) {
+                setPosition(getPosition().union(getLast().getPosition()));
             }
         }
         return this;
+    }
+    
+    /**
+     * Add other element to this list
+     * 
+     * @param other list which has elements
+     * @return this instance for method chaining
+     */
+    public ListNode addAll(Node other) {
+        return add(other);
     }
     
     public Node getLast() {

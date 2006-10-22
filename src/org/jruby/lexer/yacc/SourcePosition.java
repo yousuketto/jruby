@@ -181,11 +181,9 @@ public class SourcePosition implements ISourcePosition, Serializable {
      * @see org.jruby.lexer.yacc.ISourcePosition#union(ISourcePosition)
      */
     public ISourcePosition union(ISourcePosition other) {
-        int startLine = Math.min(getStartLine(), other.getStartLine());
-        int endLine = Math.max(getEndLine(), other.getEndLine());    
-        int startOffset = Math.min(getStartOffset(), other.getStartOffset());
-        int endOffset = Math.max(getEndOffset(), other.getEndOffset());
+        // Enebo: All AST nodes but IterNode are in ascending order position-wise.  We should not 
+        // need to safe-guard that other is a smaller source position
         
-        return new SourcePosition(file, startLine, endLine, startOffset, endOffset);
+        return new SourcePosition(file, startLine, other.getEndLine(), startOffset, other.getEndOffset());
     }
 }
