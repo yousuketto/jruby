@@ -714,7 +714,6 @@ public class RubyYaccLexer {
                                 if (src.wasBeginOfLine() && (equalLabel = isNextNoCase("end")) != null) {
                                     tokenBuffer.append(equalLabel);
                                     tokenBuffer.append(src.readLine());
-                                    src.readLine();
                                     src.unread('\n');
                                     break;
                                 }
