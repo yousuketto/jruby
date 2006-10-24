@@ -96,7 +96,6 @@ import org.jruby.ast.RescueNode;
 import org.jruby.ast.ReturnNode;
 import org.jruby.ast.SClassNode;
 import org.jruby.ast.SValueNode;
-import org.jruby.ast.ScopeNode;
 import org.jruby.ast.SplatNode;
 import org.jruby.ast.StrNode;
 import org.jruby.ast.SuperNode;
@@ -118,6 +117,7 @@ import org.jruby.exceptions.JumpException.JumpType;
 import org.jruby.internal.runtime.methods.DefaultMethod;
 import org.jruby.internal.runtime.methods.WrapperCallable;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ICallable;
@@ -386,7 +386,7 @@ public class EvaluationState {
                     rubyClass.extendObject(context.getWrapper());
                     rubyClass.includeModule(context.getWrapper());
                 }
-                return evalClassDefinitionBody(context, iVisited.getBodyNode(), rubyClass, self);
+                return evalClassDefinitionBody(context, iVisited.getScope(), iVisited.getBodyNode(), rubyClass, self);
             }
             case NodeTypes.CLASSVARASGNNODE: {
                 ClassVarAsgnNode iVisited = (ClassVarAsgnNode) node;
@@ -520,10 +520,12 @@ public class EvaluationState {
                     visibility = Visibility.PRIVATE;
                 }
     
-                DefaultMethod newMethod = new DefaultMethod(containingClass, iVisited.getBodyNode(),
-                        (ArgsNode) iVisited.getArgsNode(), visibility, context.peekCRef());
+                DefaultMethod newMethod = new DefaultMethod(containingClass, iVisited.getScope(), 
+                        iVisited.getBodyNode(), (ArgsNode) iVisited.getArgsNode(), visibility, context.peekCRef());
     
-                iVisited.getBodyNode().accept(new CreateJumpTargetVisitor(newMethod));
+                if (iVisited.getBodyNode() != null) {
+                    iVisited.getBodyNode().accept(new CreateJumpTargetVisitor(newMethod));
+                }
     
                 containingClass.addMethod(name, newMethod);
     
@@ -569,11 +571,13 @@ public class EvaluationState {
                     }
                 }
     
-                DefaultMethod newMethod = new DefaultMethod(rubyClass, iVisited.getBodyNode(),
-                        (ArgsNode) iVisited.getArgsNode(), Visibility.PUBLIC, context
-                                .peekCRef());
-    
-                iVisited.getBodyNode().accept(new CreateJumpTargetVisitor(newMethod));
+                DefaultMethod newMethod = new DefaultMethod(rubyClass, iVisited.getScope(), 
+                        iVisited.getBodyNode(), (ArgsNode) iVisited.getArgsNode(), 
+                        Visibility.PUBLIC, context.peekCRef());
+
+                if (iVisited.getBodyNode() != null) {
+                    iVisited.getBodyNode().accept(new CreateJumpTargetVisitor(newMethod));
+                }
     
                 rubyClass.addMethod(iVisited.getName(), newMethod);
                 receiver.callMethod("singleton_method_added", runtime.newSymbol(iVisited.getName()));
@@ -912,7 +916,7 @@ public class EvaluationState {
                 } else {
                     module = enclosingModule.defineModuleUnder(name);
                 }
-                return evalClassDefinitionBody(context, iVisited.getBodyNode(), module, self);
+                return evalClassDefinitionBody(context, iVisited.getScope(), iVisited.getBodyNode(), module, self);
             }
             case NodeTypes.MULTIPLEASGNNODE: {
                 MultipleAsgnNode iVisited = (MultipleAsgnNode) node;
@@ -1207,18 +1211,7 @@ public class EvaluationState {
                     singletonClass.includeModule(context.getWrapper());
                 }
     
-                return evalClassDefinitionBody(context, iVisited.getBodyNode(), singletonClass, self);
-            }
-            case NodeTypes.SCOPENODE: {
-                ScopeNode iVisited = (ScopeNode) node;
-                
-    
-                context.preScopedBody(iVisited.getLocalNames());
-                try {
-                    return eval(context, iVisited.getBodyNode(), self);
-                } finally {
-                    context.postScopedBody();
-                }
+                return evalClassDefinitionBody(context, iVisited.getScope(), iVisited.getBodyNode(), singletonClass, self);
             }
             case NodeTypes.SELFNODE:
                 return self;
@@ -1402,17 +1395,17 @@ public class EvaluationState {
     /** Evaluates the body in a class or module definition statement.
      *
      */
-    private static IRubyObject evalClassDefinitionBody(ThreadContext context, ScopeNode iVisited, RubyModule type,
-            IRubyObject self) {
+    private static IRubyObject evalClassDefinitionBody(ThreadContext context, StaticScope scope, 
+            Node bodyNode, RubyModule type, IRubyObject self) {
         IRuby runtime = context.getRuntime();
-        context.preClassEval(iVisited.getLocalNames(), type);
+        context.preClassEval(scope.getVariables(), type);
 
         try {
             if (isTrace(runtime)) {
                 callTraceFunction(context, "class", type);
             }
 
-            return eval(context, iVisited.getBodyNode(), type);
+            return eval(context, bodyNode, type);
         } finally {
             context.postClassEval();
 
@@ -1421,7 +1414,7 @@ public class EvaluationState {
             }
         }
     }
-
+    
     private static RubyClass getSuperClassFromNode(ThreadContext context, Node superNode, IRubyObject self) {
         if (superNode == null) {
             return null;

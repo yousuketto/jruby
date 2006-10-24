@@ -738,7 +738,6 @@ nil, #['NewlineNode', 0, 2, 0, 12],
 ['DefnNode', 0, 1, 0, 11],
   ['ArgumentNode', 0, 0, 4, 7],
   nil,#['ArgsNode', 0, 1, 7, 7],  
-  nil #[ScopeNode, 1, 1, 10, 11]
 ]
 
 test_tree(list, <<'EOF', "Simple def")
@@ -753,7 +752,6 @@ nil, #['NewlineNode',0,2,0,18],
   ['ArgsNode',0,0,7,12],
     ['ListNode',0,0,8,11],
       ['ArgumentNode',0,0,8,11],
-  nil #['ScopeNode',1,1,15,17]
 ]
 
 test_tree(list, <<'EOF', "Simple def with single arg list")
@@ -769,7 +767,6 @@ nil, #['NewlineNode',0,2,0,18],
       ['ListNode',0,0,8,11],
         ['ArgumentNode',0,0,8,11],
       ['BlockArgNode',0,0,13,18],
-    nil, #['ScopeNode',1,1,23,23]
 ]
 
 test_tree(list, <<'EOF', "def foo(bar, &bloc) ... end")
@@ -785,7 +782,6 @@ nil, #['NewlineNode',0,2,0,18],
     ['ArgsNode',0,0,7,19],
       ['ListNode',0,0,8,11],
         ['ArgumentNode',0,0,8,11],
-    nil, #['ScopeNode',1,1,23,23]
 ]
 
 test_tree(list, <<'EOF', "def foo(bar, *rest) ... end")
@@ -797,7 +793,6 @@ list = [
 nil, #['NewlineNode',0,5,0,70],
   ['ModuleNode',0,4,0,68],
     ['Colon2Node',0,0,7,10],
-    nil, #['ScopeNode',1,3,13,64],
       nil, #['NewlineNode',3,4,64,66],
         ['DefnNode',1,3,13,64],
           ['ArgumentNode',1,1,17,21],
@@ -805,7 +800,6 @@ nil, #['NewlineNode',0,5,0,70],
             ['ListNode',1,1,23,32],
               ['ArgumentNode',1,1,23,26],
               ['ArgumentNode',1,1,28,32],
-          nil, #['ScopeNode',2,2,39,58],
             nil, #['NewlineNode',2,3,39,60],
               ['FCallNode',2,2,39,58],
                 ['ArrayNode',2,2,44,58],
@@ -826,7 +820,6 @@ list = [
 nil, #['NewlineNode',0,5,0,56],
   ['ClassNode',0,4,0,54],
     ['Colon2Node',0,0,6,7],
-    nil, #['ScopeNode',1,3,14,50],
       nil, #['NewlineNode',1,4,14,52],
         ['DefnNode',1,3,14,50],
           ['ArgumentNode',1,1,18,22],
@@ -834,7 +827,6 @@ nil, #['NewlineNode',0,5,0,56],
             ['ListNode',1,1,24,33],
               ['ArgumentNode',1,1,24,27],
               ['ArgumentNode',1,1,29,33],
-          nil, #['ScopeNode',2,2,40,44],
             nil, #['NewlineNode',2,3,40,46],
               ['TrueNode',2,2,40,44],
     ['ConstNode',0,0,10,11]
@@ -852,14 +844,12 @@ list = [
 nil, #['NewlineNode',0,4,0,43],
   ['SClassNode',0,3,0,42],
     ['SelfNode',0,0,9,13],
-    nil, #['ScopeNode',1,2,16,38],
       nil, #['NewlineNode',1,3,16,39],
         ['DefnNode',1,2,16,38],
           ['ArgumentNode',1,1,20,25],
           ['ArgsNode',1,1,25,32],
             ['ListNode',1,1,27,31],
               ['ArgumentNode',1,1,27,31],
-          nil, #['ScopeNode',2,2,38,38]
 ]
 
 test_tree(list, <<'END', "singleton class")
@@ -957,7 +947,6 @@ nil, #['NewlineNode',0,1,0,9],
   ['DefnNode',0,0,0,25],
     ['ArgumentNode',0,0,4,5],
     ['ArgsNode',0,0,5,11],
-    ['ScopeNode',0,0,25,25],
       nil, #['NewlineNode',0,0,12,25],
         ['FCallNode',0,0,12,21],
           ['SplatNode',0,0,15,21],

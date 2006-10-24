@@ -32,7 +32,6 @@ package org.jruby.parser;
 
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.List;
 
 import org.jruby.IRuby;
 import org.jruby.RubyFile;
@@ -113,15 +112,16 @@ public class Parser {
         return result.getAST();
     }
 
-    private void expandLocalVariables(List localVariables) {
+    private void expandLocalVariables(String[] localVariables) {
         int oldSize = 0;
         ThreadContext tc = runtime.getCurrentContext();
         if (tc.getFrameScope().getLocalNames() != null) {
             oldSize = tc.getFrameScope().getLocalNames().length;
         }
-        List newNames = localVariables.subList(oldSize, localVariables.size());
-        String[] newNamesArray = new String[newNames.size()];
-        newNames.toArray(newNamesArray);
+        int newSize = localVariables.length - oldSize;
+        String[] newNamesArray = new String[newSize];
+        System.arraycopy(localVariables, oldSize, newNamesArray, 0, newSize);
+
         tc.getFrameScope().addLocalVariables(newNamesArray);
     }
 
@@ -130,7 +130,7 @@ public class Parser {
         ThreadContext tc = runtime.getCurrentContext();
        
         if (result.getLocalVariables() != null) {
-            newSize = result.getLocalVariables().size();
+            newSize = result.getLocalVariables().length;
         }
         int oldSize = 0;
         if (tc.getFrameScope().hasLocalVariables()) {

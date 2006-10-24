@@ -45,8 +45,8 @@ public class RubyParserResult {
     private final List beginNodes = new ArrayList();
     private final List endNodes = new ArrayList();
     private Node ast;
-    private List blockVariables;
-    private List localVariables;
+    private String[] blockVariables;
+    private String[] localVariables;
     private InputStream afterEndStream;
     private boolean endSeen;
     private List commentNodes = new ArrayList();
@@ -62,7 +62,7 @@ public class RubyParserResult {
      * Gets the localVariables.
      * @return Returns a List
      */
-    public List getLocalVariables() {
+    public String[] getLocalVariables() {
         return localVariables;
     }
 
@@ -70,7 +70,7 @@ public class RubyParserResult {
      * Gets the blockVariables.
      * @return Returns a List
      */
-    public List getBlockVariables() {
+    public String[] getBlockVariables() {
         return blockVariables;
     }
 
@@ -109,7 +109,7 @@ public class RubyParserResult {
      * Sets the blockVariables.
      * @param blockVariables The blockVariables to set
      */
-    public void setBlockVariables(List blockVariables) {
+    public void setBlockVariables(String[] blockVariables) {
         this.blockVariables = blockVariables;
     }
 
@@ -117,7 +117,7 @@ public class RubyParserResult {
      * Sets the localVariables.
      * @param localVariables The localVariables to set
      */
-    public void setLocalVariables(List localVariables) {
+    public void setLocalVariables(String[] localVariables) {
         this.localVariables = localVariables;
     }
     
@@ -125,7 +125,8 @@ public class RubyParserResult {
         commentNodes.add(node);
     }
     
-    public void addBeginNode(Node node) {
+    public void addBeginNode(StaticScope scope, Node node) {
+        // FIXME: We need to add BEGIN nodes properly
     	beginNodes.add(node);
     }
     

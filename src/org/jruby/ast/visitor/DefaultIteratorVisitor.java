@@ -108,7 +108,6 @@ import org.jruby.ast.RetryNode;
 import org.jruby.ast.ReturnNode;
 import org.jruby.ast.SClassNode;
 import org.jruby.ast.SValueNode;
-import org.jruby.ast.ScopeNode;
 import org.jruby.ast.SelfNode;
 import org.jruby.ast.SplatNode;
 import org.jruby.ast.StrNode;
@@ -571,14 +570,6 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 
 	public Instruction visitSClassNode(SClassNode iVisited) {
 		iVisited.accept(_Payload);
-		return null;
-	}
-
-	public Instruction visitScopeNode(ScopeNode iVisited) {
-		iVisited.accept(_Payload);
-		if (iVisited.getBodyNode() != null) {
-			iVisited.getBodyNode().accept(this);
-		}
 		return null;
 	}
 

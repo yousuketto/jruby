@@ -34,10 +34,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Stack;
 
 import org.jruby.ast.AndNode;
 import org.jruby.ast.ArgsCatNode;
@@ -55,7 +52,6 @@ import org.jruby.ast.ConstNode;
 import org.jruby.ast.DAsgnNode;
 import org.jruby.ast.DRegexpNode;
 import org.jruby.ast.DStrNode;
-import org.jruby.ast.DVarNode;
 import org.jruby.ast.DotNode;
 import org.jruby.ast.EvStrNode;
 import org.jruby.ast.FCallNode;
@@ -68,7 +64,6 @@ import org.jruby.ast.InstAsgnNode;
 import org.jruby.ast.InstVarNode;
 import org.jruby.ast.ListNode;
 import org.jruby.ast.LocalAsgnNode;
-import org.jruby.ast.LocalVarNode;
 import org.jruby.ast.Match2Node;
 import org.jruby.ast.Match3Node;
 import org.jruby.ast.MatchNode;
@@ -86,7 +81,6 @@ import org.jruby.ast.SplatNode;
 import org.jruby.ast.StrNode;
 import org.jruby.ast.SuperNode;
 import org.jruby.ast.TrueNode;
-import org.jruby.ast.VCallNode;
 import org.jruby.ast.YieldNode;
 import org.jruby.ast.types.ILiteralNode;
 import org.jruby.ast.visitor.BreakStatementVisitor;
@@ -104,8 +98,7 @@ import org.jruby.util.IdUtil;
  */
 public class ParserSupport {
     // Parser states:
-    private Stack localNamesStack;
-    private BlockNamesStack blockNamesStack;
+    private StaticScope currentScope;
     
     // We can reuse one expression visitor per parse since each parser thread uses its own.
     private ExpressionVisitor expressionVisitor = new ExpressionVisitor();
@@ -122,11 +115,24 @@ public class ParserSupport {
     private RubyParserResult result;
 
     public void reset() {
-        localNamesStack = new Stack();
-        blockNamesStack = new BlockNamesStack(localNamesStack);
-
         inSingleton = 0;
         inDefinition = false;
+    }
+    
+    public StaticScope getCurrentScope() {
+        return currentScope;
+    }
+    
+    public void popCurrentScope() {
+        currentScope = currentScope.getEnclosingScope();
+    }
+    
+    public void pushBlockScope() {
+        currentScope = new BlockStaticScope(currentScope);
+    }
+    
+    public void pushLocalScope() {
+        currentScope = new LocalStaticScope(currentScope);
     }
     
     public Node arg_concat(ISourcePosition position, Node node1, Node node2) {
@@ -169,15 +175,7 @@ public class ParserSupport {
     public Node gettable2(String id, ISourcePosition position) {
         switch (IdUtil.getVarType(id)) {
         case IdUtil.LOCAL_VAR:
-            BlockNamesElement blockNames = (BlockNamesElement) blockNamesStack.peek();
-            LocalNamesElement localNames = (LocalNamesElement) localNamesStack.peek();
-            
-            if (localNames.isInBlock() && blockNames.isDefined(id)) {
-                return new DVarNode(position, id);
-            } else if (localNames.isLocalRegistered(id)) {
-                return new LocalVarNode(position, localNames.getLocalIndex(id), id);
-            }
-            return new VCallNode(position, id); // RubyMethod call without arguments.
+            return currentScope.declare(position, id);
         case IdUtil.CONSTANT:
             return new ConstNode(position, id);
         case IdUtil.INSTANCE_VAR:
@@ -236,24 +234,7 @@ public class ParserSupport {
         } else {
             switch (IdUtil.getVarType(id)) {
             case IdUtil.LOCAL_VAR:
-
-                // TODO: Add curried dvar?
-                /*
-                 * if (rb_dvar_curr(id)) { return NEW_DASGN_CURR(id, value); } else
-                 */
-
-                BlockNamesElement blockNames = (BlockNamesElement) blockNamesStack.peek();
-                LocalNamesElement localNames = (LocalNamesElement) localNamesStack.peek();
-       
-                if (blockNames != null && blockNames.isDefined(id)) {
-                    return new DAsgnNode(lhs.getPosition(), id, value);
-                } else if (localNames.isLocalRegistered(id) || !localNames.isInBlock()) {
-                    return new LocalAsgnNode(lhs.getPosition(), id, localNames.getLocalIndex(id), value);
-                } 
-                  
-                blockNames.add(id);
-                // TODO: Should be curried
-                return new DAsgnNode(lhs.getPosition(), id, value);
+                return currentScope.assign(lhs.getPosition(), id, value);
             case IdUtil.CONSTANT:
                 if (isInDef() || isInSingle()) {
                     throw new SyntaxException(lhs.getPosition(), "dynamic constant assignment");
@@ -332,8 +313,6 @@ public class ParserSupport {
     }
 
     public Node getMatchNode(Node firstNode, Node secondNode) {
-        ((LocalNamesElement) localNamesStack.peek()).ensureLocalRegistered("~");
-
         if (firstNode instanceof DRegexpNode || firstNode instanceof RegexpNode) {
             return new Match2Node(firstNode.getPosition(), firstNode, secondNode);
         } else if (secondNode instanceof DRegexpNode || secondNode instanceof RegexpNode) {
@@ -459,24 +438,19 @@ public class ParserSupport {
 
         if (node instanceof DRegexpNode) {
             ISourcePosition position = node.getPosition();
-			LocalNamesElement localNames = (LocalNamesElement) localNamesStack.peek();
-            localNames.ensureLocalRegistered("_");
-            localNames.ensureLocalRegistered("~");
+
             return new Match2Node(position, node, new GlobalVarNode(position, "$_"));
         } else if (node instanceof DotNode) {
-            return new FlipNode(
-                    node.getPosition(),
+            int slot = currentScope.getLocalScope().addVariable("");
+            return new FlipNode(node.getPosition(),
                     getFlipConditionNode(((DotNode) node).getBeginNode()),
                     getFlipConditionNode(((DotNode) node).getEndNode()),
-                    ((DotNode) node).isExclusive(),
-					((LocalNamesElement) localNamesStack.peek()).registerLocal(null));
+                    ((DotNode) node).isExclusive(), slot);
         } else if (node instanceof RegexpNode) {
             return new MatchNode(node.getPosition(), node);
         } else if (node instanceof StrNode) {
             ISourcePosition position = node.getPosition();
-			LocalNamesElement localNames = (LocalNamesElement) localNamesStack.peek();
-            localNames.ensureLocalRegistered("_");
-            localNames.ensureLocalRegistered("~");
+
             return new MatchNode(position, new RegexpNode(position, ((StrNode) node).getValue(), 0));
         } 
 
@@ -569,19 +543,16 @@ public class ParserSupport {
     *  Description of the RubyMethod
     */
     public void initTopLocalVariables() {
-        LocalNamesElement localNames = new LocalNamesElement();
-        localNamesStack.push(localNames);
+        currentScope = new LocalStaticScope(currentScope);
 
-        String[] names = configuration.getLocalVariables();
-        if (names != null && names.length > 0) {
-			List namesList = new ArrayList(names.length);
-            for (int i = 0; i < names.length; i++) namesList.add(names[i]);
-            localNames.setNames(namesList);
-        }
-        
+        // pre-populate with passed in local vars if any were provided
+        currentScope.setVariables(configuration.getLocalVariables());
+
+
         if (configuration.getDynamicVariables() != null) {
-            localNames.changeBlockLevel(1);
-            getBlockNames().push(new BlockNamesElement(configuration.getDynamicVariables()));
+            currentScope = new BlockStaticScope(currentScope);
+            
+            currentScope.setVariables(configuration.getDynamicVariables());
         }
     }
 
@@ -589,12 +560,13 @@ public class ParserSupport {
      *  Description of the RubyMethod
      */
     public void updateTopLocalVariables() {
-		LocalNamesElement localNames = (LocalNamesElement) localNamesStack.peek();
-        result.setLocalVariables(localNames.getNames().size() > 0 ? localNames.getNames() : null);
-        result.setBlockVariables(localNames.isInBlock() ? 
-            ((BlockNamesElement) blockNamesStack.peek()).getNames() : null);
+        StaticScope localScope = currentScope.getLocalScope();
+        String[] names = localScope.getVariables();
+        
+        result.setLocalVariables(names);
+        result.setBlockVariables(currentScope != localScope ? currentScope.getVariables() : null);
 
-        localNamesStack.pop();
+        currentScope = localScope.getEnclosingScope();
     }
 
     /** Getter for property inSingle.
@@ -624,22 +596,6 @@ public class ParserSupport {
      */
     public int getInSingle() {
         return inSingleton;
-    }
-
-    /**
-     * Gets the blockNames.
-     * @return Returns a BlockNamesStack
-     */
-    public BlockNamesStack getBlockNames() {
-        return blockNamesStack;
-    }
-
-    /**
-     * Gets the localNames.
-     * @return Returns a LocalNamesStack
-     */
-    public Stack getLocalNames() {
-        return localNamesStack;
     }
 
     /**

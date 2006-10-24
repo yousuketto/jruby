@@ -28,9 +28,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -86,12 +83,11 @@ public final class DynamicVariableSet {
 		return values[index];
     }
 
-    public List names() {
-        List result = new ArrayList(size);
-        for (int i = 0; i < size; i++) {
-            result.add(names[i]);
-        }
-        return result;
+    public String[] names() {
+        String newNames[] = new String[size];
+        System.arraycopy(names, 0, newNames, 0, size);
+        
+        return newNames;
     }
 
     private int indexOf(String name) {

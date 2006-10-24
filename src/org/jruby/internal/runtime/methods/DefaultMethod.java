@@ -41,11 +41,11 @@ import org.jruby.RubyModule;
 import org.jruby.ast.ArgsNode;
 import org.jruby.ast.ListNode;
 import org.jruby.ast.Node;
-import org.jruby.ast.ScopeNode;
 import org.jruby.evaluator.AssignmentVisitor;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ICallable;
 import org.jruby.runtime.Scope;
@@ -58,18 +58,19 @@ import org.jruby.util.collections.SinglyLinkedList;
  *
  */
 public final class DefaultMethod extends AbstractMethod {
-    private ScopeNode body;
+    private StaticScope staticScope;
+    private Node body;
     private ArgsNode argsNode;
     private SinglyLinkedList cref;
 
-    public DefaultMethod(RubyModule implementationClass, ScopeNode body, ArgsNode argsNode, 
-        Visibility visibility, SinglyLinkedList cref) {
+    public DefaultMethod(RubyModule implementationClass, StaticScope staticScope, Node body, 
+            ArgsNode argsNode, Visibility visibility, SinglyLinkedList cref) {
         super(implementationClass, visibility);
         this.body = body;
+        this.staticScope = staticScope;
         this.argsNode = argsNode;
 		this.cref = cref;
 		
-		assert body != null;
 		assert argsNode != null;
     }
     
@@ -94,8 +95,8 @@ public final class DefaultMethod extends AbstractMethod {
         ThreadContext context = runtime.getCurrentContext();
         
         Scope scope = context.getFrameScope();
-        if (body.getLocalNames() != null) {
-            scope.resetLocalVariables(body.getLocalNames());
+        if (staticScope.getVariables() != null) {
+            scope.resetLocalVariables(staticScope.getVariables());
         }
         
         if (argsNode.getBlockArgNode() != null && context.isBlockGiven()) {
@@ -109,7 +110,7 @@ public final class DefaultMethod extends AbstractMethod {
 
             traceCall(runtime, receiver, name);
 
-            return receiver.eval(body.getBodyNode());
+            return receiver.eval(body);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            if (je.getPrimaryData() == this) {
@@ -226,8 +227,8 @@ public final class DefaultMethod extends AbstractMethod {
             return;
         }
 
-		ISourcePosition position = body.getBodyNode() != null ? 
-            body.getBodyNode().getPosition() : body.getPosition();  
+		ISourcePosition position = body != null ? 
+                body.getPosition() : runtime.getCurrentContext().getPosition(); 
 
 		runtime.callTraceFunction("call", position, receiver, name, getImplementationClass()); // XXX
     }
@@ -237,6 +238,6 @@ public final class DefaultMethod extends AbstractMethod {
     }
     
     public ICallable dup() {
-        return new DefaultMethod(getImplementationClass(), body, argsNode, getVisibility(), cref);
+        return new DefaultMethod(getImplementationClass(), staticScope, body, argsNode, getVisibility(), cref);
     }	
 }
