@@ -686,15 +686,16 @@ public class RubyObject implements Cloneable, IRubyObject {
                 throw getRuntime().newTypeError("wrong argument type " + scope.getMetaClass() + " (expected Proc/Binding)");
             }
         }
-        
+
+        Block blockOfBinding = ((RubyBinding)scope).getBlock();
         try {
             // Binding provided for scope, use it
-            threadContext.preEvalWithBinding((RubyBinding)scope);            
+            threadContext.preEvalWithBinding(blockOfBinding);            
             newSelf = threadContext.getFrameSelf();
 
-            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file), newSelf);
+            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file, true), newSelf);
         } finally {
-            threadContext.postBoundEvalOrYield();
+            threadContext.postBoundEvalOrYield(blockOfBinding);
             
             // restore position
             threadContext.setPosition(savedPosition);
@@ -722,7 +723,7 @@ public class RubyObject implements Cloneable, IRubyObject {
                 threadContext.setFrameIter(threadContext.getPreviousFrameIter());
             }
             
-            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file), this);
+            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file, true), this);
         } finally {
             // FIXME: this is broken for Proc, see above
             threadContext.setFrameIter(iter);

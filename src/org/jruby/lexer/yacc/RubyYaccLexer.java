@@ -1525,6 +1525,7 @@ public class RubyYaccLexer {
 
             // Lame: parsing logic made it into lexer in ruby...So we
             // are emulating
+            // FIXME:  I believe this is much simpler now...
             StaticScope scope = parserSupport.getCurrentScope();
             if (IdUtil.getVarType(tempVal) != IdUtil.LOCAL_VAR &&
                     scope instanceof BlockStaticScope && 

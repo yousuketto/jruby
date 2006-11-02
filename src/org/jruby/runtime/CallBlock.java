@@ -46,7 +46,7 @@ public class CallBlock extends Block {
     private ThreadContext tc;
 
     public CallBlock(IRubyObject self, RubyModule imClass, Arity arity, BlockCallback callback, ThreadContext ctx) {
-        super(null,new CallMethod(imClass,Visibility.PUBLIC,callback),self,ctx.getCurrentFrame(),ctx.peekCRef(),new Scope(self.getRuntime()),ctx.getRubyClass(),Iter.ITER_PRE,ctx.getCurrentDynamicVars());
+        super(null,new CallMethod(imClass,Visibility.PUBLIC,callback),self,ctx.getCurrentFrame(),ctx.peekCRef(),new Scope(),ctx.getRubyClass(),Iter.ITER_PRE,ctx.getCurrentScope());
         this.arity = arity;
         this.callback = callback;
         this.self = self;

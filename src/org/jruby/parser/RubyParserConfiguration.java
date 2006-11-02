@@ -30,30 +30,29 @@
 package org.jruby.parser;
 
 public class RubyParserConfiguration {
-    private String[] localVariables;
-    private String[] dynamicVariables;
+    private StaticScope existingScope = null;
+    private boolean asBlock = false;
 
     /**
-     * Gets the localVariables.
-     * @return Returns a List
+     * If we are performing an eval the static scope we should create first as part of
+     * parsing should be a block scope.  Calling this lets the parser no we need to do this.
+     * 
+     * @param existingScope that the new BlockLocalScope will as its captured scopes
      */
-    public String[] getLocalVariables() {
-        return localVariables;
+    public void parseAsBlock(StaticScope existingScope) {
+        this.asBlock = true;
+        this.existingScope = existingScope;
     }
-
+    
     /**
-     * Sets the localVariables.
-     * @param localVariables The localVariables to set
+     * This method returns the appropriate first scope for the parser.
+     * 
+     * @return correct top scope for source to be parsed
      */
-    public void setLocalVariables(String[] localVariables) {
-        this.localVariables = localVariables;
-    }
-
-    public String[] getDynamicVariables() {
-        return dynamicVariables;
-    }
-
-    public void setDynamicVariables(String[] dynamicVariables) {
-        this.dynamicVariables = dynamicVariables;
+    public StaticScope getExistingScope() {
+        if (asBlock) {
+            return new BlockStaticScope(existingScope);
+        } 
+        return new LocalStaticScope(existingScope);
     }
 }

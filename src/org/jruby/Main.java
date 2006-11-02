@@ -182,7 +182,7 @@ public class Main {
     }
 
     private Node getParsedScript(IRuby runtime, Reader reader, String filename) {
-        Node result = runtime.parse(reader, filename);
+        Node result = runtime.parse(reader, filename, false);
         if (commandline.isAssumePrinting()) {
             result = new ParserSupport().appendPrintToBlock(result);
         }

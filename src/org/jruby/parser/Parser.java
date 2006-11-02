@@ -38,7 +38,6 @@ import org.jruby.RubyFile;
 import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.SyntaxException;
-import org.jruby.runtime.Iter;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.util.collections.SinglyLinkedList;
 
@@ -52,33 +51,20 @@ public class Parser {
         this.runtime = runtime;
     }
 
-    public Node parse(String file, String content) {
-        return parse(file, new StringReader(content));
+    public Node parse(String file, String content, boolean asBlock) {
+        return parse(file, new StringReader(content), asBlock);
     }
 
-    public Node parse(String file, Reader content) {
-        return parse(file, content, new RubyParserConfiguration(), 
-            runtime.getObject().getCRef());
-    }
-    
-    public Node parse(String file, String content, SinglyLinkedList cref) {
-        return parse(file, new StringReader(content), new RubyParserConfiguration(), cref);
-    }
-
-    private Node parse(String file, Reader content, RubyParserConfiguration config, 
-        SinglyLinkedList cref) {
+    public Node parse(String file, Reader content, boolean asBlock) {
+        RubyParserConfiguration configuration = new RubyParserConfiguration(); 
+        SinglyLinkedList cref = runtime.getObject().getCRef();
         ThreadContext tc = runtime.getCurrentContext();
-        config.setLocalVariables(tc.getFrameScope().getLocalNames());
-        
-        // FIXME: hack; search for an ITER_CUR; this lets us know we're parsing from within a block and should bring dvars along
-        Iter[] iters = tc.getIterStack();
-        for (int i = 0; i < iters.length; i++) {
-            Iter iter = iters[i];
-            
-            if (iter == Iter.ITER_CUR) {
-                config.setDynamicVariables(tc.getCurrentDynamicVars().names());
-                break;
-            }
+
+        // We only need to pass in current static scope if we are evaluating as a block (which
+        // is only done for evals).  We need to pass this in so that we can appropriately scope
+        // down to captured scopes when we are parsing.
+        if (asBlock) {
+            configuration.parseAsBlock(tc.getCurrentScope().getStaticScope());
         }
         
         DefaultRubyParser parser = null;
@@ -86,10 +72,9 @@ public class Parser {
         try {
             parser = RubyParserPool.getInstance().borrowParser();
             parser.setWarnings(runtime.getWarnings());
-            parser.init(config);
             tc.setCRef(cref);
             LexerSource lexerSource = LexerSource.getSource(file, content);
-            result = parser.parse(lexerSource);
+            result = parser.parse(configuration, lexerSource);
             if (result.isEndSeen()) {
             	runtime.defineGlobalConstant("DATA", new RubyFile(runtime, file, content));
             	result.setEndSeen(false);
@@ -105,37 +90,8 @@ public class Parser {
             tc.unsetCRef();
         }
 
-        if (hasNewLocalVariables(result)) {
-            expandLocalVariables(result.getLocalVariables());
-        }
+        // FIXME: We should move this into ParserSupport.addRootNode since actual parser should do this.
         result.addAppendBeginAndEndNodes();
         return result.getAST();
-    }
-
-    private void expandLocalVariables(String[] localVariables) {
-        int oldSize = 0;
-        ThreadContext tc = runtime.getCurrentContext();
-        if (tc.getFrameScope().getLocalNames() != null) {
-            oldSize = tc.getFrameScope().getLocalNames().length;
-        }
-        int newSize = localVariables.length - oldSize;
-        String[] newNamesArray = new String[newSize];
-        System.arraycopy(localVariables, oldSize, newNamesArray, 0, newSize);
-
-        tc.getFrameScope().addLocalVariables(newNamesArray);
-    }
-
-    private boolean hasNewLocalVariables(RubyParserResult result) {
-        int newSize = 0;
-        ThreadContext tc = runtime.getCurrentContext();
-       
-        if (result.getLocalVariables() != null) {
-            newSize = result.getLocalVariables().length;
-        }
-        int oldSize = 0;
-        if (tc.getFrameScope().hasLocalVariables()) {
-            oldSize = tc.getFrameScope().getLocalNames().length;
-        }
-        return newSize > oldSize;
     }
 }

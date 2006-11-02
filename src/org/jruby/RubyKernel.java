@@ -536,18 +536,8 @@ public class RubyKernel {
     public static RubyArray local_variables(IRubyObject recv) {
         final IRuby runtime = recv.getRuntime();
         RubyArray localVariables = runtime.newArray();
-        ThreadContext tc = runtime.getCurrentContext();
-
-        if (tc.getFrameScope().getLocalNames() != null) {
-            for (int i = 2; i < tc.getFrameScope().getLocalNames().length; i++) {
-				String variableName = (String) tc.getFrameScope().getLocalNames()[i];
-                if (variableName != null) {
-                    localVariables.append(runtime.newString(variableName));
-                }
-            }
-        }
-
-        String[] names = tc.getCurrentDynamicVars().names();
+        
+        String[] names = runtime.getCurrentContext().getCurrentScope().getAllNamesInScope();
         for (int i = 0; i < names.length; i++) {
             localVariables.append(runtime.newString(names[i]));
         }

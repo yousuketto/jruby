@@ -48,7 +48,6 @@ import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ICallable;
-import org.jruby.runtime.Scope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -77,7 +76,7 @@ public final class DefaultMethod extends AbstractMethod {
     public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
         ThreadContext context = runtime.getCurrentContext();
         
-        context.preDefMethodInternalCall(lastClass, recv, name, args, noSuper, cref);
+        context.preDefMethodInternalCall(lastClass, recv, name, args, noSuper, cref, staticScope);
     }
     
     public void postMethod(IRuby runtime) {
@@ -93,18 +92,14 @@ public final class DefaultMethod extends AbstractMethod {
     	assert args != null;
 
         ThreadContext context = runtime.getCurrentContext();
-        
-        Scope scope = context.getFrameScope();
-        if (staticScope.getVariables() != null) {
-            scope.resetLocalVariables(staticScope.getVariables());
-        }
-        
+
         if (argsNode.getBlockArgNode() != null && context.isBlockGiven()) {
-            scope.setValue(argsNode.getBlockArgNode().getCount(), runtime.newProc());
+            // We pass depth zero since we know this only applies to newly created local scope
+            context.getCurrentScope().setValue(argsNode.getBlockArgNode().getCount(), runtime.newProc(), 0);
         }
 
         try {
-            prepareArguments(context, runtime, scope, receiver, args);
+            prepareArguments(context, runtime, receiver, args);
             
             getArity().checkArity(runtime, args);
 
@@ -123,7 +118,7 @@ public final class DefaultMethod extends AbstractMethod {
         }
     }
 
-    private void prepareArguments(ThreadContext context, IRuby runtime, Scope scope, IRubyObject receiver, IRubyObject[] args) {
+    private void prepareArguments(ThreadContext context, IRuby runtime, IRubyObject receiver, IRubyObject[] args) {
         int expectedArgsCount = argsNode.getArgsCount();
 
         int restArg = argsNode.getRestArg();
@@ -133,21 +128,20 @@ public final class DefaultMethod extends AbstractMethod {
             throw runtime.newArgumentError("Wrong # of arguments(" + args.length + " for " + expectedArgsCount + ")");
         }
 
-        if (scope.hasLocalVariables() && expectedArgsCount > 0) {
-            for (int i = 0; i < expectedArgsCount; i++) {
-                scope.setValue(i + 2, args[i]);
-            }
+        // Bind 'normal' parameter values to the local scope for this method.
+        if (expectedArgsCount > 0) {
+            context.getCurrentScope().setArgValues(args, expectedArgsCount);
         }
 
         // optArgs and restArgs require more work, so isolate them and ArrayList creation here
         if (hasOptArgs || restArg != -1) {
-            args = prepareOptOrRestArgs(context, runtime, scope, args, expectedArgsCount, restArg, hasOptArgs);
+            args = prepareOptOrRestArgs(context, runtime, args, expectedArgsCount, restArg, hasOptArgs);
         }
         
         context.setFrameArgs(args);
     }
 
-    private IRubyObject[] prepareOptOrRestArgs(ThreadContext context, IRuby runtime, Scope scope, IRubyObject[] args, int expectedArgsCount, int restArg, boolean hasOptArgs) {
+    private IRubyObject[] prepareOptOrRestArgs(ThreadContext context, IRuby runtime, IRubyObject[] args, int expectedArgsCount, int restArg, boolean hasOptArgs) {
         if (restArg == -1 && hasOptArgs) {
             int opt = expectedArgsCount + argsNode.getOptArgs().size();
 
@@ -168,44 +162,49 @@ public final class DefaultMethod extends AbstractMethod {
             allArgs.add(args[i]);
         }
         
-        if (scope.hasLocalVariables()) {
-            if (hasOptArgs) {
-                ListNode optArgs = argsNode.getOptArgs();
+        if (hasOptArgs) {
+            ListNode optArgs = argsNode.getOptArgs();
    
-                Iterator iter = optArgs.iterator();
-                for (int i = expectedArgsCount; i < args.length && iter.hasNext(); i++) {
-                    //new AssignmentVisitor(new EvaluationState(runtime, receiver)).assign((Node)iter.next(), args[i], true);
-   //                  in-frame EvalState should already have receiver set as self, continue to use it
-                    AssignmentVisitor.assign(context, context.getFrameSelf(), (Node)iter.next(), args[i], true);
-                    expectedArgsCount++;
-                }
+            Iterator iter = optArgs.iterator();
+            for (int i = expectedArgsCount; i < args.length && iter.hasNext(); i++) {
+                //new AssignmentVisitor(new EvaluationState(runtime, receiver)).assign((Node)iter.next(), args[i], true);
+                // in-frame EvalState should already have receiver set as self, continue to use it
+                AssignmentVisitor.assign(context, context.getFrameSelf(), (Node)iter.next(), args[i], true);
+                expectedArgsCount++;
+            }
    
-                // assign the default values, adding to the end of allArgs
-                while (iter.hasNext()) {
-                    //new EvaluationState(runtime, receiver).begin((Node)iter.next());
-                    //EvaluateVisitor.getInstance().eval(receiver.getRuntime(), receiver, (Node)iter.next());
-                    // in-frame EvalState should already have receiver set as self, continue to use it
-                    allArgs.add(EvaluationState.eval(context, ((Node)iter.next()), context.getFrameSelf()));
-                }
+            // assign the default values, adding to the end of allArgs
+            while (iter.hasNext()) {
+                //new EvaluationState(runtime, receiver).begin((Node)iter.next());
+                //EvaluateVisitor.getInstance().eval(receiver.getRuntime(), receiver, (Node)iter.next());
+                // in-frame EvalState should already have receiver set as self, continue to use it
+                allArgs.add(EvaluationState.eval(context, ((Node)iter.next()), context.getFrameSelf()));
             }
         }
         
         // build an array from *rest type args, also adding to allArgs
         
+        // ENEBO: Does this next comment still need to be done since I killed hasLocalVars:
         // move this out of the scope.hasLocalVariables() condition to deal
         // with anonymous restargs (* versus *rest)
+        
+        
         // none present ==> -1
         // named restarg ==> >=0
         // anonymous restarg ==> -2
         if (restArg != -1) {
-            RubyArray array = runtime.newArray(args.length - expectedArgsCount);
             for (int i = expectedArgsCount; i < args.length; i++) {
-                array.append(args[i]);
                 allArgs.add(args[i]);
             }
+
             // only set in scope if named
             if (restArg >= 0) {
-                scope.setValue(restArg, array);
+                RubyArray array = runtime.newArray(args.length - expectedArgsCount);
+                for (int i = expectedArgsCount; i < args.length; i++) {
+                    array.append(args[i]);
+                }
+
+                context.getCurrentScope().setValue(restArg, array, 0);
             }
         }
         

@@ -30,7 +30,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,42 +44,9 @@ public class RubyParserResult {
     private final List beginNodes = new ArrayList();
     private final List endNodes = new ArrayList();
     private Node ast;
-    private String[] blockVariables;
-    private String[] localVariables;
-    private InputStream afterEndStream;
     private boolean endSeen;
     private List commentNodes = new ArrayList();
-
-    /**
-     * Constructor for RubyParserResult.
-     */
-    public RubyParserResult() {
-        super();
-    }
-
-    /**
-     * Gets the localVariables.
-     * @return Returns a List
-     */
-    public String[] getLocalVariables() {
-        return localVariables;
-    }
-
-    /**
-     * Gets the blockVariables.
-     * @return Returns a List
-     */
-    public String[] getBlockVariables() {
-        return blockVariables;
-    }
-
-    /**
-     * Gets the afterEndStream.
-     * @return Returns a InputStream
-     */
-    public InputStream getAfterEndStream() {
-        return afterEndStream;
-    }
+    private StaticScope staticScope;
 
     public List getCommentNodes() {
         return commentNodes;
@@ -89,12 +55,13 @@ public class RubyParserResult {
     public Node getAST() {
         return ast;
     }
-    /**
-     * Sets the afterEndStream.
-     * @param afterEndStream The afterEndStream to set
-     */
-    public void setAfterEndStream(InputStream afterEndStream) {
-        this.afterEndStream = afterEndStream;
+    
+    public StaticScope getStaticScope() {
+        return staticScope;
+    }
+    
+    public void setStaticScope(StaticScope staticScope) {
+        this.staticScope = staticScope;
     }
 
     /**
@@ -105,22 +72,6 @@ public class RubyParserResult {
         this.ast = ast;
     }
 
-    /**
-     * Sets the blockVariables.
-     * @param blockVariables The blockVariables to set
-     */
-    public void setBlockVariables(String[] blockVariables) {
-        this.blockVariables = blockVariables;
-    }
-
-    /**
-     * Sets the localVariables.
-     * @param localVariables The localVariables to set
-     */
-    public void setLocalVariables(String[] localVariables) {
-        this.localVariables = localVariables;
-    }
-    
     public void addComment(CommentNode node) {
         commentNodes.add(node);
     }

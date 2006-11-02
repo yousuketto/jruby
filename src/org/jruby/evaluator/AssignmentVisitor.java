@@ -97,7 +97,7 @@ public class AssignmentVisitor {
         }
         case NodeTypes.DASGNNODE: {
             DAsgnNode iVisited = (DAsgnNode)node;
-            context.getCurrentDynamicVars().set(iVisited.getName(), value);
+            context.getCurrentScope().setValue(iVisited.getIndex(), value, iVisited.getDepth());
             break;
         }
         case NodeTypes.GLOBALASGNNODE: {
@@ -112,7 +112,11 @@ public class AssignmentVisitor {
         }
         case NodeTypes.LOCALASGNNODE: {
             LocalAsgnNode iVisited = (LocalAsgnNode)node;
-            context.getFrameScope().setValue(iVisited.getCount(), value);
+            
+            //System.out.println("Assigning to " + iVisited.getName() + "@"+ iVisited.getPosition());
+            //context.printScope();
+            context.getCurrentScope().setValue(iVisited.getIndex(), value, iVisited.getDepth());
+            //context.getFrameScope().setValue(iVisited.getIndex(), value);
             break;
         }
         case NodeTypes.MULTIPLEASGNNODE: {
@@ -120,8 +124,7 @@ public class AssignmentVisitor {
             if (!(value instanceof RubyArray)) {
                 value = RubyArray.newArray(runtime, value);
             }
-            result = context
-                    .mAssign(self, iVisited, (RubyArray) value, check);
+            result = context.mAssign(self, iVisited, (RubyArray) value, check);
             break;
         }
         }

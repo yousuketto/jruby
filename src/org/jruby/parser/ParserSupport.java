@@ -75,6 +75,7 @@ import org.jruby.ast.NthRefNode;
 import org.jruby.ast.OptNNode;
 import org.jruby.ast.OrNode;
 import org.jruby.ast.RegexpNode;
+import org.jruby.ast.RootNode;
 import org.jruby.ast.SValueNode;
 import org.jruby.ast.SelfNode;
 import org.jruby.ast.SplatNode;
@@ -277,6 +278,18 @@ public class ParserSupport {
         }
         
         return first.getPosition().union(second.getPosition());
+    }
+    
+    public Node addRootNode(Node topOfAST) {
+        // I am not sure we need to get AST to set AST and the appendToBlock could maybe get removed.
+        // For sure once we do two pass parsing we should since this is mostly just optimzation.
+        RootNode root = new RootNode(null, currentScope, 
+                appendToBlock(result.getAST(), topOfAST));
+
+        // FIXME: Should add begin and end nodes
+        
+        return root;
+
     }
     
     public Node appendToBlock(Node head, Node tail) {
@@ -543,30 +556,9 @@ public class ParserSupport {
     *  Description of the RubyMethod
     */
     public void initTopLocalVariables() {
-        currentScope = new LocalStaticScope(currentScope);
-
-        // pre-populate with passed in local vars if any were provided
-        currentScope.setVariables(configuration.getLocalVariables());
-
-
-        if (configuration.getDynamicVariables() != null) {
-            currentScope = new BlockStaticScope(currentScope);
-            
-            currentScope.setVariables(configuration.getDynamicVariables());
-        }
-    }
-
-    /**
-     *  Description of the RubyMethod
-     */
-    public void updateTopLocalVariables() {
-        StaticScope localScope = currentScope.getLocalScope();
-        String[] names = localScope.getVariables();
+        currentScope = configuration.getExistingScope();
         
-        result.setLocalVariables(names);
-        result.setBlockVariables(currentScope != localScope ? currentScope.getVariables() : null);
-
-        currentScope = localScope.getEnclosingScope();
+        result.setStaticScope(currentScope);
     }
 
     /** Getter for property inSingle.

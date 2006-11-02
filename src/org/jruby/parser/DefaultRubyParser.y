@@ -265,8 +265,7 @@ program       : {
                           support.checkUselessStatement($2);
                       }
                   }
-                  support.getResult().setAST(support.appendToBlock(support.getResult().getAST(), $2));
-                  support.updateTopLocalVariables();
+                  support.getResult().setAST(support.addRootNode($2));
               }
 
 bodystmt      : compstmt opt_rescue opt_else opt_ensure {
@@ -357,7 +356,7 @@ stmt          : kALIAS fitem {
                   if (support.isInDef() || support.isInSingle()) {
                       yyerror("END in method; use at_exit");
                   }
-                  support.getResult().addEndNode(new IterNode(support.union($2, $4), null, new PostExeNode(getPosition($1)), $3));
+                  support.getResult().addEndNode(new IterNode(support.union($2, $4), null, null, new PostExeNode(getPosition($1)), $3));
                   $$ = null;
               }
               | lhs '=' command_call {
@@ -464,7 +463,7 @@ block_command : block_call
 cmd_brace_block	: tLBRACE_ARG {
                     support.pushBlockScope();
 		} opt_block_var compstmt tRCURLY {
-                    $$ = new IterNode(getPosition($1), $3, $4, null);
+                    $$ = new IterNode(getPosition($1), $3, support.getCurrentScope(), $4, null);
                     support.popCurrentScope();
 		}
 
@@ -1222,7 +1221,7 @@ opt_block_var : none
 do_block      : kDO_BLOCK {
                   support.pushBlockScope();
 	      } opt_block_var compstmt kEND {
-                  $$ = new IterNode(support.union($1, $5), $3, $4, null);
+                  $$ = new IterNode(support.union($1, $5), $3, support.getCurrentScope(), $4, null);
                   support.popCurrentScope();
               }
 
@@ -1263,13 +1262,13 @@ method_call   : operation paren_args {
 brace_block   : tLCURLY {
                   support.pushBlockScope();
 	      } opt_block_var compstmt tRCURLY {
-                  $$ = new IterNode(support.union($1, $5), $3, $4, null);
+                  $$ = new IterNode(support.union($1, $5), $3, support.getCurrentScope(), $4, null);
                   support.popCurrentScope();
               }
               | kDO {
                   support.pushBlockScope();
 	      } opt_block_var compstmt kEND {
-	          $$ = new IterNode(support.union($1, $5), $3, $4, null);
+                  $$ = new IterNode(support.union($1, $5), $3, support.getCurrentScope(), $4, null);
                   support.popCurrentScope();
               }
 
@@ -1754,8 +1753,9 @@ none_block_pass: /* none */ {
     /** The parse method use an lexer stream and parse it to an AST node 
      * structure
      */
-    public RubyParserResult parse(LexerSource source) {
+    public RubyParserResult parse(RubyParserConfiguration configuration, LexerSource source) {
         support.reset();
+        support.setConfiguration(configuration);
         support.setResult(new RubyParserResult());
         
         lexer.reset();
@@ -1771,10 +1771,6 @@ none_block_pass: /* none */ {
         }
         
         return support.getResult();
-    }
-
-    public void init(RubyParserConfiguration configuration) {
-        support.setConfiguration(configuration);
     }
 
     // +++

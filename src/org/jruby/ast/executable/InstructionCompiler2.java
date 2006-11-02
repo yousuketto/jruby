@@ -738,7 +738,7 @@ public class InstructionCompiler2 implements NodeVisitor {
         loadThreadContext();
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getFrameScope", "()Lorg/jruby/runtime/Scope;");
         mv.visitInsn(Opcodes.SWAP);
-        mv.visitLdcInsn(new Integer(iVisited.getCount()));
+        mv.visitLdcInsn(new Integer(iVisited.getIndex()));
         mv.visitInsn(Opcodes.SWAP);
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/runtime/Scope", "setValue", "(ILorg/jruby/runtime/builtin/IRubyObject;)V");
         
@@ -748,7 +748,7 @@ public class InstructionCompiler2 implements NodeVisitor {
     public Instruction visitLocalVarNode(LocalVarNode iVisited) {
         lineNumber(iVisited);
         // check if it's an argument
-        int index = iVisited.getCount();
+        int index = iVisited.getIndex();
         
         if ((index - 2) < args.getArgsCount()) {
             // load from the incoming params
@@ -759,7 +759,7 @@ public class InstructionCompiler2 implements NodeVisitor {
             mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
                     THREADCONTEXT, "getFrameScope",
                     "()Lorg/jruby/runtime/Scope;");
-            mv.visitLdcInsn(new Integer(iVisited.getCount()));
+            mv.visitLdcInsn(new Integer(iVisited.getIndex()));
             mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/runtime/Scope",
                     "getValue", "(I)Lorg/jruby/runtime/builtin/IRubyObject;");
         }

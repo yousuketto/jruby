@@ -202,12 +202,12 @@ public class BaseMockRuby implements IRuby {
 
 	}
 
-	public Node parse(Reader content, String file) {
+	public Node parse(Reader content, String file, boolean asBlock) {
 		throw new MockException();
 		
 	}
 
-	public Node parse(String content, String file) {
+	public Node parse(String content, String file, boolean asBlock) {
 		throw new MockException();
 		
 	}

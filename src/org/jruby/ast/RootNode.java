@@ -11,10 +11,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2002 Anders Bengtsson <ndrsbngtssn@yahoo.se>
- * Copyright (C) 2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
- * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
- * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2006 Thomas E Enebo <enebo@acm.org>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -32,68 +29,59 @@ package org.jruby.ast;
 
 import java.util.List;
 
-import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.parser.StaticScope;
 
 /**
- * Access a local variable 
+ * Represents the top of the AST.  This is a node not present in MRI.  It was created to
+ * hold the top-most static scope in an easy to grab way and it also exists to hold BEGIN
+ * and END nodes.  These can then be interpreted/compiled in the same places as the rest
+ * of the code. 
+ *
  */
-public class LocalVarNode extends Node implements INameNode {
-    static final long serialVersionUID = 8562701804939317217L;
-
-    // The name of the variable
-    private final String name;
+// TODO: Store BEGIN and END information into this node
+// TODO: Implement BEGIN and END logic so they get invoked at the correct time.
+public class RootNode extends Node {
+    private static final long serialVersionUID = 1754281364026417051L;
     
-    // A scoped location of this variable (high 16 bits is how many scopes down and low 16 bits
-    // is what index in the right scope to set the value.
-    private final int location;
+    private StaticScope scope;
+    private Node bodyNode;
 
-    public LocalVarNode(ISourcePosition position, int location, String name) {
-        super(position, NodeTypes.LOCALVARNODE);
-        this.location = location;
-        this.name = name;
-    }
-
-    /**
-     * Accept for the visitor pattern.
-     * @param iVisitor the visitor
-     **/
-    public Instruction accept(NodeVisitor iVisitor) {
-        return iVisitor.visitLocalVarNode(this);
-    }
-
-    /**
-     * How many scopes should we burrow down to until we need to set the block variable value.
-     * 
-     * @return 0 for current scope, 1 for one down, ...
-     */
-    public int getDepth() {
-        return location >> 16;
+    public RootNode(ISourcePosition position, StaticScope scope, Node bodyNode) {
+        super(position, NodeTypes.ROOTNODE);
+        
+        this.scope = scope;
+        this.bodyNode = bodyNode;
     }
     
     /**
-     * Gets the index within the scope construct that actually holds the eval'd value
-     * of this local variable
+     * The static scoping relationships that should get set first thing before interpretation
+     * of the code represented by this AST
      * 
-     * @return Returns an int offset into storage structure
+     * @return the top scope for the AST
      */
-    public int getIndex() {
-        return location & 0xffff;
-    }
-
-    /**
-     * What is the name of this variable
-     * 
-     * @return the name of the variable
-     */
-    public String getName() {
-        return name;
+    public StaticScope getScope() {
+        return scope;
     }
     
+    /**
+     * First real AST node to be interpreted
+     * 
+     * @return real top AST node
+     */
+    public Node getBodyNode() {
+        return bodyNode;
+    }
+
+    // TODO: Visitors will need something here I think
+    public Instruction accept(NodeVisitor visitor) {
+        return null;
+    }
+
     public List childNodes() {
-        return EMPTY_LIST;
+        return createList(bodyNode);
     }
 
 }

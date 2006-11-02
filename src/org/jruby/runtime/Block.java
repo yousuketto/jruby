@@ -51,14 +51,20 @@ public class Block implements StackElement {
     private Scope scope;
     private RubyModule klass;
     private Iter iter;
-    private DynamicVariableSet dynamicVariables;
+    // Fixme: null dynamic scope screams for subclass (after rest of block clean up do this)
+    
+    // For loops are done via blocks and they have no dynamic scope of their own so we use
+    // whatever is there.  What is important is that this may be null.
+    private DynamicScope dynamicScope;
     private IRubyObject blockObject = null;
     public boolean isLambda = false;
 
     private Block next;
 
-    public static Block createBlock(Node var, ICallable method, IRubyObject self) {
+    public static Block createBlock(Node var, DynamicScope dynamicScope, ICallable method, 
+            IRubyObject self) {
         ThreadContext context = self.getRuntime().getCurrentContext();
+
         return new Block(var,
                          method,
                          self,
@@ -67,7 +73,7 @@ public class Block implements StackElement {
                          context.getFrameScope(),
                          context.getRubyClass(),
                          context.getCurrentIter(),
-                         context.getCurrentDynamicVars());
+                         dynamicScope);
     }
 
     public Block(
@@ -79,7 +85,7 @@ public class Block implements StackElement {
         Scope scope,
         RubyModule klass,
         Iter iter,
-        DynamicVariableSet dynamicVars) {
+        DynamicScope dynamicScope) {
     	
         //assert method != null;
 
@@ -91,30 +97,41 @@ public class Block implements StackElement {
         this.klass = klass;
         this.iter = iter;
         this.cref = cref;
-        this.dynamicVariables = dynamicVars;
+        this.dynamicScope = dynamicScope;
     }
     
-    public static Block createBinding(RubyModule wrapper, Iter iter, Frame frame, DynamicVariableSet dynVars) {
+    public static Block createBinding(RubyModule wrapper, Iter iter, Frame frame, DynamicScope dynamicScope) {
         ThreadContext context = frame.getSelf().getRuntime().getCurrentContext();
         
         // FIXME: Ruby also saves wrapper, which we do not
-        return new Block(null, null, frame.getSelf(), frame, context.peekCRef(), frame.getScope(), context.getRubyClass(), iter, dynVars);
+        return new Block(null, null, frame.getSelf(), frame, context.peekCRef(), frame.getScope(), context.getRubyClass(), iter, dynamicScope);
     }
 
     public IRubyObject call(IRubyObject[] args, IRubyObject replacementSelf) {
         IRuby runtime = self.getRuntime();
         ThreadContext context = runtime.getCurrentContext();
-        //Block oldBlock = context.getCurrentBlock();
-        Block newBlock = this.cloneBlock();
-        if (replacementSelf != null) {
-            newBlock.self = replacementSelf;
+
+        Block newBlock;
+        
+        // If we have no dynamic scope we are a block representing a for loop eval.
+        // We can just reuse
+        if (dynamicScope == null) {
+            newBlock = this;
+        } else {
+            newBlock = this.cloneBlock();
+            if (replacementSelf != null) {
+                newBlock.self = replacementSelf;
+            }
         }
 
         return context.yieldSpecificBlock(newBlock, runtime.newArray(args), null, null, true);
     }
 
     public Block cloneBlock() {
-        Block newBlock = new Block(var, method, self, frame, cref, scope, klass, iter, new DynamicVariableSet(dynamicVariables));
+        // We clone dynamic scope because this will be a new instance of a block.  Any previously
+        // captured instances of this block may still be around and we do not want to start
+        // overwriting those values when we create a new one.
+        Block newBlock = new Block(var, method, self, frame, cref, scope, klass, iter, dynamicScope.cloneScope());
         
         newBlock.isLambda = isLambda;
 
@@ -168,8 +185,8 @@ public class Block implements StackElement {
      * Gets the dynamicVariables.
      * @return Returns a RubyVarmap
      */
-    public DynamicVariableSet getDynamicVariables() {
-        return dynamicVariables;
+    public DynamicScope getDynamicScope() {
+        return dynamicScope;
     }
 
     /**
