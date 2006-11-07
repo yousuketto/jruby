@@ -87,9 +87,6 @@ public class DynamicScope {
         } else {
             assert offset < variableValues.length : "Setting " + offset + " to " + value + ", O: " + this; 
 
-            if (getStaticScope().exists("_erbout") >= 0) {
-                System.out.println("Setting value: " + value.inspect() + ","+value.getRuntime().getNil().inspect());
-            }
             variableValues[offset] = value;
         }
     }
