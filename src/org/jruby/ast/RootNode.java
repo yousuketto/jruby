@@ -76,8 +76,8 @@ public class RootNode extends Node {
     }
 
     // TODO: Visitors will need something here I think
-    public Instruction accept(NodeVisitor visitor) {
-        return null;
+    public Instruction accept(NodeVisitor iVisitor) {
+        return iVisitor.visitRootNode(this);
     }
 
     public List childNodes() {

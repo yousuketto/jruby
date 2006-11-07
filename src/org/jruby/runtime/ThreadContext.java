@@ -80,6 +80,8 @@ public class ThreadContext {
     private SinglyLinkedList[] crefStack = new SinglyLinkedList[INITIAL_SIZE];
     private int crefIndex = -1;
     
+    // List of active dynamic scopes.  Each of these may have captured other dynamic scopes
+    // to implement closures.
     private DynamicScope[] scopeStack = new DynamicScope[INITIAL_SIZE];
     private int scopeIndex = -1;
 
@@ -422,10 +424,6 @@ public class ThreadContext {
         return (Iter) iterStack[iterIndex];
     }
     
-    public Iter[] getIterStack() {
-        return iterStack;
-    }
-
     public Scope getFrameScope() {
         return getCurrentFrame().getScope();
     }
@@ -867,14 +865,6 @@ public class ThreadContext {
         popFrame();
     }
     
-    public void preScopedBody() {
-        assert false;
-        getCurrentFrame().newScope();
-    }
-    
-    public void postScopedBody() {
-    }
-    
     public void preBsfApply(String[] names) {
         // FIXME: I think we need these pushed somewhere?
         LocalStaticScope staticScope = new LocalStaticScope(null);
@@ -1076,7 +1066,15 @@ public class ThreadContext {
     }
 
     public void preEvalWithBinding(Block block) {
-        restoreBlockState(block, null);
+        pushFrame(block.getFrame());
+        setCRef(block.getCRef());        
+        getCurrentFrame().setScope(block.getScope());
+
+        // When we eval with a binding we use that dynamic scope (contrast with iter where
+        // we clone the scope for each invocation).
+        pushScope(block.getDynamicScope());
+        pushRubyClass(block.getKlass()); 
+        pushIter(block.getIter());
     }
 
     public void postBoundEvalOrYield(Block block) {

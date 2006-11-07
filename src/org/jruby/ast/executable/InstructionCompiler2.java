@@ -103,6 +103,7 @@ import org.jruby.ast.RescueBodyNode;
 import org.jruby.ast.RescueNode;
 import org.jruby.ast.RetryNode;
 import org.jruby.ast.ReturnNode;
+import org.jruby.ast.RootNode;
 import org.jruby.ast.SClassNode;
 import org.jruby.ast.SValueNode;
 import org.jruby.ast.SelfNode;
@@ -877,6 +878,12 @@ public class InstructionCompiler2 implements NodeVisitor {
 
     public Instruction visitReturnNode(ReturnNode iVisited) {
         throw new NotCompilableException("Node not supported: " + iVisited.toString());
+    }
+    
+    public Instruction visitRootNode(RootNode iVisited) {
+        iVisited.getBodyNode().accept(this);
+        
+        return null;
     }
 
     public Instruction visitSClassNode(SClassNode iVisited) {
