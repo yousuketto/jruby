@@ -38,6 +38,7 @@ import org.jruby.RubyFile;
 import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.SyntaxException;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.util.collections.SinglyLinkedList;
 
@@ -51,20 +52,20 @@ public class Parser {
         this.runtime = runtime;
     }
 
-    public Node parse(String file, String content, boolean asBlock) {
-        return parse(file, new StringReader(content), asBlock);
+    public Node parse(String file, String content, DynamicScope blockScope) {
+        return parse(file, new StringReader(content), blockScope);
     }
 
-    public Node parse(String file, Reader content, boolean asBlock) {
+    public Node parse(String file, Reader content, DynamicScope blockScope) {
         RubyParserConfiguration configuration = new RubyParserConfiguration(); 
         SinglyLinkedList cref = runtime.getObject().getCRef();
         ThreadContext tc = runtime.getCurrentContext();
 
-        // We only need to pass in current static scope if we are evaluating as a block (which
+        // We only need to pass in current scope if we are evaluating as a block (which
         // is only done for evals).  We need to pass this in so that we can appropriately scope
         // down to captured scopes when we are parsing.
-        if (asBlock) {
-            configuration.parseAsBlock(tc.getCurrentScope().getStaticScope());
+        if (blockScope != null) {
+            configuration.parseAsBlock(blockScope);
         }
         
         DefaultRubyParser parser = null;
@@ -88,6 +89,15 @@ public class Parser {
         } finally {
             RubyParserPool.getInstance().returnParser(parser);
             tc.unsetCRef();
+        }
+        
+        // If variables were added then we may need to grow the dynamic scope to match the static
+        // one.
+        // FIXME: Make this so we only need to check this for blockScope != null.  We cannot
+        // currently since we create the DynamicScope for a LocalStaticScope before parse begins.
+        // Refactoring should make this fixable.
+        if (result.getScope() != null) {
+            result.getScope().growIfNeeded();
         }
 
         // FIXME: We should move this into ParserSupport.addRootNode since actual parser should do this.

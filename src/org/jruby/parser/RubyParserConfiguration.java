@@ -29,17 +29,19 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
+import org.jruby.runtime.DynamicScope;
+
 public class RubyParserConfiguration {
-    private StaticScope existingScope = null;
+    private DynamicScope existingScope = null;
     private boolean asBlock = false;
 
     /**
-     * If we are performing an eval the static scope we should create first as part of
-     * parsing should be a block scope.  Calling this lets the parser no we need to do this.
+     * If we are performing an eval we should pass existing scope in.
+     * Calling this lets the parser know we need to do this.
      * 
-     * @param existingScope that the new BlockLocalScope will as its captured scopes
+     * @param existingScope is the scope that captures new vars, etc...
      */
-    public void parseAsBlock(StaticScope existingScope) {
+    public void parseAsBlock(DynamicScope existingScope) {
         this.asBlock = true;
         this.existingScope = existingScope;
     }
@@ -49,10 +51,15 @@ public class RubyParserConfiguration {
      * 
      * @return correct top scope for source to be parsed
      */
-    public StaticScope getExistingScope() {
+    public DynamicScope getScope() {
         if (asBlock) {
-            return new BlockStaticScope(existingScope);
+            return existingScope;
         } 
-        return new LocalStaticScope(existingScope);
+        
+        // FIXME: We should really not be creating the dynamic scope for the root
+        // of the AST before parsing.  This makes us end up needing to readjust
+        // this dynamic scope coming out of parse (and for local static scopes it
+        // will always happen because of $~ and $_).
+        return new DynamicScope(new LocalStaticScope(null), existingScope);
     }
 }

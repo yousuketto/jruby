@@ -33,6 +33,7 @@ import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
+import org.jruby.runtime.DynamicScope;
 
 /**
  * Represents the top of the AST.  This is a node not present in MRI.  It was created to
@@ -46,24 +47,40 @@ import org.jruby.parser.StaticScope;
 public class RootNode extends Node {
     private static final long serialVersionUID = 1754281364026417051L;
     
-    private StaticScope scope;
+    private transient DynamicScope scope;
+    private StaticScope staticScope;
     private Node bodyNode;
 
-    public RootNode(ISourcePosition position, StaticScope scope, Node bodyNode) {
+    public RootNode(ISourcePosition position, DynamicScope scope, Node bodyNode) {
         super(position, NodeTypes.ROOTNODE);
         
         this.scope = scope;
+        this.staticScope = scope.getStaticScope();
         this.bodyNode = bodyNode;
     }
     
     /**
-     * The static scoping relationships that should get set first thing before interpretation
-     * of the code represented by this AST
+     * Return the dynamic scope for this AST.  The variable backed by this is transient so
+     * for serialization this is null.  In that case we use staticScope to rebuild the dynamic
+     * scope.  The real reason for this method is supporting bindings+eval.  We need to pass
+     * our live dynamic scope in so when we eval we can use that dynamic scope. 
      * 
-     * @return the top scope for the AST
+     * @return dynamic scope of this AST
      */
-    public StaticScope getScope() {
+    public DynamicScope getScope() {
         return scope;
+    }
+    
+    /**
+     * The static scoping relationships that should get set first thing before interpretation
+     * of the code represented by this AST.  Actually, we use getScope first since that also
+     * can contain a live dynamic scope.  We rely on this method only for interpreting a root
+     * node from a serialized format.
+     * 
+     * @return the top static scope for the AST
+     */
+    public StaticScope getStaticScope() {
+        return staticScope;
     }
     
     /**
@@ -75,7 +92,6 @@ public class RootNode extends Node {
         return bodyNode;
     }
 
-    // TODO: Visitors will need something here I think
     public Instruction accept(NodeVisitor iVisitor) {
         return iVisitor.visitRootNode(this);
     }

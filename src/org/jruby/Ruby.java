@@ -70,6 +70,7 @@ import org.jruby.parser.Parser;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.GlobalVariable;
 import org.jruby.runtime.IAccessor;
 import org.jruby.runtime.ObjectSpace;
@@ -226,7 +227,7 @@ public final class Ruby implements IRuby {
      * Evaluates a script and returns a RubyObject.
      */
     public IRubyObject evalScript(String script) {
-        return eval(parse(script, "<script>", true));
+        return eval(parse(script, "<script>", getCurrentContext().getCurrentScope()));
     }
 
     public IRubyObject eval(Node node) {
@@ -689,12 +690,12 @@ public final class Ruby implements IRuby {
         globalVariables.defineReadonly(name, new ValueAccessor(value));
     }
 
-    public Node parse(Reader content, String file, boolean asBlock) {
-        return parser.parse(file, content, asBlock);
+    public Node parse(Reader content, String file, DynamicScope scope) {
+        return parser.parse(file, content, scope);
     }
 
-    public Node parse(String content, String file, boolean asBlock) {
-        return parser.parse(file, content, asBlock);
+    public Node parse(String content, String file, DynamicScope scope) {
+        return parser.parse(file, content, scope);
     }
 
     public ThreadService getThreadService() {
@@ -854,7 +855,7 @@ public final class Ruby implements IRuby {
                 self.extendObject(context.getRubyClass());
             }
 
-        	Node node = parse(source, scriptName, false);
+        	Node node = parse(source, scriptName, null);
             self.eval(node);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {

@@ -37,6 +37,7 @@ import org.jruby.ast.BlockNode;
 import org.jruby.ast.CommentNode;
 import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.runtime.DynamicScope;
 
 /**
  */
@@ -46,7 +47,7 @@ public class RubyParserResult {
     private Node ast;
     private boolean endSeen;
     private List commentNodes = new ArrayList();
-    private StaticScope staticScope;
+    private DynamicScope scope;
 
     public List getCommentNodes() {
         return commentNodes;
@@ -56,12 +57,12 @@ public class RubyParserResult {
         return ast;
     }
     
-    public StaticScope getStaticScope() {
-        return staticScope;
+    public DynamicScope getScope() {
+        return scope;
     }
     
-    public void setStaticScope(StaticScope staticScope) {
-        this.staticScope = staticScope;
+    public void setScope(DynamicScope scope) {
+        this.scope = scope;
     }
 
     /**

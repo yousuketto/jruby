@@ -445,7 +445,11 @@ public class ThreadContext {
     }
 
     public IRubyObject getBackref() {
-        return getCurrentScope().getBackRef();
+        IRubyObject value = getCurrentScope().getBackRef();
+        
+        // DynamicScope does not preinitialize these values since they are virtually
+        // never used.
+        return value == null ? runtime.getNil() : value; 
     }
 
     public void setBackref(IRubyObject backref) {
@@ -517,7 +521,7 @@ public class ThreadContext {
         		throw je;
         	}
         } finally {
-            postBoundEvalOrYield(currentBlock);
+            postYield(currentBlock);
         }
     }
 
@@ -545,7 +549,7 @@ public class ThreadContext {
                 throw je;
             }
         } finally {
-            postBoundEvalOrYield(yieldBlock);
+            postYield(yieldBlock);
             postProcBlockCall();
         }
     }
@@ -1069,20 +1073,23 @@ public class ThreadContext {
         pushFrame(block.getFrame());
         setCRef(block.getCRef());        
         getCurrentFrame().setScope(block.getScope());
-
-        // When we eval with a binding we use that dynamic scope (contrast with iter where
-        // we clone the scope for each invocation).
-        pushScope(block.getDynamicScope());
         pushRubyClass(block.getKlass()); 
         pushIter(block.getIter());
     }
 
-    public void postBoundEvalOrYield(Block block) {
+    public void postEvalWithBinding(Block block) {
+        popIter();
+        popFrame();
+        unsetCRef();
+        popRubyClass();
+    }
+    
+    public void postYield(Block block) {
         flushBlockState(block);
     }
 
-    public void preRootNode(StaticScope staticScope) {
-        pushScope(new DynamicScope(staticScope, getCurrentScope()));
+    public void preRootNode(DynamicScope scope) {
+        pushScope(scope);
         getCurrentFrame().newScope();
     }
 

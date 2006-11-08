@@ -693,9 +693,9 @@ public class RubyObject implements Cloneable, IRubyObject {
             threadContext.preEvalWithBinding(blockOfBinding);            
             newSelf = threadContext.getFrameSelf();
 
-            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file, true), newSelf);
+            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file, blockOfBinding.getDynamicScope()), newSelf);
         } finally {
-            threadContext.postBoundEvalOrYield(blockOfBinding);
+            threadContext.postEvalWithBinding(blockOfBinding);
             
             // restore position
             threadContext.setPosition(savedPosition);
@@ -723,7 +723,7 @@ public class RubyObject implements Cloneable, IRubyObject {
                 threadContext.setFrameIter(threadContext.getPreviousFrameIter());
             }
             
-            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file, true), this);
+            result = EvaluationState.eval(threadContext, getRuntime().parse(src.toString(), file, threadContext.getCurrentScope()), this);
         } finally {
             // FIXME: this is broken for Proc, see above
             threadContext.setFrameIter(iter);

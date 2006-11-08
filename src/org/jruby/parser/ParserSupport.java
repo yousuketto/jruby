@@ -92,6 +92,7 @@ import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.lexer.yacc.ISourcePositionHolder;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.lexer.yacc.Token;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.util.IdUtil;
 
 /** 
@@ -283,7 +284,7 @@ public class ParserSupport {
     public Node addRootNode(Node topOfAST) {
         // I am not sure we need to get AST to set AST and the appendToBlock could maybe get removed.
         // For sure once we do two pass parsing we should since this is mostly just optimzation.
-        RootNode root = new RootNode(null, currentScope, 
+        RootNode root = new RootNode(null, result.getScope(),
                 appendToBlock(result.getAST(), topOfAST));
 
         // FIXME: Should add begin and end nodes
@@ -556,9 +557,10 @@ public class ParserSupport {
     *  Description of the RubyMethod
     */
     public void initTopLocalVariables() {
-        currentScope = configuration.getExistingScope();
+        DynamicScope scope = configuration.getScope(); 
+        currentScope = scope.getStaticScope(); 
         
-        result.setStaticScope(currentScope);
+        result.setScope(scope);
     }
 
     /** Getter for property inSingle.

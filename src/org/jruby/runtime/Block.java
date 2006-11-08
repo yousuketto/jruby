@@ -34,6 +34,7 @@ package org.jruby.runtime;
 import org.jruby.IRuby;
 import org.jruby.RubyModule;
 import org.jruby.ast.Node;
+import org.jruby.parser.BlockStaticScope;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.collections.SinglyLinkedList;
 import org.jruby.util.collections.StackElement;
@@ -102,6 +103,17 @@ public class Block implements StackElement {
     
     public static Block createBinding(RubyModule wrapper, Iter iter, Frame frame, DynamicScope dynamicScope) {
         ThreadContext context = frame.getSelf().getRuntime().getCurrentContext();
+        
+        // We create one extra dynamicScope on a binding so that when we 'eval "b=1", binding' the
+        // 'b' will get put into this new dynamic scope.  The original scope does not see the new
+        // 'b' and successive evals with this binding will.  This particular aspect of binding is
+        // fairly confusing to me.  I take it having the ability to have succesive binding evals
+        // be able to share same scope makes sense from a programmers perspective, but it is odd 
+        // that they do not modify existing scope.
+        //
+        // One other crappy outcome of this design is it requires Dynamic and Static scopes to be
+        // mutable.
+        dynamicScope = new DynamicScope(new BlockStaticScope(dynamicScope.getStaticScope()), dynamicScope);
         
         // FIXME: Ruby also saves wrapper, which we do not
         return new Block(null, null, frame.getSelf(), frame, context.peekCRef(), frame.getScope(), context.getRubyClass(), iter, dynamicScope);

@@ -108,6 +108,27 @@ public class DynamicScope {
         }
     }
 
+    /**
+     * 
+     * Make a larger dynamic scope if the static scope grew.
+     * 
+     * Eval's with bindings require us to possibly change the size of the dynamic scope if
+     * things like 'eval "b = 2", binding' happens.
+     *
+     */
+    public void growIfNeeded() {
+        int dynamicSize = variableValues == null ? 0: variableValues.length;
+        
+        if (staticScope.getNumberOfVariables() > dynamicSize) {
+            IRubyObject values[] = new IRubyObject[staticScope.getNumberOfVariables()];
+            
+            if (dynamicSize > 0) {
+                System.arraycopy(variableValues, 0, values, 0, dynamicSize);
+            }
+            
+            variableValues = values;
+        }
+    }
 
     // FIXME: Depending on profiling we may want to cache information on location and depth of
     // both $_ and/or $~ since in some situations they may happen a lot.  isDefined should be
@@ -133,8 +154,8 @@ public class DynamicScope {
     
     public IRubyObject getBackRef() {
         int location = staticScope.isDefined("$~");
-
-        return getValue(location & 0xffff, location >> 16);
+        
+        return getValue(location & 0xffff, location >> 16); 
     }
 
     /**
