@@ -105,7 +105,7 @@ public final class DefaultMethod extends AbstractMethod {
 
             traceCall(runtime, receiver, name);
 
-            return receiver.eval(body);
+            return EvaluationState.eval(context, body, receiver);
         } catch (JumpException je) {
         	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
 	            if (je.getPrimaryData() == this) {
@@ -124,6 +124,7 @@ public final class DefaultMethod extends AbstractMethod {
         int restArg = argsNode.getRestArg();
         boolean hasOptArgs = argsNode.getOptArgs() != null;
 
+        // FIXME: This seems redundant with the arity check in internalCall...is it actually different?
         if (expectedArgsCount > args.length) {
             throw runtime.newArgumentError("Wrong # of arguments(" + args.length + " for " + expectedArgsCount + ")");
         }

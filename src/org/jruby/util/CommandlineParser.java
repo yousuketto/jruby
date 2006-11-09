@@ -64,6 +64,7 @@ public class CommandlineParser {
     private String[] scriptArguments = null;
     private boolean shouldRunInterpreter = true;
     private boolean objectSpaceEnabled = true;
+    private boolean compilerEnabled = false;
 
     public int argumentIndex = 0;
     public int characterIndex = 0;
@@ -121,6 +122,9 @@ public class CommandlineParser {
                     break;
                 case 'O' :
                     objectSpaceEnabled = false;
+                    break;
+                case 'C' :
+                    compilerEnabled = true;
                     break;
                 case 'n' :
                     assumeLoop = true;
@@ -272,4 +276,8 @@ public class CommandlineParser {
     public boolean isObjectSpaceEnabled() {
         return objectSpaceEnabled;
     }
+    
+    public boolean isCompilerEnabled() {
+        return compilerEnabled;
+}
 }

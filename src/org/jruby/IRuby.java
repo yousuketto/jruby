@@ -45,6 +45,8 @@ public interface IRuby {
 
 	public IRubyObject eval(Node node);
 
+    public IRubyObject compileAndRun(Node node);
+
 	public RubyClass getObject();
     
     public RubyModule getKernel();

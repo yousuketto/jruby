@@ -27,7 +27,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast.executable;
 
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.jruby.IRuby;
 import org.jruby.ast.AliasNode;
@@ -125,7 +127,11 @@ import org.jruby.ast.ZArrayNode;
 import org.jruby.ast.ZSuperNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
-import org.jruby.runtime.callback.Callback;
+import org.jruby.internal.runtime.methods.MultiStub;
+import org.jruby.internal.runtime.methods.MultiStubMethod;
+import org.jruby.runtime.Arity;
+import org.jruby.runtime.Visibility;
+import org.jruby.util.JRubyClassLoader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -133,6 +139,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 public class InstructionCompiler2 implements NodeVisitor {
+    private static final String RUBYMODULE = "org/jruby/RubyModule";
+
     private static final String IRUBY = "org/jruby/IRuby";
 
     private static final String IRUBYOBJECT = "org/jruby/runtime/builtin/IRubyObject";
@@ -149,9 +157,16 @@ public class InstructionCompiler2 implements NodeVisitor {
     
     private int lastLine = 0;
 
-    private boolean tcLoaded;
-
     private boolean runtimeLoaded;
+    
+    Map classWriters = new HashMap();
+    ClassWriter currentMultiStub = null;
+    int multiStubIndex = -1;
+    int multiStubCount = -1;
+
+    private String classname;
+
+    private String sourceName;
     
     public class NotCompilableException extends RuntimeException {
         private static final long serialVersionUID = 8481162670192366492L;
@@ -161,14 +176,40 @@ public class InstructionCompiler2 implements NodeVisitor {
         }
     }
 
-    public InstructionCompiler2(String classname, String sourceName) {
+    public InstructionCompiler2() {
+    }
+    
+    public void closeOutMultiStub() {
+        if (currentMultiStub != null) {
+            while (multiStubIndex < 9) {
+                MethodVisitor multiStubMethod = createNewMethod();
+                multiStubMethod.visitCode();
+                multiStubMethod.visitInsn(Opcodes.ACONST_NULL);
+                multiStubMethod.visitInsn(Opcodes.ARETURN);
+                multiStubMethod.visitMaxs(1, 1);
+                multiStubMethod.visitEnd();
+            }
+        }
+    }
+    
+    public void defineModuleFunction(IRuby runtime, String module, String name, MultiStub stub, int index, Arity arity, Visibility visibility) {
+        runtime.getModule(module).addMethod(name, new MultiStubMethod(stub, index, runtime.getModule(module), arity, visibility));
+    }
+    
+    public String[] compile(String classname, String sourceName, Node node) {
         cv = new ClassWriter(true);
+        if (classname.startsWith("-e")) {
+            classname = classname.replaceAll("-e", "DashE");
+        }
+        classWriters.put(classname, cv);
+        this.classname = classname;
+        this.sourceName = sourceName;
 
         cv.visit(Opcodes.V1_2, Opcodes.ACC_PUBLIC + Opcodes.ACC_SUPER,
-                classname, null, "java/lang/Object", null);
+                classname, null, "java/lang/Object", new String[] {"org/jruby/ast/executable/Script"});
         cv.visitSource(sourceName, null);
 
-        mv = cv.visitMethod(Opcodes.ACC_PRIVATE, "<init>", "()V", null, null);
+        mv = cv.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitCode();
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>",
@@ -176,60 +217,99 @@ public class InstructionCompiler2 implements NodeVisitor {
         mv.visitInsn(Opcodes.RETURN);
         mv.visitMaxs(1, 1);
         mv.visitEnd();
-    }
 
-    public void newMethod(String methodName, String signature, Node node) {
-        mv = cv.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
-                methodName, signature, null, null);
+        // create method for toplevel of script
+        mv = createNewMethod();
+        String className = classname + "$MultiStub" + multiStubCount;
+        String methodName = "method" + multiStubIndex;
         mv.visitCode();
 
+        try {
         node.accept(this);
+        } catch (NotCompilableException nce) {
+            // TODO: recover somehow? build a pure eval method?
+            throw nce;
+        }
 
-        mv.visitMaxs(1, 1); // bogus values, ASM will auto-calculate
         mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(1, 1); // automatically calculated by ASM
         mv.visitEnd();
         
-        // clean up state
-        tcLoaded = false;
         runtimeLoaded = false;
+        
+        closeOutMultiStub();
+
+        // add Script#run impl
+        mv = cv.visitMethod(Opcodes.ACC_PUBLIC, "run", "(Lorg/jruby/runtime/ThreadContext;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;", null, null);
+        mv.visitTypeInsn(Opcodes.NEW, className);
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, className, "<init>", "()V");
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitInsn(Opcodes.ACONST_NULL);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className, methodName, "(Lorg/jruby/runtime/ThreadContext;Lorg/jruby/runtime/builtin/IRubyObject;[Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(1, 1);
+        mv.visitEnd();
+        
+        return new String[] {className, methodName};
     }
     
-    public void defineModuleFunction(IRuby runtime, String module, String name, Callback callback) {
-        runtime.getModule("Kernel").definePublicModuleFunction(name, callback);
+    public Class loadClasses(JRubyClassLoader loader) throws ClassNotFoundException {
+        for (Iterator iter = classWriters.entrySet().iterator(); iter.hasNext();) {
+            Map.Entry entry = (Map.Entry)iter.next();
+            String key = (String)entry.getKey();
+            ClassWriter writer = (ClassWriter)entry.getValue();
+            
+            loader.defineClass(key.replaceAll("/", "."), writer.toByteArray());
+    }
+
+        return loader.loadClass(classname.replaceAll("/", "."));
     }
 
     // finished
     public Instruction visitAliasNode(AliasNode iVisited) {
         lineNumber(iVisited);
-        loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getRubyClass", "()Lorg/jruby/RubyModule;");
+        getRubyClass();
         mv.visitInsn(Opcodes.DUP);
         mv.visitInsn(Opcodes.DUP);
         Label l1 = new Label();
         mv.visitJumpInsn(Opcodes.IFNONNULL, l1);
-        loadRuntime();
-        mv.visitLdcInsn("no class to make alias");
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "newTypeError", "(Ljava/lang/String;)Lorg/jruby/exceptions/RaiseException;");
+        newTypeError("no class to make alias");
         mv.visitInsn(Opcodes.ATHROW);
         
         mv.visitLabel(l1);
-        mv.visitLdcInsn(iVisited.getNewName());
-        mv.visitLdcInsn(iVisited.getOldName());
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/RubyModule", "defineAlias", "(Ljava/lang/String;Ljava/lang/String;)V");
+        defineAlias(iVisited.getNewName(), iVisited.getOldName());
         mv.visitLdcInsn("method_added");
-        loadRuntime();
-        mv.visitLdcInsn(iVisited.getNewName());
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "newSymbol", "()Lorg/jruby/RubySymbol;");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/RubyModule", "callMethod", "(Ljava/lang/String;Lorg/jruby/RubySymbol;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        newSymbol(iVisited.getNewName());
+        invokeRubyModule("callMethod", "(Ljava/lang/String;Lorg/jruby/RubySymbol;)Lorg/jruby/runtime/builtin/IRubyObject;");
         
         return null;
+    }
+
+    private void newSymbol(String name) {
+        loadRuntime();
+        mv.visitLdcInsn(name);
+        invokeIRuby("newSymbol", "()Lorg/jruby/RubySymbol;");
+    }
+
+    private void defineAlias(String newName, String oldName) {
+        mv.visitLdcInsn(newName);
+        mv.visitLdcInsn(oldName);
+        invokeRubyModule("defineAlias", "(Ljava/lang/String;Ljava/lang/String;)V");
+    }
+
+    private void newTypeError(String error) {
+        loadRuntime();
+        mv.visitLdcInsn(error);
+        invokeIRuby("newTypeError", "(Ljava/lang/String;)Lorg/jruby/exceptions/RaiseException;");
     }
 
     public Instruction visitAndNode(AndNode iVisited) {
         lineNumber(iVisited);
         iVisited.getFirstNode().accept(this);
         mv.visitInsn(Opcodes.DUP);
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "isTrue", "()B");
+        invokeIRubyObject("isTrue", "()B");
         Label l1 = new Label();
         mv.visitJumpInsn(Opcodes.IFEQ, l1);
         mv.visitInsn(Opcodes.POP); // remove first node's result
@@ -237,6 +317,22 @@ public class InstructionCompiler2 implements NodeVisitor {
         mv.visitLabel(l1);
         
         return null;
+    }
+
+    private void invokeIRubyObject(String methodName, String signature) {
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, methodName, signature);
+    }
+
+    private void invokeIRuby(String methodName, String signature) {
+        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, methodName, signature);
+    }
+
+    private void invokeThreadContext(String methodName, String signature) {
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, methodName, signature);
+    }
+
+    private void invokeRubyModule(String methodName, String signature) {
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, RUBYMODULE, methodName, signature);
     }
 
     public Instruction visitArgsNode(ArgsNode iVisited) {
@@ -264,7 +360,7 @@ public class InstructionCompiler2 implements NodeVisitor {
         };
         buildObjectArray(IRUBYOBJECT, iVisited.childNodes().toArray(), callback);
 
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "newArray", "([Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/RubyArray;");
+        invokeIRuby("newArray", "([Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/RubyArray;");
         
         return null;
     }
@@ -350,7 +446,9 @@ public class InstructionCompiler2 implements NodeVisitor {
     }
 
     public Instruction visitBeginNode(BeginNode iVisited) {
-        throw new NotCompilableException("Node not supported: " + iVisited.toString());
+        iVisited.getBodyNode().accept(this);
+        
+        return null;
     }
 
     public Instruction visitBignumNode(BignumNode iVisited) {
@@ -404,88 +502,145 @@ public class InstructionCompiler2 implements NodeVisitor {
         if (iVisited.getPathNode() != null) {
             iVisited.getPathNode().accept(this);
         } else {
-            loadThreadContext();
-            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getRubyClass", "()Lorg/jruby/RubyModule;");
+            getRubyClass();
             Label l1 = new Label();
             
             mv.visitJumpInsn(Opcodes.IFNONNULL, l1);
             
-            loadRuntime();
-            mv.visitLdcInsn("no class/module to define constant");
-            mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "newTypeError", "(Ljava/lang/String;)Lorg/jruby/exceptions/RaiseException;");
+            newTypeError("no class/module to define constant");
             mv.visitInsn(Opcodes.ATHROW);
             
             mv.visitLabel(l1);
             
-            loadThreadContext();
-            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "peekCRef", "()Lorg/jruby/util/collections/SinglyLinkedList;");
-            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getValue", "()Ljava/lang/Object;");
+            peekCRef();
         }
 
-        mv.visitTypeInsn(Opcodes.CHECKCAST, "org/jruby/RubyModule");
+        mv.visitTypeInsn(Opcodes.CHECKCAST, RUBYMODULE);
         
         mv.visitInsn(Opcodes.SWAP);
         mv.visitLdcInsn(iVisited.getName());
         mv.visitInsn(Opcodes.SWAP);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/RubyModule", "setConstant", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeRubyModule("setConstant", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
         
         return null;
     }
 
+    private void peekCRef() {
+        loadThreadContext();
+        invokeThreadContext("peekCRef", "()Lorg/jruby/util/collections/SinglyLinkedList;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/util/collections/SingleLinkedList", "getValue", "()Ljava/lang/Object;");
+    }
+
     public Instruction visitClassVarAsgnNode(ClassVarAsgnNode iVisited) {
-        // TODO untested
         lineNumber(iVisited);
         
+        // eval value
         iVisited.getValueNode().accept(this);
                 
-        loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "peekCRef", "()Lorg/jruby/util/collections/SinglyLinkedList;");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/util/collections/SinglyLinkedList", "getValue", "()Ljava/lang/Object;");
-        mv.visitTypeInsn(Opcodes.CHECKCAST, "org/jruby/RubyModule");
+        getCRefClass();
+        
+        // dup it
         mv.visitInsn(Opcodes.DUP);
         
         Label l1 = new Label();
         Label l2 = new Label();
         mv.visitJumpInsn(Opcodes.IFNONNULL, l1);
         
-        // null class
+        // pop extra null class
+        // FIXME this bit is untested
         mv.visitInsn(Opcodes.POP);
-        loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getFrameSelf", "()Lorg/jruby/runtime/builtin/IRubyObject;");
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "getMetaClass", "()Lorg/jruby/RubyClass;");
+        loadSelf();
+        invokeIRubyObject("getMetaClass", "()Lorg/jruby/RubyClass;");
         mv.visitJumpInsn(Opcodes.GOTO, l2);
         
+        // FIXME this bit is untested
         mv.visitLabel(l1);
+        // dup it again
         mv.visitInsn(Opcodes.DUP);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/RubyModule", "isSingleton", "()B");
+        invokeRubyModule("isSingleton", "()Z");
         mv.visitJumpInsn(Opcodes.IFEQ, l2);
         
         mv.visitLdcInsn("__attached__");
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/RubyObject", "getInstanceVariable", "(Ljava/lang/String;)Lorg/jruby/runtime/builtin/IRubyObject;");
-        mv.visitTypeInsn(Opcodes.CHECKCAST, "org/jruby/RubyModule");
+        invokeIRubyObject("getInstanceVariable", "(Ljava/lang/String;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        mv.visitTypeInsn(Opcodes.CHECKCAST, RUBYMODULE);
         
         mv.visitLabel(l2);
         
         mv.visitInsn(Opcodes.SWAP);
         mv.visitLdcInsn(iVisited.getName());
         mv.visitInsn(Opcodes.SWAP);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/RubyModule", "setClassVar", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeRubyModule("setClassVar", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
         
         return null;
     }
 
     public Instruction visitClassVarDeclNode(ClassVarDeclNode iVisited) {
-        throw new NotCompilableException("Node not supported: " + iVisited.toString());
+        // FIXME INCOMPLETE, probably broken
+        lineNumber(iVisited);
+        
+        getRubyClass();
+        Label l298 = new Label();
+        mv.visitJumpInsn(Opcodes.IFNONNULL, l298);
+        newTypeError("no class/module to define class variable");
+        mv.visitInsn(Opcodes.ATHROW);
+        
+        mv.visitLabel(l298);
+        System.out.println("foo");
+        getCRefClass();
+        
+        mv.visitLdcInsn(iVisited.getName());
+        
+        iVisited.getValueNode().accept(this);
+        
+        invokeRubyModule("setClassVar", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)V");
+        
+        loadRuntime();
+        invokeIRuby("getNil", "()Lorg/jruby/runtime/builtin/IRubyObject;");
+        
+        return null;
     }
 
     public Instruction visitClassVarNode(ClassVarNode iVisited) {
-        throw new NotCompilableException("Node not supported: " + iVisited.toString());
+        // TODO untested
+        lineNumber(iVisited);
+        
+        getCRefClass();
+        
+        // dup it
+        mv.visitInsn(Opcodes.DUP);
+        
+        Label l1 = new Label();
+        Label l2 = new Label();
+        mv.visitJumpInsn(Opcodes.IFNONNULL, l1);
+        
+        // pop extra null class
+        mv.visitInsn(Opcodes.POP);
+        loadSelf();
+        invokeIRubyObject("getMetaClass", "()Lorg/jruby/RubyClass;");
+        mv.visitJumpInsn(Opcodes.GOTO, l2);
+        
+        mv.visitLabel(l1);
+        // dup it again
+        mv.visitInsn(Opcodes.DUP);
+        invokeRubyModule("isSingleton", "()Z");
+        mv.visitJumpInsn(Opcodes.IFEQ, l2);
+        
+        mv.visitLdcInsn("__attached__");
+        invokeIRubyObject("getInstanceVariable", "(Ljava/lang/String;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        mv.visitTypeInsn(Opcodes.CHECKCAST, RUBYMODULE);
+        
+        mv.visitLabel(l2);
+        
+        mv.visitLdcInsn(iVisited.getName());
+        invokeRubyModule("getClassVar", "(Ljava/lang/String;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        
+        return null;
     }
 
     public Instruction visitCallNode(CallNode iVisited) {
         lineNumber(iVisited);
         loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "beginCallArgs", "()V");
+        invokeThreadContext("beginCallArgs", "()V");
         
         // TODO: try finally around this
         // recv
@@ -495,14 +650,14 @@ public class InstructionCompiler2 implements NodeVisitor {
         setupArgs(iVisited.getArgsNode());
 
         loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "endCallArgs", "()V");
+        invokeThreadContext("endCallArgs", "()V");
         
         // dup recv for CallType check
         mv.visitInsn(Opcodes.SWAP);
         mv.visitInsn(Opcodes.DUP);
         
         loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getFrameSelf", "()Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeThreadContext("getFrameSelf", "()Lorg/jruby/runtime/builtin/IRubyObject;");
         
         Label l1 = new Label();
         Label l2 = new Label();
@@ -527,7 +682,7 @@ public class InstructionCompiler2 implements NodeVisitor {
         // pop name and recv on top
         mv.visitInsn(Opcodes.POP2);
         
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "callMethod", "(Ljava/lang/String;[Lorg/jruby/runtime/builtin/IRubyObject;Lorg/jruby/runtime/CallType;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeIRubyObject("callMethod", "(Ljava/lang/String;[Lorg/jruby/runtime/builtin/IRubyObject;Lorg/jruby/runtime/CallType;)Lorg/jruby/runtime/builtin/IRubyObject;");
         
         return null;
     }
@@ -549,7 +704,13 @@ public class InstructionCompiler2 implements NodeVisitor {
     }
 
     public Instruction visitConstNode(ConstNode iVisited) {
-        throw new NotCompilableException("Node not supported: " + iVisited.toString());
+        lineNumber(iVisited);
+        
+        loadThreadContext();
+        mv.visitLdcInsn(iVisited.getName());
+        invokeThreadContext("getConstant", "(Ljava/lang/String;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        
+        return null;
     }
 
     public Instruction visitDAsgnNode(DAsgnNode iVisited) {
@@ -580,14 +741,64 @@ public class InstructionCompiler2 implements NodeVisitor {
         throw new NotCompilableException("Node not supported: " + iVisited.toString());
     }
 
+    public MethodVisitor createNewMethod() {
+        // create a new MultiStub-based method impl and provide the method visitor for it
+        if (currentMultiStub == null || multiStubIndex == 9) {
+            if (currentMultiStub != null) {
+                // FIXME can we end if there's still a method in flight?
+                currentMultiStub.visitEnd();
+            }
+            
+            multiStubCount++;
+            
+            currentMultiStub = new ClassWriter(true);
+            currentMultiStub.visit(Opcodes.V1_2, Opcodes.ACC_PUBLIC + Opcodes.ACC_SUPER + Opcodes.ACC_STATIC,
+                    classname + "$MultiStub" + multiStubCount, null, "java/lang/Object", new String[] {"org/jruby/internal/runtime/methods/MultiStub"});
+            cv.visitInnerClass(classname + "$MultiStub" + multiStubCount, classname, "MultiStub" + multiStubCount, Opcodes.ACC_PUBLIC + Opcodes.ACC_STATIC);
+            multiStubIndex = 0;
+            classWriters.put(classname + "$MultiStub" + multiStubCount, currentMultiStub);
+            currentMultiStub.visitSource(sourceName, null);
+
+            MethodVisitor stubConstructor = currentMultiStub.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+            stubConstructor.visitCode();
+            stubConstructor.visitVarInsn(Opcodes.ALOAD, 0);
+            stubConstructor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>",
+                    "()V");
+            stubConstructor.visitInsn(Opcodes.RETURN);
+            stubConstructor.visitMaxs(1, 1);
+            stubConstructor.visitEnd();
+        } else {
+            multiStubIndex++;
+        }
+        
+        return currentMultiStub.visitMethod(Opcodes.ACC_PUBLIC, "method" + multiStubIndex, "(Lorg/jruby/runtime/ThreadContext;Lorg/jruby/runtime/builtin/IRubyObject;[Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;", null, null);
+    }
+
     public Instruction visitDefnNode(DefnNode iVisited) {
         // TODO: build arg list based on number of args, optionals, etc
-        mv = cv.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
-                iVisited.getName(), "(Lorg/jruby/runtime/builtin/IRubyObject;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;", null, null);
+        MethodVisitor oldMethod = mv;
+        boolean oldRuntimeLoaded = runtimeLoaded;
+        
+        runtimeLoaded = false;
+        
+        mv = createNewMethod();
         mv.visitCode();
         
         // TODO: this probably isn't always an ArgsNode
         args = (ArgsNode)iVisited.getArgsNode();
+        
+        mv.visitLdcInsn(new Integer(iVisited.getScope().getNumberOfVariables()));
+        mv.visitTypeInsn(Opcodes.ANEWARRAY, "org/jruby/runtime/builtin/IRubyObject");
+        mv.visitInsn(Opcodes.DUP);
+        // FIXME: use constant for index of local vars
+        mv.visitVarInsn(Opcodes.ASTORE, 4);
+        mv.visitVarInsn(Opcodes.ALOAD, 3);
+        mv.visitInsn(Opcodes.SWAP);
+        mv.visitLdcInsn(new Integer(0));
+        mv.visitInsn(Opcodes.SWAP);
+        mv.visitLdcInsn(new Integer(0));
+        mv.visitLdcInsn(new Integer(args.getArity().getValue()));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "arraycopy", "(Ljava/lang/Object;ILjava/lang/Object;II)V");
         
         try {
             iVisited.getBodyNode().accept(this);
@@ -600,10 +811,146 @@ public class InstructionCompiler2 implements NodeVisitor {
         mv.visitInsn(Opcodes.ARETURN);
         mv.visitEnd();
         
-        tcLoaded = false;
-        runtimeLoaded = false;
+        runtimeLoaded = oldRuntimeLoaded;
+        
+        mv = oldMethod;
+        
+        // method compiled, add to class
+        getRubyClass();
+        Label l335 = new Label();
+        // if class is null, throw error
+        mv.visitJumpInsn(Opcodes.IFNONNULL, l335);
+        newTypeError("No class to add method.");
+        mv.visitInsn(Opcodes.ATHROW);
+        mv.visitLabel(l335);
+        
+        Label l338 = new Label();
+        
+        // only do Object#initialize check if necessary
+        if (iVisited.getName().equals("initialize")) {
+            // got class, compare to Object
+            getRubyClass();
+            loadRuntime();
+            invokeIRuby("getObject", "()Lorg/jruby/RubyClass;");
+            // if class == Object
+            mv.visitJumpInsn(Opcodes.IF_ACMPNE, l338);
+            loadRuntime();
+            // display warning about redefining Object#initialize
+            invokeIRuby("getWarnings", "()Lorg/jruby/common/RubyWarnings;");
+            mv.visitLdcInsn("redefining Object#initialize may cause infinite loop");
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/common/RubyWarnings", "warn", "(Ljava/lang/String;)V");
+        }
+        
+        mv.visitLabel(l338);
+        // TODO: fix this section for initialize visibility
+//        mv.visitLdcInsn(iVisited.getName());
+//        mv.visitLdcInsn("initialize");
+//        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z");
+//        Label l341 = new Label();
+//        mv.visitJumpInsn(Opcodes.IFNE, l341);
+//        getCurrentVisibility();
+//        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/runtime/Visibility", "isModuleFunction", "()Z");
+//        Label l342 = new Label();
+//        mv.visitJumpInsn(Opcodes.IFEQ, l342);
+//        mv.visitLabel(l341);
+//        mv.visitFieldInsn(Opcodes.GETSTATIC, "org/jruby/runtime/Visibility", "PRIVATE", "Lorg/jruby/runtime/Visibility;");
+//        mv.visitVarInsn(ASTORE, 7);
+//        mv.visitLabel(l342);
+        getRubyClass();
+        mv.visitTypeInsn(Opcodes.NEW, "org/jruby/internal/runtime/methods/MultiStubMethod");
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitTypeInsn(Opcodes.NEW, classname + "$MultiStub" + multiStubCount);
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, classname + "$MultiStub" + multiStubCount, "<init>", "()V");
+        mv.visitLdcInsn(new Integer(multiStubIndex));
+        getRubyClass();
+        // TODO: handle args some way? maybe unnecessary with method compiled?
+//        mv.visitVarInsn(ALOAD, 4);
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/ast/DefnNode", "getArgsNode", "()Lorg/jruby/ast/Node;");
+//        mv.visitTypeInsn(CHECKCAST, "org/jruby/ast/ArgsNode");
+        mv.visitLdcInsn(new Integer(args.getArity().getValue()));
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "org/jruby/runtime/Arity", "createArity", "(I)Lorg/jruby/runtime/Arity;");
+        getCurrentVisibility();
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "org/jruby/internal/runtime/methods/MultiStubMethod", "<init>", "(Lorg/jruby/internal/runtime/methods/MultiStub;ILorg/jruby/RubyModule;Lorg/jruby/runtime/Arity;Lorg/jruby/runtime/Visibility;)V");
+        
+        mv.visitLdcInsn(iVisited.getName());
+        // put name before MultiStubMethod instance
+        mv.visitInsn(Opcodes.SWAP);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/RubyModule", "addMethod", "(Ljava/lang/String;Lorg/jruby/runtime/ICallable;)V");
+        // FIXME: this part is for invoking method_added or singleton_method_added
+//        Label l345 = new Label();
+//        mv.visitLabel(l345);
+//        mv.visitLineNumber(538, l345);
+//        loadThreadContext();
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/runtime/ThreadContext", "getCurrentVisibility", "()Lorg/jruby/runtime/Visibility;");
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/runtime/Visibility", "isModuleFunction", "()Z");
+//        Label l346 = new Label();
+//        mv.visitJumpInsn(IFEQ, l346);
+//        Label l347 = new Label();
+//        mv.visitLabel(l347);
+//        mv.visitLineNumber(539, l347);
+//        mv.visitVarInsn(ALOAD, 5);
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/RubyModule", "getSingletonClass", "()Lorg/jruby/MetaClass;");
+//        mv.visitLdcInsn(iVisited.getName());
+//        mv.visitTypeInsn(NEW, "org/jruby/internal/runtime/methods/WrapperCallable");
+//        mv.visitInsn(DUP);
+//        mv.visitVarInsn(ALOAD, 5);
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/RubyModule", "getSingletonClass", "()Lorg/jruby/MetaClass;");
+//        mv.visitVarInsn(ALOAD, 8);
+//        mv.visitFieldInsn(GETSTATIC, "org/jruby/runtime/Visibility", "PUBLIC", "Lorg/jruby/runtime/Visibility;");
+//        mv.visitMethodInsn(INVOKESPECIAL, "org/jruby/internal/runtime/methods/WrapperCallable", "<init>", "(Lorg/jruby/RubyModule;Lorg/jruby/runtime/ICallable;Lorg/jruby/runtime/Visibility;)V");
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/MetaClass", "addMethod", "(Ljava/lang/String;Lorg/jruby/runtime/ICallable;)V");
+//        Label l348 = new Label();
+//        mv.visitLabel(l348);
+//        mv.visitLineNumber(543, l348);
+//        mv.visitVarInsn(ALOAD, 5);
+//        mv.visitLdcInsn("singleton_method_added");
+//        loadRuntime();
+//        mv.visitLdcInsn(iVisited.getName());
+//        invokeIRuby("newSymbol", "(Ljava/lang/String;)Lorg/jruby/RubySymbol;");
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/RubyModule", "callMethod", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
+//        mv.visitInsn(POP);
+//        mv.visitLabel(l346);
+//        mv.visitLineNumber(547, l346);
+//        mv.visitVarInsn(ALOAD, 5);
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/RubyModule", "isSingleton", "()Z");
+//        Label l349 = new Label();
+//        mv.visitJumpInsn(IFEQ, l349);
+//        Label l350 = new Label();
+//        mv.visitLabel(l350);
+//        mv.visitLineNumber(548, l350);
+//        mv.visitVarInsn(ALOAD, 5);
+//        mv.visitTypeInsn(CHECKCAST, "org/jruby/MetaClass");
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/MetaClass", "getAttachedObject", "()Lorg/jruby/runtime/builtin/IRubyObject;");
+//        mv.visitLdcInsn("singleton_method_added");
+//        loadRuntime();
+//        mv.visitVarInsn(ALOAD, 4);
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/ast/DefnNode", "getName", "()Ljava/lang/String;");
+//        invokeIRuby("newSymbol", "(Ljava/lang/String;)Lorg/jruby/RubySymbol;");
+//        mv.visitMethodInsn(INVOKEINTERFACE, "org/jruby/runtime/builtin/IRubyObject", "callMethod", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
+//        mv.visitInsn(POP);
+//        Label l351 = new Label();
+//        mv.visitJumpInsn(GOTO, l351);
+//        mv.visitLabel(l349);
+//        mv.visitLineNumber(551, l349);
+//        mv.visitVarInsn(ALOAD, 5);
+//        mv.visitLdcInsn("method_added");
+//        loadRuntime();
+//        mv.visitLdcInsn(iVisited.getName());
+//        invokeIRuby("newSymbol", "(Ljava/lang/String;)Lorg/jruby/RubySymbol;");
+//        mv.visitMethodInsn(INVOKEVIRTUAL, "org/jruby/RubyModule", "callMethod", "(Ljava/lang/String;Lorg/jruby/runtime/builtin/IRubyObject;)Lorg/jruby/runtime/builtin/IRubyObject;");
+//        mv.visitInsn(POP);
+//        mv.visitLabel(l351);
+//        mv.visitLineNumber(554, l351);
+        loadRuntime();
+        invokeIRuby("getNil", "()Lorg/jruby/runtime/builtin/IRubyObject;");
         
         return null;
+    }
+
+    private void getCurrentVisibility() {
+        loadThreadContext();
+        invokeThreadContext("getCurrentVisibility", "()Lorg/jruby/runtime/Visibility;");
     }
 
     public Instruction visitDefsNode(DefsNode iVisited) {
@@ -625,22 +972,22 @@ public class InstructionCompiler2 implements NodeVisitor {
     public Instruction visitFCallNode(FCallNode iVisited) {
         lineNumber(iVisited);
         loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getFrameSelf", "()Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeThreadContext("getFrameSelf", "()Lorg/jruby/runtime/builtin/IRubyObject;");
         
         mv.visitLdcInsn(iVisited.getName());
         
         loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "beginCallArgs", "()V");
+        invokeThreadContext("beginCallArgs", "()V");
         
         // args
         setupArgs(iVisited.getArgsNode());
 
         loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "endCallArgs", "()V");
+        invokeThreadContext("endCallArgs", "()V");
         
         mv.visitFieldInsn(Opcodes.GETSTATIC, "org/jruby/runtime/CallType", "FUNCTIONAL", "Lorg/jruby/runtime/CallType;");
         
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "callMethod", "(Ljava/lang/String;[Lorg/jruby/runtime/builtin/IRubyObject;Lorg/jruby/runtime/CallType;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeIRubyObject("callMethod", "(Ljava/lang/String;[Lorg/jruby/runtime/builtin/IRubyObject;Lorg/jruby/runtime/CallType;)Lorg/jruby/runtime/builtin/IRubyObject;");
         
         return null;
     }
@@ -648,7 +995,7 @@ public class InstructionCompiler2 implements NodeVisitor {
     public Instruction visitFalseNode(FalseNode iVisited) {
         lineNumber(iVisited);
         loadRuntime();
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "getFalse", "()Lorg/jruby/RubyBoolean;");
+        invokeIRuby("getFalse", "()Lorg/jruby/RubyBoolean;");
         
         return null;
     }
@@ -660,8 +1007,7 @@ public class InstructionCompiler2 implements NodeVisitor {
                 THREADCONTEXT, "getRuntime",
                 "()Lorg/jruby/IRuby;");
         mv.visitLdcInsn(new Long(iVisited.getValue()));
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY,
-                "newFixnum", "(J)Lorg/jruby/RubyFixnum;");
+        invokeIRuby("newFixnum", "(J)Lorg/jruby/RubyFixnum;");
 
         return null;
     }
@@ -712,8 +1058,7 @@ public class InstructionCompiler2 implements NodeVisitor {
         iVisited.getCondition().accept(this);
 
         // call isTrue on the result
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE,
-                IRUBYOBJECT, "isTrue", "()Z");
+        invokeIRubyObject("isTrue", "()Z");
         mv.visitJumpInsn(Opcodes.IFEQ, falseJmp); // EQ == 0 (i.e. false)
         iVisited.getThenBody().accept(this);
         mv.visitJumpInsn(Opcodes.GOTO, afterJmp);
@@ -735,13 +1080,19 @@ public class InstructionCompiler2 implements NodeVisitor {
         
         iVisited.getValueNode().accept(this);
         mv.visitInsn(Opcodes.DUP);
-        
-        loadThreadContext();
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, THREADCONTEXT, "getFrameScope", "()Lorg/jruby/runtime/Scope;");
+        mv.visitVarInsn(Opcodes.ALOAD, 4);
         mv.visitInsn(Opcodes.SWAP);
         mv.visitLdcInsn(new Integer(iVisited.getIndex()));
         mv.visitInsn(Opcodes.SWAP);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/runtime/Scope", "setValue", "(ILorg/jruby/runtime/builtin/IRubyObject;)V");
+        mv.visitInsn(Opcodes.AASTORE);
+        
+//        loadThreadContext();
+//        invokeThreadContext("getFrameScope", "()Lorg/jruby/runtime/Scope;");
+//        mv.visitInsn(Opcodes.SWAP);
+//        mv.visitLdcInsn(new Integer(iVisited.getCount()));
+//        mv.visitInsn(Opcodes.SWAP);
+//        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/runtime/Scope", "setValue", "(ILorg/jruby/runtime/builtin/IRubyObject;)V");
+
         
         return null;
     }
@@ -750,20 +1101,28 @@ public class InstructionCompiler2 implements NodeVisitor {
         lineNumber(iVisited);
         // check if it's an argument
         int index = iVisited.getIndex();
+//        int index = iVisited.getCount();
+//        
+//        if ((index - 2) < args.getArgsCount()) {
+//            // load from the incoming params
+//            // index is 2-based, and our zero is runtime
+//            
+//            // load args array
+//            mv.visitVarInsn(Opcodes.ALOAD, 3);
+//            mv.visitLdcInsn(new Integer(index - 2));
+//            mv.visitInsn(Opcodes.AALOAD);
+//        } else {
+//            loadThreadContext();
+//            invokeThreadContext("getFrameScope", "()Lorg/jruby/runtime/Scope;");
+//            mv.visitLdcInsn(new Integer(iVisited.getCount()));
+//            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/runtime/Scope",
+//                    "getValue", "(I)Lorg/jruby/runtime/builtin/IRubyObject;");
+//        }
         
-        if ((index - 2) < args.getArgsCount()) {
-            // load from the incoming params
-            // index is 2-based, and our zero is runtime
-            mv.visitVarInsn(Opcodes.ALOAD, index - 1);
-        } else {
-            loadThreadContext();
-            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL,
-                    THREADCONTEXT, "getFrameScope",
-                    "()Lorg/jruby/runtime/Scope;");
-            mv.visitLdcInsn(new Integer(iVisited.getIndex()));
-            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/runtime/Scope",
-                    "getValue", "(I)Lorg/jruby/runtime/builtin/IRubyObject;");
-        }
+        // FIXME: better base index?
+        mv.visitVarInsn(Opcodes.ALOAD, 4);
+        mv.visitLdcInsn(new Integer(iVisited.getIndex()));
+        mv.visitInsn(Opcodes.AALOAD);
 
         return null;
     }
@@ -803,7 +1162,7 @@ public class InstructionCompiler2 implements NodeVisitor {
     public Instruction visitNilNode(NilNode iVisited) {
         lineNumber(iVisited);
         loadRuntime();
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "getNil", "()Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeIRuby("getNil", "()Lorg/jruby/runtime/builtin/IRubyObject;");
         
         return null;
     }
@@ -812,13 +1171,13 @@ public class InstructionCompiler2 implements NodeVisitor {
         lineNumber(iVisited);
         loadRuntime();
         iVisited.getConditionNode().accept(this);
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "isTrue", "()B");
+        invokeIRubyObject("isTrue", "()B");
         Label l1 = new Label();
         Label l2 = new Label();
         mv.visitJumpInsn(Opcodes.IFEQ, l1);
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "getFalse", "()Lorg/jruby/RubyBoolean;");
+        invokeIRuby("getFalse", "()Lorg/jruby/RubyBoolean;");
         mv.visitLabel(l1);
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "getTrue", "()Lorg/jruby/RubyBoolean;");
+        invokeIRuby("getTrue", "()Lorg/jruby/RubyBoolean;");
         mv.visitLabel(l2);
         
         return null;
@@ -902,7 +1261,7 @@ public class InstructionCompiler2 implements NodeVisitor {
         lineNumber(iVisited);
         loadRuntime();
         mv.visitLdcInsn(iVisited.getValue());
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "newString", "(Ljava/lang/String;)Lorg/jruby/RubyString;");
+        invokeIRuby("newString", "(Ljava/lang/String;)Lorg/jruby/RubyString;");
         
         return null;
     }
@@ -926,7 +1285,7 @@ public class InstructionCompiler2 implements NodeVisitor {
     public Instruction visitTrueNode(TrueNode iVisited) {
         lineNumber(iVisited);
         loadRuntime();
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "getTrue", "()Lorg/jruby/RubyBoolean;");
+        invokeIRuby("getTrue", "()Lorg/jruby/RubyBoolean;");
         
         return null;
     }
@@ -936,7 +1295,36 @@ public class InstructionCompiler2 implements NodeVisitor {
     }
 
     public Instruction visitUntilNode(UntilNode iVisited) {
-        throw new NotCompilableException("Node not supported: " + iVisited.toString());
+        lineNumber(iVisited);
+        
+        // FIXME support next, break, etc
+        
+        // leave nil on the stack when we're done
+        loadRuntime();
+        invokeIRuby("getNil", "()Lorg/jruby/runtime/builtin/IRubyObject;");
+        
+        if (iVisited.getBodyNode() != null) {
+            Label l1 = new Label();
+            Label l2 = new Label();
+            
+            mv.visitLabel(l1);
+            
+            iVisited.getConditionNode().accept(this);
+            invokeIRubyObject("isTrue", "()Z");
+            // conditionally jump end for until
+            mv.visitJumpInsn(Opcodes.IFNE, l2);
+            
+            iVisited.getBodyNode().accept(this);
+            // clear last result
+            mv.visitInsn(Opcodes.POP);
+            
+            // jump back for until
+            mv.visitJumpInsn(Opcodes.GOTO, l1);
+            
+            mv.visitLabel(l2);
+    }
+
+        return null;
     }
 
     public Instruction visitVAliasNode(VAliasNode iVisited) {
@@ -944,7 +1332,17 @@ public class InstructionCompiler2 implements NodeVisitor {
     }
 
     public Instruction visitVCallNode(VCallNode iVisited) {
-        throw new NotCompilableException("Node not supported: " + iVisited.toString());
+        lineNumber(iVisited);
+        loadSelf();
+        
+        mv.visitLdcInsn(iVisited.getName());
+
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "org/jruby/runtime/builtin/IRubyObject", "NULL_ARRAY", "[Lorg/jruby/runtime/builtin/IRubyObject;");
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "org/jruby/runtime/CallType", "FUNCTIONAL", "Lorg/jruby/runtime/CallType;");
+        
+        invokeIRubyObject("callMethod", "(Ljava/lang/String;[Lorg/jruby/runtime/builtin/IRubyObject;Lorg/jruby/runtime/CallType;)Lorg/jruby/runtime/builtin/IRubyObject;");
+        
+        return null;
     }
 
     public Instruction visitWhenNode(WhenNode iVisited) {
@@ -956,7 +1354,7 @@ public class InstructionCompiler2 implements NodeVisitor {
         
         // leave nil on the stack when we're done
         loadRuntime();
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "getNil", "()Lorg/jruby/runtime/builtin/IRubyObject;");
+        invokeIRuby("getNil", "()Lorg/jruby/runtime/builtin/IRubyObject;");
         
         if (iVisited.getBodyNode() != null) {
             Label l1 = new Label();
@@ -966,7 +1364,7 @@ public class InstructionCompiler2 implements NodeVisitor {
             
             if (iVisited.evaluateAtStart()) {
                 iVisited.getConditionNode().accept(this);
-                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "isTrue", "()Z");
+                invokeIRubyObject("isTrue", "()Z");
                 // conditionally jump end for while
                 mv.visitJumpInsn(Opcodes.IFEQ, l2);
             }
@@ -977,7 +1375,7 @@ public class InstructionCompiler2 implements NodeVisitor {
             
             if (!iVisited.evaluateAtStart()) {
                 iVisited.getConditionNode().accept(this);
-                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "isTrue", "()Z");
+                invokeIRubyObject("isTrue", "()Z");
                 // conditionally jump back for do...while
                 mv.visitJumpInsn(Opcodes.IFNE, l1);
             } else {
@@ -1018,20 +1416,16 @@ public class InstructionCompiler2 implements NodeVisitor {
         mv.visitLineNumber(iVisited.getPosition().getEndLine(), l);
     }
 
-    public ClassWriter getClassWriter() {
-        return cv;
+    public Map getClassWriters() {
+        return classWriters;
     }
     
-    public void setClassWriter(ClassWriter cv) {
-        this.cv = cv;
-    }
-
     private void setupArgs(Node node) {
-        lineNumber(node);
         if (node == null) {
             mv.visitInsn(Opcodes.ICONST_0);
             mv.visitTypeInsn(Opcodes.ANEWARRAY, IRUBYOBJECT);
         } else if (node instanceof ArrayNode) {
+            lineNumber(node);
             int count = ((ArrayNode)node).size();
             mv.visitLdcInsn(new Integer(count));
             mv.visitTypeInsn(Opcodes.ANEWARRAY, IRUBYOBJECT);
@@ -1058,27 +1452,36 @@ public class InstructionCompiler2 implements NodeVisitor {
 
     private void loadThreadContext() {
         // FIXME: make this work correctly for non-static, non-singleton
-        if (tcLoaded) {
-            mv.visitVarInsn(Opcodes.ALOAD, 51);
-            return;
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
         }
-        loadRuntime();
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBY, "getCurrentContext", "()Lorg/jruby/runtime/ThreadContext;");
-        mv.visitInsn(Opcodes.DUP);
-        mv.visitVarInsn(Opcodes.ASTORE, 51);
-        tcLoaded = true;
-    }
 
     private void loadRuntime() {
         // FIXME: make this work correctly for non-static, non-singleton
-        if (runtimeLoaded) {
-            mv.visitVarInsn(Opcodes.ALOAD, 50);
-            return;
+//        if (runtimeLoaded) {
+//            mv.visitVarInsn(Opcodes.ALOAD, 50);
+//            return;
+//        }
+        // load ThreadContext param
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        invokeThreadContext("getRuntime", "()Lorg/jruby/IRuby;");
+//        mv.visitInsn(Opcodes.DUP);
+//        mv.visitVarInsn(Opcodes.ASTORE, 50);
+//        // FIXME find a better way of caching, since the path that caches may be conditional
+//        runtimeLoaded = false;
         } 
-        mv.visitVarInsn(Opcodes.ALOAD, 0);
-        mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, IRUBYOBJECT, "getRuntime", "()Lorg/jruby/IRuby;");
-        mv.visitInsn(Opcodes.DUP);
-        mv.visitVarInsn(Opcodes.ASTORE, 50);
-        runtimeLoaded = true;
+
+    private void loadSelf() {
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+    }
+
+    private void getCRefClass() {
+        loadThreadContext();
+        invokeThreadContext("peekCRef", "()Lorg/jruby/util/collections/SinglyLinkedList;");
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "org/jruby/util/collections/SinglyLinkedList", "getValue", "()Ljava/lang/Object;");
+        mv.visitTypeInsn(Opcodes.CHECKCAST, RUBYMODULE);
+}
+    private void getRubyClass() {
+        loadThreadContext();
+        invokeThreadContext("getRubyClass", "()Lorg/jruby/RubyModule;");
     }
 }
