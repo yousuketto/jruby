@@ -793,11 +793,11 @@ public final class Ruby implements IRuby {
             return;
         }
 
-        RubyArray backtrace = (RubyArray) excp.callMethod("backtrace");
+        ThreadContext tc = getCurrentContext();
+        RubyArray backtrace = (RubyArray) excp.callMethod(tc, "backtrace");
 
         PrintStream errorStream = getErrorStream();
 		if (backtrace.isNil()) {
-            ThreadContext tc = getCurrentContext();
             
             if (tc.getSourceFile() != null) {
                 errorStream.print(tc.getPosition());

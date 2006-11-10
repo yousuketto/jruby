@@ -63,11 +63,11 @@ public class AssignmentVisitor {
             IRubyObject receiver = EvaluationState.eval(context, iVisited.getReceiverNode(), context.getFrameSelf());
 
             if (iVisited.getArgsNode() == null) { // attribute set.
-                receiver.callMethod(iVisited.getName(), new IRubyObject[] {value}, CallType.NORMAL);
+                receiver.callMethod(context, iVisited.getName(), new IRubyObject[] {value}, CallType.NORMAL);
             } else { // element set
                 RubyArray args = (RubyArray)EvaluationState.eval(context, iVisited.getArgsNode(), context.getFrameSelf());
                 args.append(value);
-                receiver.callMethod(iVisited.getName(), args.toJavaArray(), CallType.NORMAL);
+                receiver.callMethod(context, iVisited.getName(), args.toJavaArray(), CallType.NORMAL);
             }
             break;
         }

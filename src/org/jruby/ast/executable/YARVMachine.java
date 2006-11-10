@@ -125,7 +125,7 @@ public class YARVMachine {
             }
             case YARVInstructions.TOSTRING:
                 // TODO: do not call to_s if it's already a string...
-                stack[stackTop] = ((IRubyObject)stack[stackTop]).callMethod("to_s");
+                stack[stackTop] = ((IRubyObject)stack[stackTop]).callMethod(context, "to_s");
                 break;
             case YARVInstructions.TOREGEXP:
                 break;
@@ -226,7 +226,7 @@ public class YARVMachine {
 
                 assert receiver.getMetaClass() != null : receiver.getClass().getName();
                 
-                stack[++stackTop] = receiver.callMethod(name, args, callType);
+                stack[++stackTop] = receiver.callMethod(context, name, args, callType);
                 break;
             }
             case YARVInstructions.INVOKESUPER: break;

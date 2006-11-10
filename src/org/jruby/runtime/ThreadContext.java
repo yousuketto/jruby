@@ -483,8 +483,8 @@ public class ThreadContext {
                 // TODO cnutter: I believe modules, the only ones here to have no superclasses, should have Module as their superclass
             	superClass = runtime.getClass("Module");
             }
-            return frame.getSelf().callMethod(superClass, frame.getLastFunc(),
-                                   args, CallType.SUPER);
+            return frame.getSelf().callMethod(this, superClass,
+                                   frame.getLastFunc(), args, CallType.SUPER);
         } finally {
             clearNoBlock();
         }
@@ -565,7 +565,7 @@ public class ThreadContext {
         while (true) {
             try {
                 // FIXME: is it appropriate to use the current frame's (the block's frame's) lastClass?
-                IRubyObject result = yieldBlock.getMethod().call(runtime, self, getCurrentFrame().getLastClass(), null, args, false);
+                IRubyObject result = yieldBlock.getMethod().call(runtime.getCurrentContext(), self, getCurrentFrame().getLastClass(), null, args, false);
                 
                 return result;
             } catch (JumpException je) {
