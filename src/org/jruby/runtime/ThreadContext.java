@@ -95,9 +95,9 @@ public class ThreadContext {
     public ThreadContext(IRuby runtime) {
         this.runtime = runtime;
         
-        // TOPLEVEL self and a few others want some top-level scope.  I do not think this is
-        // the right scope to be top-level...
-        pushScope(new DynamicScope(new LocalStaticScope(null), null));
+        // TOPLEVEL self and a few others want a top-level scope.  We create this one right
+        // away and then pass it into top-level parse so it ends up being the top level.
+       pushScope(new DynamicScope(new LocalStaticScope(null), null));
     }
     
     Visibility lastVis;
@@ -989,17 +989,6 @@ public class ThreadContext {
         // we'll want to revisit these issues of block ownership since the block is created in one thread and used in another
         //currentBlock.getFrame().setEvalState(new EvaluationState(runtime, currentBlock.getFrame().getSelf()));
         blockStack = currentBlock;
-    }
-    
-    public void preKernelEval() {
-        // we pop here and push in the post so the eval runs under the previous frame
-        // pop the frame created for us by the method call
-        popFrame();
-    }
-    
-    public void postKernelEval() {
-        // push a dummy frame back to the stack for the method call to pop
-        pushFrameNoBlock();
     }
     
     public void preTrace() {

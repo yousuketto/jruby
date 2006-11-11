@@ -186,7 +186,8 @@ public class Main {
     }
 
     private Node getParsedScript(IRuby runtime, Reader reader, String filename) {
-        Node result = runtime.parse(reader, filename, null);
+        // current scope is top-level scope (what we set TOPLEVEL_BINDING to).
+        Node result = runtime.parse(reader, filename, runtime.getCurrentContext().getCurrentScope());
         if (commandline.isAssumePrinting()) {
             result = new ParserSupport().appendPrintToBlock(result);
         }

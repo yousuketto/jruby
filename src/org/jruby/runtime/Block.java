@@ -106,17 +106,36 @@ public class Block implements StackElement {
         
         // We create one extra dynamicScope on a binding so that when we 'eval "b=1", binding' the
         // 'b' will get put into this new dynamic scope.  The original scope does not see the new
-        // 'b' and successive evals with this binding will.  This particular aspect of binding is
-        // fairly confusing to me.  I take it having the ability to have succesive binding evals
-        // be able to share same scope makes sense from a programmers perspective, but it is odd 
-        // that they do not modify existing scope.
-        //
-        // One other crappy outcome of this design is it requires Dynamic and Static scopes to be
-        // mutable.
-        dynamicScope = new DynamicScope(new BlockStaticScope(dynamicScope.getStaticScope()), dynamicScope);
+        // 'b' and successive evals with this binding will.  I take it having the ability to have 
+        // succesive binding evals be able to share same scope makes sense from a programmers 
+        // perspective.   One crappy outcome of this design is it requires Dynamic and Static 
+        // scopes to be mutable for this one case.
+        
+        // Note: In Ruby 1.9 all of this logic can go away since they will require explicit
+        // bindings for evals.
+        
+        // We only define one special dynamic scope per 'logical' binding.  So all bindings for
+        // the same scope should share the same dynamic scope.  This allows multiple evals with
+        // different different bindings in the same scope to see the same stuff.
+        DynamicScope extraScope = dynamicScope.getBindingScope();
+        
+        // No binding scope so we should create one
+        if (extraScope == null) {
+            // If the next scope out has the same binding scope as this scope it means
+            // we are evaling within an eval and in that case we should be sharing the same
+            // binding scope.
+            DynamicScope parent = dynamicScope.getNextCapturedScope(); 
+            if (parent != null && parent.getBindingScope() == dynamicScope) {
+                extraScope = dynamicScope;
+            } else {
+                extraScope = new DynamicScope(new BlockStaticScope(dynamicScope.getStaticScope()), dynamicScope);
+                dynamicScope.setBindingScope(extraScope);
+            }
+        } 
         
         // FIXME: Ruby also saves wrapper, which we do not
-        return new Block(null, null, frame.getSelf(), frame, context.peekCRef(), frame.getScope(), context.getRubyClass(), iter, dynamicScope);
+        return new Block(null, null, frame.getSelf(), frame, context.peekCRef(), frame.getScope(), 
+                context.getRubyClass(), iter, extraScope);
     }
 
     public IRubyObject call(IRubyObject[] args, IRubyObject replacementSelf) {

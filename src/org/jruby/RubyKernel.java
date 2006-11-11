@@ -637,7 +637,6 @@ public class RubyKernel {
     }
 
     public static IRubyObject eval(IRubyObject recv, IRubyObject[] args) {
-        IRuby runtime = recv.getRuntime();
         RubyString src = (RubyString) args[0];
         IRubyObject scope = null;
         String file = "(eval)";
@@ -655,16 +654,12 @@ public class RubyKernel {
         //int line = args.length > 3 ? RubyNumeric.fix2int(args[3]) : 1;
 
         src.checkSafeString();
-        ThreadContext context = runtime.getCurrentContext();
-
-        if (scope == null && context.getPreviousFrame() != null) {
-            try {
-                context.preKernelEval();
-                return recv.evalSimple(context, src, file);
-            } finally {
-                context.postKernelEval();
-            }
+        ThreadContext context = recv.getRuntime().getCurrentContext();
+        
+        if (scope == null) {
+            scope = recv.getRuntime().newBinding();
         }
+        
         return recv.evalWithBinding(context, src, scope, file);
     }
 

@@ -29,6 +29,12 @@ public class DynamicScope {
     
     // Captured dyanmic scopes
     private DynamicScope parent;
+    
+    // A place to store that special hiding space that bindings need to implement things like:
+    // eval("a = 1", binding); eval("p a").  All binding instances must get access to this
+    // hidden shared scope.  We store it here.  This will be null if no binding has yet
+    // been called.
+    private DynamicScope bindingScope;
 
     public DynamicScope(StaticScope staticScope, DynamicScope parent) {
         this.staticScope = staticScope;
@@ -156,6 +162,24 @@ public class DynamicScope {
         int location = staticScope.isDefined("$~");
         
         return getValue(location & 0xffff, location >> 16); 
+    }
+    
+    public DynamicScope getBindingScope() {
+        return bindingScope;
+    }
+    
+    public void setBindingScope(DynamicScope bindingScope) {
+        this.bindingScope = bindingScope;
+    }
+    
+    /**
+     * Get next 'captured' scope.
+     * 
+     * @return the scope captured by this scope for implementing closures
+     *
+     */
+    public DynamicScope getNextCapturedScope() {
+        return parent;
     }
 
     /**

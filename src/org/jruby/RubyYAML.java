@@ -540,19 +540,19 @@ public class RubyYAML {
         public IRubyObject method4(ThreadContext context, IRubyObject self, IRubyObject[] args) {
             IRubyObject tz = self.getRuntime().newString("Z");
             IRubyObject difference_sign = self.getRuntime().newString("-");
-            if(!self.callMethod(context, "ucontext?").isTrue()) {
-                IRubyObject ucontext_same_instant = self.callMethod(context, "dup").callMethod(context, "ucontext");
-                IRubyObject ucontext_same_writing = self.getRuntime().getClass("Time").callMethod(context,"ucontext", new IRubyObject[]{
+            if(!self.callMethod(context, "utc?").isTrue()) {
+                IRubyObject utc_same_instant = self.callMethod(context, "dup").callMethod(context, "utc");
+                IRubyObject utc_same_writing = self.getRuntime().getClass("Time").callMethod(context,"utc", new IRubyObject[]{
                         self.callMethod(context, "year"),self.callMethod(context, "month"),self.callMethod(context, "day"),self.callMethod(context, "hour"),
                         self.callMethod(context, "min"),self.callMethod(context, "sec"),self.callMethod(context, "usec")});
-                IRubyObject difference_to_ucontext = ucontext_same_writing.callMethod(context,"-", ucontext_same_instant);
+                IRubyObject difference_to_utc = utc_same_writing.callMethod(context,"-", utc_same_instant);
                 IRubyObject absolute_difference;
-                if(difference_to_ucontext.callMethod(context,"<", RubyFixnum.zero(self.getRuntime())).isTrue()) {
+                if(difference_to_utc.callMethod(context,"<", RubyFixnum.zero(self.getRuntime())).isTrue()) {
                     difference_sign = self.getRuntime().newString("-");
-                    absolute_difference = RubyFixnum.zero(self.getRuntime()).callMethod(context,"-", difference_to_ucontext);
+                    absolute_difference = RubyFixnum.zero(self.getRuntime()).callMethod(context,"-", difference_to_utc);
                 } else {
                     difference_sign = self.getRuntime().newString("+");
-                    absolute_difference = difference_to_ucontext;
+                    absolute_difference = difference_to_utc;
                 }
                 IRubyObject difference_minutes = absolute_difference.callMethod(context,"/", self.getRuntime().newFixnum(60)).callMethod(context, "round");
                 tz = self.getRuntime().newString("%s%02d:%02d").callMethod(context,"%", self.getRuntime().newArray(new IRubyObject[]{difference_sign,difference_minutes.callMethod(context,"/", self.getRuntime().newFixnum(60)),difference_minutes.callMethod(context,"%", self.getRuntime().newFixnum(60))}));
