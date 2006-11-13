@@ -586,7 +586,6 @@ public class InstructionCompiler2 implements NodeVisitor {
         mv.visitInsn(Opcodes.ATHROW);
         
         mv.visitLabel(l298);
-        System.out.println("foo");
         getCRefClass();
         
         mv.visitLdcInsn(iVisited.getName());
@@ -1112,20 +1111,16 @@ public class InstructionCompiler2 implements NodeVisitor {
         lineNumber(iVisited);
         // check if it's an argument
         int index = iVisited.getIndex();
-        System.out.println("args count: " + args.getArgsCount());
+        
         if ((index - 2) < args.getArgsCount()) {
             // load from the incoming params
             // index is 2-based, and our zero is runtime
             
             // load args array
             mv.visitVarInsn(Opcodes.ALOAD, 3);
-            System.out.println(iVisited.getName());
-            System.out.println(iVisited.getIndex());
             mv.visitLdcInsn(new Integer(index - 2));
             mv.visitInsn(Opcodes.AALOAD);
         } else {
-        //    System.out.println(iVisited.getName());
-        //   System.out.println(iVisited.getIndex());
         //    loadThreadContext();
         //    invokeThreadContext("getCurrentScope", "()Lorg/jruby/runtime/DynamicScope;");
         //    mv.visitLdcInsn(new Integer(iVisited.getIndex()));
