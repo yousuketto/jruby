@@ -169,6 +169,10 @@ public class LoadService {
     }
 
     public void load(String file) {
+        if(!runtime.getProfile().allowLoad(file)) {
+            throw runtime.newLoadError("No such file to load -- " + file);
+        }
+
         Library library = null;
         
         library = findLibrary(file);
@@ -290,6 +294,10 @@ public class LoadService {
     }
 
     public boolean require(String file) {
+        if(!runtime.getProfile().allowRequire(file)) {
+            throw runtime.newLoadError("No such file to load -- " + file);
+        }
+
         String filestr = suffixPattern.matcher(file).replaceAll("$1");
         if (loadedFeaturesInternal.contains(filestr)) {
             return false;
