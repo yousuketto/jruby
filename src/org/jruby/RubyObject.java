@@ -97,7 +97,7 @@ public class RubyObject implements Cloneable, IRubyObject {
     /*
      *  Is object immediate (def: Fixnum, Symbol, true, false, nil?).
      */
-    public boolean isImmediate() {
+     public boolean isImmediate() {
     	return false;
     }
 
