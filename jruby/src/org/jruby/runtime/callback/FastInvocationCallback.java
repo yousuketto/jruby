@@ -11,7 +11,7 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2006 Ola Bini <ola@ologix.com>
+ * Copyright (C) 2007 Ola Bini <ola@ologix.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -39,14 +39,14 @@ import org.jruby.exceptions.MainExitException;
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
-public abstract class InvocationCallback implements Callback {
+public abstract class FastInvocationCallback implements Callback {
     private Arity arity;
 
     public IRubyObject execute(IRubyObject recv, IRubyObject[] oargs, Block block) {
         IRuby runtime = recv.getRuntime();
         arity.checkArity(runtime, oargs);
         try {
-            return call(recv,oargs,block);
+            return call(recv,oargs);
         } catch(RaiseException e) {
             throw e;
         } catch(JumpException e) {
@@ -58,10 +58,10 @@ public abstract class InvocationCallback implements Callback {
         } catch(Exception e) {
             runtime.getJavaSupport().handleNativeException(e);
             return runtime.getNil();
-        }        
+        }
     }
 
-    public abstract IRubyObject call(Object receiver, Object[] args, Block block);
+    public abstract IRubyObject call(Object receiver, Object[] args);
 
     public void setArity(Arity arity) {
         this.arity = arity;
@@ -70,4 +70,5 @@ public abstract class InvocationCallback implements Callback {
     public Arity getArity() {
         return arity;
     }
-}// InvocationCallback
+
+}// FastInvocationCallback
