@@ -348,17 +348,17 @@ public class RubyObject implements Cloneable, IRubyObject {
     }
 
     /**
-     *
+     * Used by the compiler to ease calling indexed methods
      */
     public IRubyObject callMethod(ThreadContext context, byte methodIndex, String name,
-            IRubyObject[] args, CallType callType) {
+            IRubyObject[] args, CallType callType, Block block) {
         RubyModule module = getMetaClass();
         
         if (module.index != 0) {
-            return callMethod(context, module, getRuntime().getSelectorTable().table[module.index][methodIndex], name, args, callType);
+            return callMethod(context, module, getRuntime().getSelectorTable().table[module.index][methodIndex], name, args, callType, block);
         } 
             
-        return callMethod(context, module, name, args, callType, null);
+        return callMethod(context, module, name, args, callType, block);
     }
 
     /**
@@ -367,6 +367,14 @@ public class RubyObject implements Cloneable, IRubyObject {
     public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, byte switchvalue, String name,
             IRubyObject[] args, CallType callType) {
         return callMethod(context, rubyclass, name, args, callType, null);
+    }
+
+    /**
+     *
+     */
+    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, byte switchvalue, String name,
+            IRubyObject[] args, CallType callType, Block block) {
+        return callMethod(context, rubyclass, name, args, callType, block);
     }
     
     /**

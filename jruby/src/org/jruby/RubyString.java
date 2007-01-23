@@ -98,7 +98,7 @@ public class RubyString extends RubyObject {
 	}
     
     public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, byte switchvalue, String name,
-            IRubyObject[] args, CallType callType) {
+            IRubyObject[] args, CallType callType, Block block) {
         switch (switchvalue) {
             case OP_PLUS_SWITCHVALUE:
                 Arity.singleArgument().checkArity(context.getRuntime(), args);
@@ -129,7 +129,7 @@ public class RubyString extends RubyObject {
                 return empty();
             case 0:
             default:
-                return super.callMethod(context, rubyclass, name, args, callType, null);
+                return super.callMethod(context, rubyclass, name, args, callType, block);
         }
     }
 
