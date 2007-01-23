@@ -1349,6 +1349,9 @@ public class EvaluationState {
                 IRubyObject[] args = setupArgs(context, iVisited.getArgsNode(), self);
                 Block block = getBlock(context, self, aBlock, iVisited.getIterNode());
                 
+                // If no explicit block passed to super, then use the one passed in.
+                if (block == null) block = aBlock;
+                
                 return context.callSuper(args, block);
             }
             case NodeTypes.SVALUENODE: {

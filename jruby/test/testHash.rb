@@ -48,9 +48,7 @@ test_equal(nil, h.index(10))
 h = Hash.new {|h,k| h[k] = k.to_i*10 }
 
 test_ok(!nil, h.default_proc)
-puts "A"
 test_equal(100, h[10])
-puts "B"
 test_equal(20, h.default(2))
 
 #behavior change in 1.8.5 led to this:

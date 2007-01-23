@@ -368,7 +368,7 @@ nil, #['NewlineNode',0,1,6,9],
     ['IterNode',0,0,6,8]
 ]
 
-test_tree(list, <<'END', "operation brace_block [parens no-args block", true)
+test_tree(list, <<'END', "operation brace_block [parens no-args block")
 foo() {}
 END
 
