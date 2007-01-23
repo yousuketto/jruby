@@ -59,9 +59,9 @@ public abstract class FullInvocationMethod extends AbstractMethod {
         context.postReflectedMethodInternalCall();
     }
 
-    private IRubyObject wrap(IRuby runtime, IRubyObject receiver, IRubyObject[] args) {
+    private IRubyObject wrap(IRuby runtime, IRubyObject receiver, IRubyObject[] args, Block block) {
         try {
-            return call(receiver,args);
+            return call(receiver,args,block);
         } catch(RaiseException e) {
             throw e;
         } catch(JumpException e) {
@@ -76,7 +76,7 @@ public abstract class FullInvocationMethod extends AbstractMethod {
         }        
     }
     
-	public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+	public IRubyObject internalCall(ThreadContext context, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper, Block block) {
         IRuby runtime = context.getRuntime();
         arity.checkArity(runtime, args);
 
@@ -85,15 +85,15 @@ public abstract class FullInvocationMethod extends AbstractMethod {
 
             runtime.callTraceFunction(context, "c-call", position, receiver, name, getImplementationClass());
             try {
-                return wrap(runtime,receiver,args);
+                return wrap(runtime,receiver,args,block);
             } finally {
                 runtime.callTraceFunction(context, "c-return", position, receiver, name, getImplementationClass());
             }
         }
-        return wrap(runtime,receiver,args);
+        return wrap(runtime,receiver,args,block);
     }
 
-    public abstract IRubyObject call(IRubyObject receiver, IRubyObject[] args);
+    public abstract IRubyObject call(IRubyObject receiver, IRubyObject[] args, Block block);
     
 	public DynamicMethod dup() {
         System.err.println("shouldn't dup this class...");

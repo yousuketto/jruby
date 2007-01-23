@@ -493,57 +493,273 @@ public class InvocationCallbackFactory extends CallbackFactory implements Opcode
     }
 
     public Callback getFastMethod(String method, Class arg1) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 2");
-        return null;
+        String mname = type.getName() + "Invoker" + method + "1";
+        String mnamePath = typePath + "Invoker" + method + "1";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{arg1});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_0);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg1));
+                mv.visitMethodInsn(INVOKEVIRTUAL, typePath, method, "("+ci(arg1)+")L"+ret+";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(3, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.singleArgument());
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastMethod(String method, Class arg1, Class arg2) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 3");
-        return null;
+        String mname = type.getName() + "Invoker" + method + "2";
+        String mnamePath = typePath + "Invoker" + method + "2";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{arg1,arg2});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_0);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg1));
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_1);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg2));
+                mv.visitMethodInsn(INVOKEVIRTUAL, typePath, method, "("+ci(arg1)+ci(arg2)+")L"+ret+";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(4, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.twoArguments());
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastMethod(String method, Class arg1, Class arg2, Class arg3) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 4");
-        return null;
+        String mname = type.getName() + "Invoker" + method + "3";
+        String mnamePath = typePath + "Invoker" + method + "3";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{arg1,arg2,arg3});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_0);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg1));
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_1);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg2));
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_2);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg3));
+                mv.visitMethodInsn(INVOKEVIRTUAL, typePath, method, "("+ci(arg1)+ci(arg2)+ci(arg3)+")L"+ret+";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(5, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.fixed(3));
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastSingletonMethod(String method) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 5");
-        return null;
+        String mname = type.getName() + "InvokerS" + method + "0";
+        String mnamePath = typePath + "InvokerS" + method + "0";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{IRubyObject.class});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallSFast(cw);
+                mv.visitMethodInsn(INVOKESTATIC, typePath, method, "(" + IRUB_ID + ")L" + ret +";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(1, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.noArguments());
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastSingletonMethod(String method, Class arg1) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 6");
-        return null;
+        String mname = type.getName() + "InvokerS" + method + "1";
+        String mnamePath = typePath + "InvokerS" + method + "1";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{IRubyObject.class,arg1});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallSFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_0);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg1));
+                mv.visitMethodInsn(INVOKESTATIC, typePath, method, "(" + IRUB_ID + ci(arg1) + ")L" + ret + ";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(3, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.singleArgument());
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastSingletonMethod(String method, Class arg1, Class arg2) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 7");
-        return null;
+        String mname = type.getName() + "InvokerS" + method + "2";
+        String mnamePath = typePath + "InvokerS" + method + "2";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{IRubyObject.class,arg1,arg2});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallSFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_0);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg1));
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_1);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg2));
+                mv.visitMethodInsn(INVOKESTATIC, typePath, method, "(" + IRUB_ID + ci(arg1) + ci(arg2) + ")L" + ret + ";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(4, 4);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.twoArguments());
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastSingletonMethod(String method, Class arg1, Class arg2, Class arg3) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 8");
-        return null;
+        String mname = type.getName() + "InvokerS" + method + "3";
+        String mnamePath = typePath + "InvokerS" + method + "3";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{IRubyObject.class,arg1,arg2,arg3});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallSFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_0);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg1));
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_1);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg2));
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitInsn(ICONST_2);
+                mv.visitInsn(AALOAD);
+                mv.visitTypeInsn(CHECKCAST, p(arg3));
+                mv.visitMethodInsn(INVOKESTATIC, typePath, method, "(" + IRUB_ID + ci(arg1) + ci(arg2) + ci(arg3) + ")L" + ret + ";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(5, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.fixed(3));
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastOptMethod(String method) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 9");
-        return null;
+        String mname = type.getName() + "Invoker" + method + "xx1";
+        String mnamePath = typePath + "Invoker" + method + "xx1";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{IRubyObject[].class});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitTypeInsn(CHECKCAST, "[" + IRUB_ID);
+                mv.visitTypeInsn(CHECKCAST, "[" + IRUB_ID);
+                mv.visitMethodInsn(INVOKEVIRTUAL, typePath, method, "([" + IRUB_ID + ")L" + ret + ";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(2, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.optional());
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 
     public Callback getFastOptSingletonMethod(String method) {
-        // TODO Auto-generated method stub
-        System.err.println("NOT_IMPLEMENTED 10");
-        return null;
+        String mname = type.getName() + "InvokerS" + method + "xx1";
+        String mnamePath = typePath + "InvokerS" + method + "xx1";
+        Class c = tryClass(mname);
+        try {
+            if(c == null) {
+                String ret = getReturnName(method,new Class[]{IRubyObject.class,IRubyObject[].class});
+                ClassWriter cw = createCtorFast(mnamePath);
+                MethodVisitor mv = startCallSFast(cw);
+                mv.visitVarInsn(ALOAD, 2);
+                mv.visitTypeInsn(CHECKCAST, "[" + IRUB_ID);
+                mv.visitTypeInsn(CHECKCAST, "[" + IRUB_ID);
+                mv.visitMethodInsn(INVOKESTATIC, typePath, method, "(" + IRUB_ID + "[" + IRUB_ID + ")L"+ret+";");
+                mv.visitInsn(ARETURN);
+                mv.visitMaxs(2, 3);
+                c = endCall(cw,mv,mname);
+            }
+            FastInvocationCallback ic = (FastInvocationCallback)c.newInstance();
+            ic.setArity(Arity.optional());
+            return ic;
+        } catch(IllegalArgumentException e) {
+            throw e;
+        } catch(Exception e) {
+            throw new IllegalArgumentException(e);
+        }
     }
 } //InvocationCallbackFactory
 
