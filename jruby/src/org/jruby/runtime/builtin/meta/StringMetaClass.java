@@ -30,22 +30,14 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime.builtin.meta;
 
-import java.util.Locale;
 
 import org.jruby.IRuby;
-import org.jruby.RubyArray;
 import org.jruby.RubyClass;
-import org.jruby.RubyFixnum;
-import org.jruby.RubyInteger;
 import org.jruby.RubyString;
-import org.jruby.javasupport.JavaUtil;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.ObjectAllocator;
-import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.PrintfFormat;
 import org.jruby.util.collections.SinglyLinkedList;
 
 public class StringMetaClass extends ObjectMetaClass {
@@ -121,7 +113,7 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineFastMethod("lstrip!", Arity.noArguments(), "lstrip_bang");
 	        defineFastMethod("match", Arity.singleArgument(), "match3");
 	        defineFastMethod("oct", Arity.noArguments());
-	        defineFastMethod("replace", Arity.singleArgument());
+	        defineMethod("replace", Arity.singleArgument());
 	        defineFastMethod("reverse", Arity.noArguments());
 	        defineFastMethod("reverse!", Arity.noArguments(), "reverse_bang");
 	        defineFastMethod("rindex", Arity.optional());

@@ -48,8 +48,8 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
     private final static String SIMPLE_SUPER_CLASS = SimpleInvocationMethod.class.getName().replace('.','/');
     private final static String COMPILED_SUPER_CLASS = CompiledMethod.class.getName().replace('.','/');
     private final static String FULL_SUPER_CLASS = FullInvocationMethod.class.getName().replace('.','/');
-    private final static String IRUB = "org/jruby/runtime/builtin/IRubyObject";
     private final static String IRUB_ID = "Lorg/jruby/runtime/builtin/IRubyObject;";
+    private final static String BLOCK_ID = "Lorg/jruby/runtime/Block;";
     private final static String CALL_SIG = "(" + IRUB_ID + "[" + IRUB_ID + ")" + IRUB_ID;
     private final static String COMPILED_CALL_SIG = "(Lorg/jruby/runtime/ThreadContext;" + IRUB_ID + "[" + IRUB_ID + "Lorg/jruby/runtime/Block;)" + IRUB_ID;
     private final static String SUPER_SIG = "(" + ci(RubyModule.class) + ci(Arity.class) + ci(Visibility.class) + ")V";
@@ -143,6 +143,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
                     for(int i=0;i<ar_len;i++) {
                         sbe.append(IRUB_ID);
                     }
+                    sbe.append(BLOCK_ID);
                     String ret = getReturnName(type, method, sign);
                     mv = cw.visitMethod(ACC_PUBLIC, "call", CALL_SIG, null, null);
                     mv.visitCode();
@@ -160,13 +161,13 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
                     mv.visitMethodInsn(INVOKEVIRTUAL, typePath, method, "(" + sbe + ")" + ret);
                     mv.visitInsn(ARETURN);
                 } else {
-                    String ret = getReturnName(type, method, new Class[]{IRubyObject[].class});
+                    String ret = getReturnName(type, method, new Class[]{IRubyObject[].class, Block.class});
                     mv = cw.visitMethod(ACC_PUBLIC, "call", CALL_SIG, null, null);
                     mv.visitCode();
                     mv.visitVarInsn(ALOAD, 1);
                     mv.visitTypeInsn(CHECKCAST, typePath);
                     mv.visitVarInsn(ALOAD, 2);
-                    mv.visitMethodInsn(INVOKEVIRTUAL, typePath, method, "([" + IRUB_ID + ")" + ret);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, typePath, method, "([" + IRUB_ID + BLOCK_ID + ")" + ret);
                     mv.visitInsn(ARETURN);
                 }
                 c = endCall(implementationClass.getRuntime(), cw,mv,mname);
@@ -174,6 +175,7 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
             
             return (DynamicMethod)c.getConstructor(new Class[]{RubyModule.class, Arity.class, Visibility.class}).newInstance(new Object[]{implementationClass,arity,visibility});
         } catch(Exception e) {
+            e.printStackTrace();
             throw implementationClass.getRuntime().newLoadError(e.getMessage());
         }
     }

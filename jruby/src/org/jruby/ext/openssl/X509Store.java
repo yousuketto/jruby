@@ -39,6 +39,7 @@ import org.jruby.ext.openssl.x509store.Function2;
 import org.jruby.ext.openssl.x509store.X509AuxCertificate;
 import org.jruby.ext.openssl.x509store.X509_STORE;
 import org.jruby.ext.openssl.x509store.X509_STORE_CTX;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -169,7 +170,7 @@ public class X509Store extends RubyObject {
         return this;
     }
 
-    public IRubyObject verify(IRubyObject[] args) throws Exception {
+    public IRubyObject verify(IRubyObject[] args, Block block) throws Exception {
         IRubyObject cert, chain;
         if(checkArgumentCount(args,1,2) == 2) {
             chain = args[1];
@@ -179,8 +180,8 @@ public class X509Store extends RubyObject {
         cert = args[0];
         IRubyObject proc, result;
         X509StoreCtx ctx = (X509StoreCtx)cStoreContext.callMethod(getRuntime().getCurrentContext(),"new",new IRubyObject[]{this,cert,chain});
-        if(getRuntime().getCurrentContext().isBlockGiven()) {
-            proc = RubyProc.newProc(getRuntime(),false);
+        if (block != null) {
+            proc = getRuntime().newProc(false, block);
         } else {
             proc = getInstanceVariable("@verify_callback");
         }

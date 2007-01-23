@@ -119,7 +119,7 @@ public class IterNode extends Node {
     }
     
     public List childNodes() {
-        return Node.createList(varNode, bodyNode, iterNode);
+        return Node.createList(varNode, bodyNode);
     }
 
     public ICallable getCallable() {

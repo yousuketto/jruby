@@ -367,7 +367,7 @@ public class InvocationCallbackFactory extends CallbackFactory implements Opcode
             new Class[] { IRubyObject.class, IRubyObject.class },
             false,
             true,
-            Arity.fixed(2));
+            Arity.fixed(2), false);
     }
 
     public Callback getOptSingletonMethod(String method) {
@@ -422,6 +422,56 @@ public class InvocationCallbackFactory extends CallbackFactory implements Opcode
         } catch(Exception e) {
             throw new IllegalArgumentException(e);
         }
+    }
+
+    public Callback getFastMethod(String method) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastMethod(String method, Class arg1) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastMethod(String method, Class arg1, Class arg2) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastMethod(String method, Class arg1, Class arg2, Class arg3) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastSingletonMethod(String method) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastSingletonMethod(String method, Class arg1) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastSingletonMethod(String method, Class arg1, Class arg2) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastSingletonMethod(String method, Class arg1, Class arg2, Class arg3) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastOptMethod(String method) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    public Callback getFastOptSingletonMethod(String method) {
+        // TODO Auto-generated method stub
+        return null;
     }
 } //InvocationCallbackFactory
 

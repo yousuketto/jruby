@@ -124,7 +124,7 @@ public class SSLSocket extends RubyObject {
         c = (SocketChannel)(((RubyIO)io).getChannel());
         callMethod(tc,"context=",ctx);
         callMethod(tc,"sync_close=",getRuntime().getFalse());
-        return callMethod(tc,getMetaClass().getSuperClass(),"initialize",args,CallType.SUPER);
+        return callMethod(tc,getMetaClass().getSuperClass(),"initialize",args,CallType.SUPER, null);
     }
 
     private void ossl_ssl_setup() throws Exception {

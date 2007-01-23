@@ -31,24 +31,19 @@
 package org.jruby.libraries;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Iterator;
-import java.util.Collections;
 import java.util.LinkedList;
 
 import org.jruby.IRuby;
 import org.jruby.RubyObject;
 import org.jruby.RubyClass;
-import org.jruby.RubyModule;
 import org.jruby.RubyBoolean;
-import org.jruby.RubyArray;
 import org.jruby.RubyThread;
 import org.jruby.RubyInteger;
 import org.jruby.RubyNumeric;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ObjectAllocator;
-import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.load.Library;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -66,9 +61,9 @@ public class ThreadLibrary implements Library {
     public static class Mutex extends RubyObject {
         private RubyThread owner = null;
 
-        public static Mutex newInstance(IRubyObject recv, IRubyObject[] args) {
+        public static Mutex newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
             Mutex result = new Mutex(recv.getRuntime(), (RubyClass)recv);
-            result.callInit(args);
+            result.callInit(args, block);
             return result;
         }
 
@@ -138,11 +133,10 @@ public class ThreadLibrary implements Library {
             }
         }
 
-        public IRubyObject synchronize() throws InterruptedException {
-            ThreadContext tc = getRuntime().getCurrentContext();
+        public IRubyObject synchronize(Block block) throws InterruptedException {
             try {
                 lock();
-                return getRuntime().getCurrentContext().yield(null);
+                return getRuntime().getCurrentContext().yield(null, block);
             } finally {
                 unlock();
             }
@@ -150,9 +144,9 @@ public class ThreadLibrary implements Library {
     }
 
     public static class ConditionVariable extends RubyObject {
-        public static ConditionVariable newInstance(IRubyObject recv, IRubyObject[] args) {
+        public static ConditionVariable newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
             ConditionVariable result = new ConditionVariable(recv.getRuntime(), (RubyClass)recv);
-            result.callInit(args);
+            result.callInit(args, block);
             return result;
         }
 
@@ -207,9 +201,9 @@ public class ThreadLibrary implements Library {
     public static class Queue extends RubyObject {
         private LinkedList entries;
 
-        public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
+        public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
             Queue result = new Queue(recv.getRuntime(), (RubyClass)recv);
-            result.callInit(args);
+            result.callInit(args, block);
             return result;
         }
 
@@ -283,9 +277,9 @@ public class ThreadLibrary implements Library {
     public static class SizedQueue extends Queue {
         private int capacity;
 
-        public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
+        public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
             SizedQueue result = new SizedQueue(recv.getRuntime(), (RubyClass)recv);
-            result.callInit(args);
+            result.callInit(args, block);
             return result;
         }
 

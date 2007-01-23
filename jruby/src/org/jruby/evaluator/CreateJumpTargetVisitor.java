@@ -46,6 +46,7 @@ import org.jruby.ast.DefinedNode;
 import org.jruby.ast.DotNode;
 import org.jruby.ast.EnsureNode;
 import org.jruby.ast.EvStrNode;
+import org.jruby.ast.FCallNode;
 import org.jruby.ast.FlipNode;
 import org.jruby.ast.ForNode;
 import org.jruby.ast.GlobalAsgnNode;
@@ -128,6 +129,7 @@ public class CreateJumpTargetVisitor {
                     node = ((ClassVarDeclNode)node).getValueNode();
                     continue bigloop;
                 case NodeTypes.CALLNODE:
+                    setJumpTarget(target, ((CallNode)node).getIterNode());
                     node = ((CallNode)node).getReceiverNode();
                     continue bigloop;
                 case NodeTypes.CASENODE:
@@ -154,6 +156,9 @@ public class CreateJumpTargetVisitor {
                 case NodeTypes.EVSTRNODE:
                     node = ((EvStrNode)node).getBody();
                     continue bigloop;
+                case NodeTypes.FCALLNODE:
+                    setJumpTarget(target, ((FCallNode)node).getIterNode());
+                    return;
                 case NodeTypes.FLIPNODE:
                     setJumpTarget(target, ((FlipNode)node).getBeginNode());
                     node = ((FlipNode)node).getEndNode();

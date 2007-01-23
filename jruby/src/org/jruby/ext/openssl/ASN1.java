@@ -68,8 +68,8 @@ import org.jruby.RubyString;
 import org.jruby.RubySymbol;
 import org.jruby.RubyTime;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
-import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -857,10 +857,10 @@ public class ASN1 {
             return null;
         }
 
-        public IRubyObject each() {
+        public IRubyObject each(Block block) {
             RubyArray arr = (RubyArray)callMethod(getRuntime().getCurrentContext(),"value");
             for(Iterator iter = arr.getList().iterator();iter.hasNext();) {
-                getRuntime().getCurrentContext().yield((IRubyObject)iter.next());
+                getRuntime().getCurrentContext().yield((IRubyObject)iter.next(), block);
             }
             return getRuntime().getNil();
         }

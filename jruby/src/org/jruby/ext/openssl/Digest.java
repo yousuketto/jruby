@@ -34,6 +34,7 @@ import org.jruby.IRuby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -88,8 +89,8 @@ public class Digest extends RubyObject {
         return inp;
     }
 
-    public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
-        Digest result = (Digest)((RubyClass)recv).allocate();
+    public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
+        Digest result = (Digest)((RubyClass)recv).allocate(null);
         if(!(recv.toString().equals("OpenSSL::Digest::Digest"))) {
             try {
                 result.name = recv.toString();
@@ -98,7 +99,7 @@ public class Digest extends RubyObject {
                 throw recv.getRuntime().newNotImplementedError("Unsupported digest algorithm (" + recv.toString() + ")");
             }
         }
-        result.callInit(args);
+        result.callInit(args, block);
         return result;
     }
 
