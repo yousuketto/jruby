@@ -79,10 +79,10 @@ public class ThreadLibrary implements Library {
             });
             CallbackFactory cb = runtime.callbackFactory(Mutex.class);
             cMutex.defineSingletonMethod("new", cb.getOptSingletonMethod("newInstance"));
-            cMutex.defineMethod("locked?", cb.getMethod("locked_p"));
-            cMutex.defineMethod("try_lock", cb.getMethod("try_lock"));
-            cMutex.defineMethod("lock", cb.getMethod("lock"));
-            cMutex.defineMethod("unlock", cb.getMethod("unlock"));
+            cMutex.defineFastMethod("locked?", cb.getFastMethod("locked_p"));
+            cMutex.defineFastMethod("try_lock", cb.getFastMethod("try_lock"));
+            cMutex.defineFastMethod("lock", cb.getFastMethod("lock"));
+            cMutex.defineFastMethod("unlock", cb.getFastMethod("unlock"));
             cMutex.defineMethod("synchronize", cb.getMethod("synchronize"));
         }
 
@@ -162,9 +162,9 @@ public class ThreadLibrary implements Library {
             });
             CallbackFactory cb = runtime.callbackFactory(ConditionVariable.class);
             cConditionVariable.defineSingletonMethod("new", cb.getOptSingletonMethod("newInstance"));
-            cConditionVariable.defineMethod("wait", cb.getMethod("wait_ruby", Mutex.class));
-            cConditionVariable.defineMethod("broadcast", cb.getMethod("broadcast"));
-            cConditionVariable.defineMethod("signal", cb.getMethod("signal"));
+            cConditionVariable.defineFastMethod("wait", cb.getFastMethod("wait_ruby", Mutex.class));
+            cConditionVariable.defineFastMethod("broadcast", cb.getFastMethod("broadcast"));
+            cConditionVariable.defineFastMethod("signal", cb.getFastMethod("signal"));
         }
 
         public IRubyObject wait_ruby(Mutex mutex) throws InterruptedException {
@@ -221,12 +221,12 @@ public class ThreadLibrary implements Library {
             CallbackFactory cb = runtime.callbackFactory(Queue.class);
             cQueue.defineSingletonMethod("new", cb.getOptSingletonMethod("newInstance"));
 
-            cQueue.defineMethod("clear", cb.getMethod("clear"));
-            cQueue.defineMethod("empty?", cb.getMethod("empty_p"));
-            cQueue.defineMethod("length", cb.getMethod("length"));
-            cQueue.defineMethod("num_waiting", cb.getMethod("num_waiting"));
-            cQueue.defineMethod("pop", cb.getOptMethod("pop"));
-            cQueue.defineMethod("push", cb.getMethod("push", IRubyObject.class));
+            cQueue.defineFastMethod("clear", cb.getFastMethod("clear"));
+            cQueue.defineFastMethod("empty?", cb.getFastMethod("empty_p"));
+            cQueue.defineFastMethod("length", cb.getFastMethod("length"));
+            cQueue.defineFastMethod("num_waiting", cb.getFastMethod("num_waiting"));
+            cQueue.defineFastMethod("pop", cb.getFastOptMethod("pop"));
+            cQueue.defineFastMethod("push", cb.getFastMethod("push", IRubyObject.class));
             
             cQueue.defineAlias("<<", "push");
             cQueue.defineAlias("deq", "pop");
@@ -297,13 +297,13 @@ public class ThreadLibrary implements Library {
             CallbackFactory cb = runtime.callbackFactory(SizedQueue.class);
             cSizedQueue.defineSingletonMethod("new", cb.getOptSingletonMethod("newInstance"));
 
-            cSizedQueue.defineMethod("initialize", cb.getMethod("max_set", RubyInteger.class));
+            cSizedQueue.defineFastMethod("initialize", cb.getFastMethod("max_set", RubyInteger.class));
 
-            cSizedQueue.defineMethod("clear", cb.getMethod("clear"));
-            cSizedQueue.defineMethod("max", cb.getMethod("max"));
-            cSizedQueue.defineMethod("max=", cb.getMethod("max_set", RubyInteger.class));
-            cSizedQueue.defineMethod("pop", cb.getOptMethod("pop"));
-            cSizedQueue.defineMethod("push", cb.getMethod("push", IRubyObject.class));
+            cSizedQueue.defineFastMethod("clear", cb.getFastMethod("clear"));
+            cSizedQueue.defineFastMethod("max", cb.getFastMethod("max"));
+            cSizedQueue.defineFastMethod("max=", cb.getFastMethod("max_set", RubyInteger.class));
+            cSizedQueue.defineFastMethod("pop", cb.getFastOptMethod("pop"));
+            cSizedQueue.defineFastMethod("push", cb.getFastMethod("push", IRubyObject.class));
 
             cSizedQueue.defineAlias("<<", "push");
             cSizedQueue.defineAlias("deq", "pop");

@@ -992,19 +992,7 @@ public class RubyModule extends RubyObject {
     }
 
     public static RubyModule newModule(IRuby runtime, String name, SinglyLinkedList parentCRef) {
-        // Modules do not directly define Object as their superClass even though in theory they
-        // should.  The C version of Ruby may also do this (special checks in rb_alias for Module
-        // makes me think this).
-        // TODO cnutter: Shouldn't new modules have Module as their superclass?
-        RubyModule newModule = new RubyModule(runtime, runtime.getClass("Module"), null, parentCRef, name);
-
-        // FIXME: Hooo haw...not in newModule
-        /*
-        ThreadContext tc = runtime.getCurrentContext();
-        if (tc.isBlockGiven()) {
-            newModule.module_eval(NULL_ARRAY);
-        }*/
-        return newModule;
+        return new RubyModule(runtime, runtime.getClass("Module"), null, parentCRef, name); 
     }
 
     public RubyString name() {
