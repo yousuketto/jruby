@@ -242,8 +242,7 @@ public class RubyEnumerator extends RubyObject {
         public IRubyObject method0(ThreadContext tc, IRubyObject self, IRubyObject[] args, Block block) {
             RubyClass klass = (RubyClass)self;
             
-            // ENEBO: Enumerator new not block capable?
-            RubyEnumerator result = (RubyEnumerator) klass.allocate(null);
+            RubyEnumerator result = (RubyEnumerator) klass.allocate();
             
             result.callInit(args, block);
             

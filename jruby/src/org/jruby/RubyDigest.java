@@ -119,7 +119,7 @@ public class RubyDigest {
 
             RubyClass klass = (RubyClass)recv;
             
-            Base result = (Base)klass.allocate(null);
+            Base result = (Base) klass.allocate();
             try {
                 result.setAlgorithm(((RubyClass)recv).getClassVar("metadata"));
             } catch(NoSuchAlgorithmException e) {

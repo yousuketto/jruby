@@ -627,7 +627,7 @@ public class RubyZlib {
         public static RubyGzipFile newInstance(IRubyObject recv, Block block) {
             RubyClass klass = (RubyClass)recv;
             
-            RubyGzipFile result = (RubyGzipFile)klass.allocate(null);
+            RubyGzipFile result = (RubyGzipFile) klass.allocate();
             
             result.callInit(new IRubyObject[0], block);
             
@@ -715,7 +715,7 @@ public class RubyZlib {
         private static RubyGzipReader newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
             RubyClass klass = (RubyClass)recv;
             
-            RubyGzipReader result = (RubyGzipReader)klass.allocate(null);
+            RubyGzipReader result = (RubyGzipReader)klass.allocate();
             result.callInit(args, block);
             return result;
         }
@@ -936,7 +936,7 @@ public class RubyZlib {
         private static RubyGzipWriter newGzipWriter(IRubyObject recv, IRubyObject[] args, Block block) {
             RubyClass klass = (RubyClass)recv;
             
-            RubyGzipWriter result = (RubyGzipWriter)klass.allocate(null);
+            RubyGzipWriter result = (RubyGzipWriter)klass.allocate();
             result.callInit(args, block);
             return result;
         }

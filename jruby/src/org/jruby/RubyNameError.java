@@ -76,7 +76,7 @@ public class RubyNameError extends RubyException {
     public static RubyNameError newRubyNameError(IRubyObject recv, IRubyObject[] args) {
         RubyClass klass = (RubyClass)recv;
         
-        RubyNameError newError = (RubyNameError)klass.allocate(null);
+        RubyNameError newError = (RubyNameError) klass.allocate();
         
         newError.callInit(args, null);
         

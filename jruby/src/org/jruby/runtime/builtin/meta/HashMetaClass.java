@@ -106,7 +106,7 @@ public class HashMetaClass extends ObjectMetaClass {
     };
 
     public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
-        RubyHash hash = (RubyHash)((RubyClass)recv).allocate(null);
+        RubyHash hash = (RubyHash) ((RubyClass) recv).allocate();
         
         hash.callInit(args, block);
         
@@ -115,8 +115,8 @@ public class HashMetaClass extends ObjectMetaClass {
     
     public static IRubyObject create(IRubyObject recv, IRubyObject[] args, Block block) {
         IRuby runtime = recv.getRuntime();
-        RubyClass klass = (RubyClass)recv;
-        RubyHash hash = (RubyHash)klass.allocate(null);
+        RubyClass klass = (RubyClass) recv;
+        RubyHash hash = (RubyHash) klass.allocate();
 
         if (args.length == 1) {
             hash.setValueMap(new HashMap(((RubyHash) args[0]).getValueMap()));

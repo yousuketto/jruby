@@ -28,7 +28,6 @@
 package org.jruby.runtime.callback;
 
 import org.jruby.IRuby;
-import org.jruby.util.JRubyClassLoader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;

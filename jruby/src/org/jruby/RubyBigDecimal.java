@@ -148,7 +148,7 @@ public class RubyBigDecimal extends RubyNumeric {
     public static RubyBigDecimal newInstance(IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
         RubyClass klass = (RubyClass)recv;
         
-        RubyBigDecimal result = (RubyBigDecimal)klass.allocate(null);
+        RubyBigDecimal result = (RubyBigDecimal) klass.allocate();
         
         result.callInit(args, unusedBlock);
         

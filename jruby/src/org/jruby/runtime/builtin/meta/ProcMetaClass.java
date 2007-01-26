@@ -68,7 +68,7 @@ public class ProcMetaClass extends ObjectMetaClass {
      * this case, we need to check previous frame for a block to consume.
      */
     public IRubyObject newInstance(IRubyObject[] args, Block block) {
-        IRubyObject obj = (IRubyObject) allocate(null);
+        IRubyObject obj = (IRubyObject) allocate();
         
         // No passed in block, lets check next outer frame for one ('Proc.new')
         if (block == null) {

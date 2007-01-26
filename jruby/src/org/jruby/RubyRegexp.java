@@ -176,7 +176,7 @@ public class RubyRegexp extends RubyObject implements ReOptions {
     public static RubyRegexp newInstance(IRubyObject recv, IRubyObject[] args) {
         RubyClass klass = (RubyClass)recv;
         
-        RubyRegexp re = (RubyRegexp)klass.allocate(null);
+        RubyRegexp re = (RubyRegexp) klass.allocate();
         
         re.callInit(args, null);
         

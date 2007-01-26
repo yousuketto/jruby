@@ -147,8 +147,7 @@ public class ArrayMetaClass extends ObjectMetaClass {
     };
     
     public static IRubyObject create(IRubyObject klass, IRubyObject[] args, Block block) {
-        // FIXME: Why is this calling newArray directly instead of the normal newInstance process? Performance?
-        RubyArray array = (RubyArray)((RubyClass)klass).allocate(null);
+        RubyArray array = (RubyArray) ((RubyClass) klass).allocate();
         array.callInit(IRubyObject.NULL_ARRAY, block);
         
         if (args.length >= 1) {

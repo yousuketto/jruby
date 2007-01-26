@@ -90,7 +90,7 @@ public class Digest extends RubyObject {
     }
 
     public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
-        Digest result = (Digest)((RubyClass)recv).allocate(null);
+        Digest result = (Digest) ((RubyClass) recv).allocate();
         if(!(recv.toString().equals("OpenSSL::Digest::Digest"))) {
             try {
                 result.name = recv.toString();

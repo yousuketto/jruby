@@ -81,8 +81,7 @@ public class RubyClass extends RubyModule {
         this.runtime = runtime;
     }
     
-    // ENEBO: We only have block in cases like this because we set up other stuff in TC
-    public final IRubyObject allocate(Block unusedBlock) {
+    public final IRubyObject allocate() {
         return getAllocator().allocate(getRuntime(), this);
     }
     
@@ -123,7 +122,7 @@ public class RubyClass extends RubyModule {
     public static void createClassClass(RubyClass classClass) {
         CallbackFactory callbackFactory = classClass.getRuntime().callbackFactory(RubyClass.class);
         classClass.defineSingletonMethod("new", callbackFactory.getOptSingletonMethod("newClass"));
-        classClass.defineMethod("allocate", callbackFactory.getMethod("allocate"));
+        classClass.defineFastMethod("allocate", callbackFactory.getFastMethod("allocate"));
         classClass.defineMethod("new", callbackFactory.getOptMethod("newInstance"));
         classClass.defineMethod("superclass", callbackFactory.getMethod("superclass"));
         classClass.defineSingletonMethod("inherited", callbackFactory.getSingletonMethod("inherited", IRubyObject.class));
@@ -203,7 +202,7 @@ public class RubyClass extends RubyModule {
      *
      */
     public IRubyObject newInstance(IRubyObject[] args, Block block) {
-        IRubyObject obj = (IRubyObject) allocate(null);
+        IRubyObject obj = (IRubyObject) allocate();
         obj.callInit(args, block);
         return obj;
     }
