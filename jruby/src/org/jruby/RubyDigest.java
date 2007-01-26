@@ -50,7 +50,7 @@ public class RubyDigest {
         cDigestBase.defineFastSingletonMethod("hexdigest",basecb.getFastSingletonMethod("s_hexdigest",IRubyObject.class));
 
         cDigestBase.defineMethod("initialize",basecb.getOptMethod("initialize"));
-        cDigestBase.defineMethod("initialize_copy",basecb.getMethod("initialize_copy",IRubyObject.class));
+        cDigestBase.defineFastMethod("initialize_copy",basecb.getFastMethod("initialize_copy",IRubyObject.class));
         cDigestBase.defineFastMethod("clone",basecb.getFastMethod("rbClone"));
         cDigestBase.defineFastMethod("update",basecb.getFastMethod("update",IRubyObject.class));
         cDigestBase.defineFastMethod("<<",basecb.getFastMethod("update",IRubyObject.class));

@@ -806,7 +806,7 @@ public class RubyObject implements Cloneable, IRubyObject {
 		return this == other ? getRuntime().getTrue() : getRuntime().getFalse();
 	}
 
-	public IRubyObject initialize_copy(IRubyObject original, Block block) {
+	public IRubyObject initialize_copy(IRubyObject original) {
 	    if (this != original) {
 	        checkFrozen();
 	        if (!getClass().equals(original.getClass())) {

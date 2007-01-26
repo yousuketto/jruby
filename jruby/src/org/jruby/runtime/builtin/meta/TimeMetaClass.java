@@ -117,7 +117,7 @@ public class TimeMetaClass extends ObjectMetaClass {
             defineAlias("gmtime?", "gmt?");
             defineFastMethod("localtime", Arity.noArguments()); 
             defineFastMethod("hash", Arity.noArguments()); 
-            defineMethod("initialize_copy", Arity.singleArgument()); 
+            defineFastMethod("initialize_copy", Arity.singleArgument()); 
             defineMethod("_dump", Arity.optional(),"dump"); 
             defineFastMethod("gmt_offset", Arity.noArguments());
             defineAlias("gmtoff", "gmt_offset");

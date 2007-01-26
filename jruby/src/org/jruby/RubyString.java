@@ -396,7 +396,7 @@ public class RubyString extends RubyObject {
 	/** rb_str_replace_m
 	 *
 	 */
-	public RubyString replace(IRubyObject other, Block block) {
+	public RubyString replace(IRubyObject other) {
 		RubyString newValue = stringValue(other);
 		if (this == other || sameAs(newValue)) {
 			return this;
@@ -425,9 +425,9 @@ public class RubyString extends RubyObject {
 		return newString;
 	}
 
-	public IRubyObject initialize(IRubyObject[] args, Block block) {
+	public IRubyObject initialize(IRubyObject[] args, Block unusedBlock) {
 	    if (checkArgumentCount(args, 0, 1) == 1) {
-	        replace(args[0], null);
+	        replace(args[0]);
 	    }
 	    return this;
 	}
@@ -1399,7 +1399,7 @@ public class RubyString extends RubyObject {
                 }
             }
 			if (bang) {
-				replace(newStr, block);
+				replace(newStr);
 				return this;
 			}
 

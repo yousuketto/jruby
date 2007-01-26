@@ -104,7 +104,7 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineFastMethod("include?", Arity.singleArgument(), "include");
 	        defineFastMethod("index", Arity.optional());
 	        defineMethod("initialize", Arity.optional(), "initialize");
-	        defineMethod("initialize_copy", Arity.singleArgument(), "replace");
+	        defineFastMethod("initialize_copy", Arity.singleArgument(), "replace");
 	        defineFastMethod("insert", Arity.twoArguments());
 	        defineFastMethod("inspect", Arity.noArguments());
 	        defineFastMethod("length", Arity.noArguments());
@@ -113,7 +113,7 @@ public class StringMetaClass extends ObjectMetaClass {
 	        defineFastMethod("lstrip!", Arity.noArguments(), "lstrip_bang");
 	        defineFastMethod("match", Arity.singleArgument(), "match3");
 	        defineFastMethod("oct", Arity.noArguments());
-	        defineMethod("replace", Arity.singleArgument());
+	        defineFastMethod("replace", Arity.singleArgument());
 	        defineFastMethod("reverse", Arity.noArguments());
 	        defineFastMethod("reverse!", Arity.noArguments(), "reverse_bang");
 	        defineFastMethod("rindex", Arity.optional());
