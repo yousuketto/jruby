@@ -51,9 +51,9 @@ import org.jruby.runtime.builtin.IRubyObject;
 /**
  * @author <a href="mailto:ola.bini@ki.se">Ola Bini</a>
  */
-public class YARVCompiledRunner implements Runnable {
+public class YARVCompiledRunner {
     private IRuby runtime;
-    private YARVMachine ym;
+    private YARVMachine ym = YARVMachine.INSTANCE;
 
     private YARVMachine.InstructionSequence iseq;
 
@@ -62,7 +62,6 @@ public class YARVCompiledRunner implements Runnable {
 
     public YARVCompiledRunner(IRuby runtime, Reader reader, String filename) {
         this.runtime = runtime;
-        this.ym = new YARVMachine();
         char[] first = new char[4];
         try {
             reader.read(first);
@@ -76,14 +75,18 @@ public class YARVCompiledRunner implements Runnable {
             throw new RuntimeException("Couldn't read from source",e);
         }
     }
+
+    public YARVCompiledRunner(IRuby runtime, YARVMachine.InstructionSequence iseq) {
+        this.runtime = runtime;
+        this.iseq = iseq;
+    }
     
-    public void run() {
-        YARVMachine ym = new YARVMachine();
+    public IRubyObject run() {
         ThreadContext context = runtime.getCurrentContext();
         StaticScope scope = new LocalStaticScope(null);
         scope.setVariables(iseq.locals);
         context.setPosition(new ISeqPosition(iseq));
-        ym.exec(context, runtime.getObject(), new DynamicScope(scope,null), iseq.body);
+        return ym.exec(context, runtime.getObject(), new DynamicScope(scope,null), iseq.body);
     }
 
     private YARVMachine.InstructionSequence transformIntoSequence(IRubyObject arr) {
@@ -93,7 +96,7 @@ public class YARVCompiledRunner implements Runnable {
         labels.clear();
         jumps.clear();
 
-        YARVMachine.InstructionSequence seq = new YARVMachine.InstructionSequence();
+        YARVMachine.InstructionSequence seq = new YARVMachine.InstructionSequence(runtime,null,null,null);
         Iterator internal = (((RubyArray)arr).getList()).iterator();
         seq.magic = internal.next().toString();
         seq.major = RubyNumeric.fix2int((IRubyObject)internal.next());
