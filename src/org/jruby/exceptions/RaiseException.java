@@ -34,53 +34,59 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.exceptions;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import org.jruby.IRuby;
-import org.jruby.NativeException;
-import org.jruby.RubyClass;
-import org.jruby.RubyException;
+import org.jruby.*;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.EventHook;
+import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class RaiseException extends JumpException {
-	private static final long serialVersionUID = -7612079169559973951L;
-	
-	private RubyException exception;
+    private static final long serialVersionUID = -7612079169559973951L;
+    
+    private RubyException exception;
 
     public RaiseException(RubyException actException) {
-    	super(JumpType.RaiseJump);
-        setException(actException, false);
+        this(actException, false);
     }
 
-    public RaiseException(IRuby runtime, RubyClass excptnClass, String msg, boolean nativeException) {
-		super(msg, JumpType.RaiseJump);
+    public RaiseException(Ruby runtime, RubyClass excptnClass, String msg, boolean nativeException) {
+        super(msg);
         if (msg == null) {
             msg = "No message available";
         }
-        setException((RubyException) excptnClass.callMethod("new", excptnClass.getRuntime().newString(msg)), nativeException);
+        setException((RubyException) excptnClass.callMethod(runtime.getCurrentContext(), "new", new IRubyObject[] {excptnClass.getRuntime().newString(msg)}, Block.NULL_BLOCK), nativeException);
     }
-    
-    public static RaiseException createNativeRaiseException(IRuby runtime, Throwable cause) {
+
+    public RaiseException(RubyException exception, boolean isNativeException) {
+        super();
+        setException(exception, isNativeException);
+    }
+
+    public static RaiseException createNativeRaiseException(Ruby runtime, Throwable cause) {
         NativeException nativeException = new NativeException(runtime, runtime.getClass(NativeException.CLASS_NAME), cause);
         return new RaiseException(cause, nativeException);
     }
 
     private static String buildMessage(Throwable exception) {
-	    StringBuffer sb = new StringBuffer();
-	    StringWriter stackTrace = new StringWriter();
-	    exception.printStackTrace(new PrintWriter(stackTrace));
-	
-	    sb.append("Native Exception: '").append(exception.getClass()).append("'; ");
-	    sb.append("Message: ").append(exception.getMessage()).append("; ");
-	    sb.append("StackTrace: ").append(stackTrace.getBuffer().toString());
+        StringBuffer sb = new StringBuffer();
+        StringWriter stackTrace = new StringWriter();
+        exception.printStackTrace(new PrintWriter(stackTrace));
+    
+        sb.append("Native Exception: '").append(exception.getClass()).append("'; ");
+        sb.append("Message: ").append(exception.getMessage()).append("; ");
+        sb.append("StackTrace: ").append(stackTrace.getBuffer().toString());
 
-	    return sb.toString();
+        return sb.toString();
     }
 
     public RaiseException(Throwable cause, NativeException nativeException) {
-        super(buildMessage(cause), cause, JumpType.RaiseJump);
+        super(buildMessage(cause), cause);
         setException(nativeException, false);
     }
 
@@ -97,18 +103,21 @@ public class RaiseException extends JumpException {
      * @param newException The exception to set
      */
     protected void setException(RubyException newException, boolean nativeException) {
-        IRuby runtime = newException.getRuntime();
-        ThreadContext tc = runtime.getCurrentContext();
-        
-        runtime.getGlobalVariables().set("$!", newException);
+        Ruby runtime = newException.getRuntime();
+        ThreadContext context = runtime.getCurrentContext();
 
-        if (runtime.getTraceFunction() != null) {
-            runtime.callTraceFunction(
-                "return",
-                tc.getPosition(),
-                tc.getFrameSelf(),
-                tc.getFrameLastFunc(),
-                tc.getFrameLastClass());
+        if (!context.isWithinDefined()) {
+            runtime.getGlobalVariables().set("$!", newException);
+        }
+
+        if (runtime.hasEventHooks()) {
+            runtime.callEventHooks(
+                    context,
+                    EventHook.RUBY_EVENT_RETURN,
+                    context.getPosition().getFile(),
+                    context.getPosition().getStartLine(),
+                    context.getFrameName(),
+                    context.getFrameKlazz());
         }
 
         this.exception = newException;
@@ -119,11 +128,46 @@ public class RaiseException extends JumpException {
 
         runtime.setStackTraces(runtime.getStackTraces() + 1);
 
-        if (newException.callMethod("backtrace").isNil() && tc.getSourceFile() != null) {
-            IRubyObject backtrace = tc.createBacktrace(0, nativeException);
-            newException.callMethod("set_backtrace", backtrace);
-        }
+        newException.setBacktraceFrames(context.createBacktrace(0, nativeException));
+        newException.getBacktrace();
 
         runtime.setStackTraces(runtime.getStackTraces() - 1);
+    }
+
+    public Throwable fillInStackTrace() {
+        return originalFillInStackTrace();
+    }
+    
+    public void printStackTrace() {
+        printStackTrace(System.err);
+    }
+    
+    public void printStackTrace(PrintStream ps) {
+        StackTraceElement[] trace = getStackTrace();
+        int externalIndex = 0;
+        for (int i = trace.length - 1; i > 0; i--) {
+            if (trace[i].getClassName().indexOf("org.jruby.evaluator") >= 0) {
+                break;
+            }
+            externalIndex = i;
+        }
+        IRubyObject backtrace = exception.backtrace();
+        Ruby runtime = backtrace.getRuntime();
+        if (runtime.getNil() != backtrace) {
+            String firstLine = backtrace.callMethod(runtime.getCurrentContext(), "first").callMethod(runtime.getCurrentContext(), MethodIndex.TO_S, "to_s").toString();
+            ps.print(firstLine + ": ");
+        }
+        ps.println(exception.message + " (" + exception.getMetaClass().toString() + ")");
+        exception.printBacktrace(ps);
+        ps.println("\t...internal jruby stack elided...");
+        for (int i = externalIndex; i < trace.length; i++) {
+            ps.println("\tfrom " + trace[i].toString());
+        }
+    }
+    
+    public void printStackTrace(PrintWriter pw) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        printStackTrace(new PrintStream(baos));
+        pw.print(baos.toString());
     }
 }

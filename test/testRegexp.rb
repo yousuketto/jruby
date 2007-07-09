@@ -89,5 +89,69 @@ a = []
 }
 test_ok(a.size == 0)
 
+# In Ruby 1.8.5, quote can take an optional encoding arg
+test_equal("hel\\\\l\\*o\317\200", Regexp.quote("hel\\l*o\317\200", "n"))
+test_equal("hel\\\\l\\*o\317\200", Regexp.quote("hel\\l*o\317\200", "u"))
+
 # test matching \r
 test_equal("\r", /./.match("\r")[0])
+
+#test_exception(SyntaxError) { r = /*/ }
+
+test_equal(/a/.hash, /a/.hash)
+
+test_equal("\\-", Regexp.quote('-'))
+
+# JRUBY-722
+/a((abc)|(foo))d/ =~ "afood"
+test_equal ["foo", nil, "foo"], $~.captures
+
+# JRUBY-741
+test_equal "foo", Regexp.last_match(1)
+
+# JRUBY-717
+test_equal nil, /./ =~ "\n"
+test_equal 0, /(?m:.)/ =~ "\n"
+
+
+NAME_STR= '[\w]*'
+TAG_MATCH = /^<#{NAME_STR}\s*>/u
+input = <<-EOL
+<path
+  >
+EOL
+test_ok TAG_MATCH =~ input
+
+xy = /(.*).*\1\}/
+xy =~ "12}"
+
+/1{2}+/ =~ "1111"
+test_equal $&, "1111"
+/1{2}+/ =~ "111111111111"
+test_equal $&, "111111111111"
+/1{2}+/ =~ "111"
+test_equal $&, "11"
+
+# JRUBY-139: don't show result of internal JRuby translations
+test_equal("/[:alpha:]/", %r{[:alpha:]}.inspect)
+test_equal("[:alpha:]", %r{[:alpha:]}.source)
+
+# Why anyone would do this I have no idea, but it matches MRI
+test_equal(/x/, +/x/)
+
+
+def m(it = false)
+  a = /a/
+  a.instance_variable_set :@set, true if it
+  a
+end
+
+test_equal nil, m().instance_variable_get(:@set)
+test_equal true, m(true).instance_variable_get(:@set)
+test_equal true, m().instance_variable_get(:@set)
+
+# JRUBY-1046: Support \G correctly:
+test_equal ["aa1 ", "aa2 "], "aa1 aa2 ba3 ".scan(/\Ga+\d\s*/)
+
+# JRUBY-1109: Octal literals eat next character...
+test_equal 0, "\034\015" =~ /^\034\015$/

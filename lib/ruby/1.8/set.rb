@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 #--
 # set.rb - defines the Set class
 #++

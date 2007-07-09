@@ -30,57 +30,22 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.jruby.ast.BlockNode;
 import org.jruby.ast.CommentNode;
 import org.jruby.ast.Node;
-import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.runtime.DynamicScope;
 
 /**
  */
 public class RubyParserResult {
     private final List beginNodes = new ArrayList();
-    private final List endNodes = new ArrayList();
     private Node ast;
-    private List blockVariables;
-    private List localVariables;
-    private InputStream afterEndStream;
     private boolean endSeen;
     private List commentNodes = new ArrayList();
-
-    /**
-     * Constructor for RubyParserResult.
-     */
-    public RubyParserResult() {
-        super();
-    }
-
-    /**
-     * Gets the localVariables.
-     * @return Returns a List
-     */
-    public List getLocalVariables() {
-        return localVariables;
-    }
-
-    /**
-     * Gets the blockVariables.
-     * @return Returns a List
-     */
-    public List getBlockVariables() {
-        return blockVariables;
-    }
-
-    /**
-     * Gets the afterEndStream.
-     * @return Returns a InputStream
-     */
-    public InputStream getAfterEndStream() {
-        return afterEndStream;
-    }
+    private DynamicScope scope;
 
     public List getCommentNodes() {
         return commentNodes;
@@ -89,12 +54,13 @@ public class RubyParserResult {
     public Node getAST() {
         return ast;
     }
-    /**
-     * Sets the afterEndStream.
-     * @param afterEndStream The afterEndStream to set
-     */
-    public void setAfterEndStream(InputStream afterEndStream) {
-        this.afterEndStream = afterEndStream;
+    
+    public DynamicScope getScope() {
+        return scope;
+    }
+    
+    public void setScope(DynamicScope scope) {
+        this.scope = scope;
     }
 
     /**
@@ -105,59 +71,29 @@ public class RubyParserResult {
         this.ast = ast;
     }
 
-    /**
-     * Sets the blockVariables.
-     * @param blockVariables The blockVariables to set
-     */
-    public void setBlockVariables(List blockVariables) {
-        this.blockVariables = blockVariables;
-    }
-
-    /**
-     * Sets the localVariables.
-     * @param localVariables The localVariables to set
-     */
-    public void setLocalVariables(List localVariables) {
-        this.localVariables = localVariables;
-    }
-    
     public void addComment(CommentNode node) {
         commentNodes.add(node);
     }
     
-    public void addBeginNode(Node node) {
+    public void addBeginNode(StaticScope scope, Node node) {
+        // FIXME: We need to add BEGIN nodes properly
     	beginNodes.add(node);
     }
     
-    public void addEndNode(Node node) {
-    	endNodes.add(node);
-    }
-    
-    public void addAppendBeginAndEndNodes() {
-    	if (beginNodes.isEmpty() && endNodes.isEmpty()) {
-    		return;
-    	}
-    	BlockNode n;
+    public void addAppendBeginNodes() {
+    	if (beginNodes.isEmpty()) return;
+
+        BlockNode n;
     	if (getAST() != null) {
     		n = new BlockNode(getAST().getPosition());
     	} else {
-    		ISourcePosition p;
-    		if (!beginNodes.isEmpty()) {
-    			p = ((Node) beginNodes.get(0)).getPosition();
-    		} else {
-    			p = ((Node) endNodes.get(endNodes.size() - 1)).getPosition();
-    		}
-    		n = new BlockNode(p);
+    		n = new BlockNode(((Node) beginNodes.get(0)).getPosition());
     	}
     	for (int i = 0; i < beginNodes.size(); i++) {
     		n.add((Node) beginNodes.get(i));
     	}
-    	if (getAST() != null) {
-    		n.add(getAST());
-    	}
-    	for (int i = endNodes.size() - 1; i >= 0; i--) {
-    		n.add((Node) endNodes.get(i));
-    	}
+    	if (getAST() != null) n.add(getAST());
+
     	setAST(n);
     }
     

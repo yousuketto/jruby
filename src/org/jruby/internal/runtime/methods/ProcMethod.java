@@ -14,6 +14,7 @@
  * Copyright (C) 2002 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2002-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2004-2005 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2007 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -29,10 +30,11 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime.methods;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyModule;
 import org.jruby.RubyProc;
-import org.jruby.runtime.ICallable;
+import org.jruby.runtime.Arity;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -41,7 +43,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * 
  * @author jpetersen
  */
-public class ProcMethod extends AbstractMethod {
+public class ProcMethod extends DynamicMethod {
     private RubyProc proc;
 
     /**
@@ -53,27 +55,31 @@ public class ProcMethod extends AbstractMethod {
         this.proc = proc;
     }
     
-    public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-        ThreadContext context = runtime.getCurrentContext();
-        
-        context.preMethodCall(implementationClass, lastClass, recv, name, args, noSuper);
+    // ENEBO: I doubt this is right...it should be proc.block?
+    public void preMethod(ThreadContext context, RubyModule klazz, IRubyObject self, String name, IRubyObject[] args, boolean noSuper, Block block) {
     }
     
-    public void postMethod(IRuby runtime) {
-        ThreadContext context = runtime.getCurrentContext();
-        
-        context.postMethodCall();
+    public void postMethod(ThreadContext context) {
     }
 
     /**
-     * @see org.jruby.runtime.ICallable#call(IRuby, IRubyObject, String, IRubyObject[], boolean)
+     * @see org.jruby.runtime.ICallable#call(Ruby, IRubyObject, String, IRubyObject[], boolean)
      */
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-        IRubyObject self = receiver;
-        return proc.call(args, self);
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule klazz, String name, IRubyObject[] args, boolean noSuper, Block block) {
+        context.preMethodCall(implementationClass, klazz, self, name, args, getArity().required(), block, noSuper, this);
+        
+        try {
+            return proc.call(args, self, Block.NULL_BLOCK);
+        } finally {
+            context.postMethodCall();
+        }
     }
     
-    public ICallable dup() {
+    public DynamicMethod dup() {
         return new ProcMethod(getImplementationClass(), proc, getVisibility());
     }
+    
+    public Arity getArity() {
+        return proc.getBlock().arity();
+    }    
 }

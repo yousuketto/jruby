@@ -31,8 +31,13 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
+import org.jruby.Ruby;
+import org.jruby.RubyClass;
 import org.jruby.runtime.callback.Callback;
 import org.jruby.runtime.callback.ReflectionCallbackFactory;
+import org.jruby.runtime.callback.InvocationCallbackFactory;
+import org.jruby.runtime.callback.DumpingInvocationCallbackFactory;
+import org.jruby.util.JRubyClassLoader;
 
 /**
  * Helper class to build Callback method.
@@ -49,6 +54,7 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getMethod(String method);
+    public abstract Callback getFastMethod(String method);
 
     /**
      * gets an instance method with 1 argument.
@@ -57,6 +63,7 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getMethod(String method, Class arg1);
+    public abstract Callback getFastMethod(String method, Class arg1);
 
     /**
      * gets an instance method with two arguments.
@@ -66,6 +73,7 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getMethod(String method, Class arg1, Class arg2);
+    public abstract Callback getFastMethod(String method, Class arg1, Class arg2);
     
     /**
      * gets an instance method with two arguments.
@@ -76,6 +84,7 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getMethod(String method, Class arg1, Class arg2, Class arg3);
+    public abstract Callback getFastMethod(String method, Class arg1, Class arg2, Class arg3);
 
     /**
      * gets a singleton (class) method without arguments.
@@ -83,6 +92,7 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getSingletonMethod(String method);
+    public abstract Callback getFastSingletonMethod(String method);
 
     /**
      * gets a singleton (class) method with 1 argument.
@@ -91,6 +101,7 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getSingletonMethod(String method, Class arg1);
+    public abstract Callback getFastSingletonMethod(String method, Class arg1);
 
     /**
      * gets a singleton (class) method with 2 arguments.
@@ -98,6 +109,7 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getSingletonMethod(String method, Class arg1, Class arg2);
+    public abstract Callback getFastSingletonMethod(String method, Class arg1, Class arg2);
 
     /**
      * gets a singleton (class) method with 3 arguments.
@@ -105,8 +117,10 @@ public abstract class CallbackFactory {
      * @return a CallBack object corresponding to the appropriate method
      **/
     public abstract Callback getSingletonMethod(String method, Class arg1, Class arg2, Class arg3);
+    public abstract Callback getFastSingletonMethod(String method, Class arg1, Class arg2, Class arg3);
 
     public abstract Callback getBlockMethod(String method);
+    public abstract CompiledBlockCallback getBlockCallback(String method);
 
     /**
     * gets a singleton (class) method with no mandatory argument and some optional arguments.
@@ -114,6 +128,7 @@ public abstract class CallbackFactory {
     * @return a CallBack object corresponding to the appropriate method
     **/
     public abstract Callback getOptSingletonMethod(String method);
+    public abstract Callback getFastOptSingletonMethod(String method);
 
     /**
     * gets an instance method with no mandatory argument and some optional arguments.
@@ -121,8 +136,46 @@ public abstract class CallbackFactory {
     * @return a CallBack object corresponding to the appropriate method
     **/
     public abstract Callback getOptMethod(String method);
+    public abstract Callback getFastOptMethod(String method);
+    
+    public abstract Dispatcher createDispatcher(RubyClass metaClass);
 
-    public static CallbackFactory createFactory(Class type) {
-        return new ReflectionCallbackFactory(type);
+    private static boolean reflection = false;
+    private static boolean dumping = false;
+    private static String dumpingPath = null;
+
+    static {
+       if (Ruby.isSecurityRestricted())
+           reflection = true;
+       else {
+           if(System.getProperty("jruby.reflection") != null && Boolean.getBoolean("jruby.reflection")) {
+               reflection = true;
+           }
+           if(System.getProperty("jruby.dump_invocations") != null) {
+               dumping = true;
+               dumpingPath = System.getProperty("jruby.dump_invocations").toString();
+           }
+       }
+    }
+
+    public static CallbackFactory createFactory(Ruby runtime, Class type) {
+        if(reflection) {
+            return new ReflectionCallbackFactory(type);
+        } else if(dumping) {
+            return new DumpingInvocationCallbackFactory(runtime, type, runtime.getJRubyClassLoader(), dumpingPath);
+        } else {
+            return new InvocationCallbackFactory(runtime, type, runtime.getJRubyClassLoader());
+        }
+    }
+
+    public static CallbackFactory createFactory(Ruby runtime, Class type, ClassLoader classLoader) {
+        if(reflection) {
+            return new ReflectionCallbackFactory(type);
+        } else if(dumping) {
+            return new DumpingInvocationCallbackFactory(runtime, type, (JRubyClassLoader)classLoader, dumpingPath);
+        } else {
+            // FIXME: No, I don't like it.
+            return new InvocationCallbackFactory(runtime, type, (JRubyClassLoader)classLoader);
+        }
     }
 }

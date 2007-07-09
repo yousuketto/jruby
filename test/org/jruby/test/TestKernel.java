@@ -38,6 +38,7 @@ import org.jruby.RubyException;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyObject;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.runtime.builtin.IRubyObject;
 
 /**
  * Unit test for the kernel class.
@@ -65,17 +66,13 @@ public class TestKernel extends TestRubyBase {
         assertEquals("failed to load the file test/loadTest", "0", eval("require 'test/loadTest'"));
         assertEquals("incorrectly reloaded the file test/loadTest", "", eval("require 'test/loadTest'"));
 
-        assertEquals("incorrect value for $\" variable", "test/loadTest.rbbuiltin/etc.rb.ast.ser", eval("print $\""));
+        assertEquals("incorrect value for $\" variable", "test/loadTest.rb", eval("print $\".sort"));
     }
 
     public void testPrintf() throws Exception {
         assertEquals("hello", eval("printf(\"%s\", \"hello\")"));
         assertEquals("", eval("printf(\"%s\", nil)"));
     }
-	
-	public void testReturn() throws Exception {
-		assertEquals("returned", runtime.evalScript("return 'returned'").toString());
-	}
 
     public void testExit() throws Exception {
         verifyExit(RubyFixnum.zero(runtime),   "true");
@@ -91,7 +88,7 @@ public class TestKernel extends TestRubyBase {
         } catch (RaiseException re) {
         	RubyException raisedException = re.getException();
         	if (raisedException.isKindOf(runtime.getClass("SystemExit"))) {
-	            RubyObject status = (RubyObject)raisedException.getInstanceVariable("status");
+	            IRubyObject status = raisedException.callMethod(runtime.getCurrentContext(), "status");
 	            assertEquals(expectedStatus, status);
         	} else {
         		throw re;

@@ -36,16 +36,16 @@ if [ -z "$JRUBY_HOME" ] ; then
     ls=`ls -ld "$PRG"`
     link=`expr "$ls" : '.*-> \(.*\)$'`
     if expr "$link" : '.*/.*' > /dev/null; then
-	PRG="$link"
+    PRG="$link"
     else
-	PRG="`dirname $PRG`/$link"
+    PRG="`dirname $PRG`/$link"
     fi
   done
   
   JRUBY_HOME_1=`dirname "$PRG"`           # the ./bin dir
   JRUBY_HOME_1=`dirname "$JRUBY_HOME_1"`  # the . dir
   if [ -d "${JRUBY_HOME_1}/lib" ] ; then 
-	JRUBY_HOME="${JRUBY_HOME_1}"
+    JRUBY_HOME="${JRUBY_HOME_1}"
   fi
 else
   if $cygwin; then
@@ -58,36 +58,46 @@ if [ -z "$JRUBY_OPTS" ] ; then
 fi
 
 if [ -z "$JAVA_HOME" ] ; then
-  echo You must set JAVA_HOME to point at your Java Development Kit installation
-  exit 1
+  JAVA_CMD='java'
 else
   if $cygwin; then
     JAVA_HOME=`cygpath -u "$JAVA_HOME"`
   fi
+  JAVA_CMD="$JAVA_HOME/bin/java"
 fi
 
 JRUBY_SHELL=/bin/sh
 
 # ----- Set Up The System Classpath -------------------------------------------
 
-if [ "$CLASSPATH" != "" ]; then
-  CP="$CLASSPATH"
-  if $cygwin; then
-    CP=`cygpath -p -w "$CP"`
-  fi
+if [ "$JRUBY_PARENT_CLASSPATH" != "" ]; then
+    # Use same classpath propagated from parent jruby
+    CP=$JRUBY_PARENT_CLASSPATH
 else
-  CP=""
-fi
+    if [ "$CLASSPATH" != "" ]; then
+        CP="$CLASSPATH"
+        if $cygwin; then
+            CP=`cygpath -p -u "$CP"`
+        fi
+    else
+        CP=""
+    fi
 
-if $cygwin; then
-   CP_DELIMETER=";"
-else 
-   CP_DELIMETER=":"
-fi
+    CP_DELIMETER=":"
 
-for i in "$JRUBY_HOME"/lib/*.jar; do
-  CP=$CP$CP_DELIMETER$i
-done
+    # add necessary jars for command-line execution
+    for j in "$JRUBY_HOME"/lib/*.jar; do
+        if [ "$CP" ]; then
+            CP="$CP$CP_DELIMETER$j"
+            else
+            CP="$j"
+        fi
+    done
+
+    if $cygwin; then
+	CP=`cygpath -p -w "$CP"`
+    fi
+fi
 
 # ----- Set Up JRUBY_BASE If Necessary -------------------------------------
 
@@ -97,21 +107,49 @@ fi
 
 # ----- Execute The Requested Command -----------------------------------------
 
-DEBUG=""
-if [ "$1" = "JAVA_DEBUG" ]; then
-  DEBUG="-Xdebug -Xrunjdwp:transport=dt_socket,address=8000,server=y,suspend=y"
-  shift
-else
-  if [ "$1" = "JPROFILER" ]; then
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JPROFILER_PATH/bin/linux-x86
-    DEBUG="-Xrunjprofiler:port=8000,noexit -Xbootclasspath/a:/$JPROFILER_PATH/bin/agent.jar"
+
+JAVA_MEM=-Xmx256m
+JAVA_STACK=-Xss1024k
+
+# Split out any -J argument for passing to the JVM.
+# Scanning for args is aborted by '--'.
+java_args=()
+ruby_args=()
+    while [ $# -gt 0 ]
+do
+    case "$1" in
+    # Stuff after '-J' in this argument goes to JVM
+    -J*)
+        val=${1:2}
+        if [ "${val:0:4}" = "-Xmx" ]; then
+            JAVA_MEM=$val
+        elif [ "${val:0:4}" = "-Xss" ]; then
+            JAVA_STACK=$val
+        else
+            java_args=("${java_args[@]}" "${1:2}")
+        fi
+        ;;
+     # Match switches that take an argument
+     -e|-I|-S) ruby_args=("${ruby_args[@]}" "$1" "$2"); shift ;;
+     # Match same switches with argument stuck together
+     -e*|-I*|-S*) ruby_args=("${ruby_args[@]}" "$1" ) ;;
+     # Abort processing on the double dash
+     --) break ;;
+     # Other opts go to ruby
+     -*) ruby_args=("${ruby_args[@]}" "$1") ;;
+     # Abort processing on first non-opt arg
+     *) break ;;
+    esac
     shift
-  else if [ "$1" = "HPROF" ]; then
-      DEBUG="-Xrunhprof:cpu=samples"
-      shift
-  fi
-  fi
-fi
+done
+
+# Append the rest of the arguments
+ruby_args=("${ruby_args[@]}" "$@")
+
+# Put the ruby_args back into the position arguments $1, $2 etc
+set -- "${ruby_args[@]}"
+
+JAVA_OPTS="$JAVA_OPTS ${java_args[@]} $JAVA_MEM $JAVA_STACK -da"
 
 if $cygwin; then
   JAVA_HOME=`cygpath --mixed "$JAVA_HOME"`
@@ -120,18 +158,9 @@ if $cygwin; then
   JRUBY_SHELL=`cygpath --mixed "$JRUBY_SHELL"`
 fi
 
-EN_US=
-if [ "$1" = "EN_US" ]; then
-  EN_US="-Duser.language=en -Duser.country=US"
-  shift
-fi
-
-  "$JAVA_HOME/bin/java" $DEBUG -Xmx256m -ea -classpath "$CP" \
-  "-Djruby.base=$JRUBY_BASE" \
-  "-Djruby.home=$JRUBY_HOME" \
-  "-Djruby.lib=$JRUBY_BASE/lib" \
-  -Djruby.script=jruby \
-  "-Djruby.shell=$JRUBY_SHELL" \
-  $EN_US \
-  org.jruby.Main $JRUBY_OPTS "$@" 
+exec "$JAVA_CMD" $JAVA_OPTS -classpath "$CP"	\
+  "-Djruby.base=$JRUBY_BASE" "-Djruby.home=$JRUBY_HOME"				\
+  "-Djruby.lib=$JRUBY_BASE/lib" -Djruby.script=jruby				\
+  "-Djruby.shell=$JRUBY_SHELL"  						\
+  org.jruby.Main $JRUBY_OPTS "$@"
 

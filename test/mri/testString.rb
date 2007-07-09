@@ -3,7 +3,6 @@ require 'test/minirunit'
 test_check "string & char"
 
 test_ok("abcd" == "abcd")
-test_ok("abcd" =~ "abcd")
 test_ok("abcd" === "abcd")
 # compile time string concatenation
 test_ok("ab" "cd" == "abcd")
@@ -37,6 +36,7 @@ ABCD
 END
 $x.gsub!(/((.|\n)*?)B((.|\n)*?)D/){$1+$3}
 test_ok($x == "AC\nAC\n")
+
 
 test_ok("foobar" =~ /foo(?=(bar)|(baz))/)
 test_ok("foobaz" =~ /foo(?=(bar)|(baz))/)

@@ -153,4 +153,15 @@ end
 f = PrivMethod.new
 f.bar
 test_equal('good', f.a)
+# Method to_s and inspect tests
+test_equal('#<Method: String#to_s>', "string".method(:to_s).to_s)
+test_equal('#<Method: String#to_s>', "string".method(:to_s).inspect)
+test_equal('#<UnboundMethod: String#to_s>', "string".method(:to_s).unbind.to_s)
+test_equal('#<UnboundMethod: String#to_s>', "string".method(:to_s).unbind.inspect)
 
+class C
+  def var=(val)
+    test_equal(nil, val)
+  end
+end
+C.new.var =()

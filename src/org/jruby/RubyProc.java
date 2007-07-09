@@ -18,6 +18,7 @@
  * Copyright (C) 2002-2005 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
+ * Copyright (C) 2007 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -34,7 +35,10 @@
 package org.jruby;
 
 import org.jruby.exceptions.JumpException;
+import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
+import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -42,101 +46,145 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author  jpetersen
  */
 public class RubyProc extends RubyObject {
-    private Block block = null;
-    private RubyModule wrapper = null;
+    private Block block = Block.NULL_BLOCK;
+    private boolean isLambda;
 
-    public RubyProc(IRuby runtime, RubyClass rubyClass) {
+    public RubyProc(Ruby runtime, RubyClass rubyClass, boolean isLambda) {
         super(runtime, rubyClass);
+        
+        this.isLambda = isLambda;
+    }
+    
+    private static ObjectAllocator PROC_ALLOCATOR = new ObjectAllocator() {
+        public IRubyObject allocate(Ruby runtime, RubyClass klass) {
+            RubyProc instance = RubyProc.newProc(runtime, false);
+
+            instance.setMetaClass(klass);
+
+            return instance;
+        }
+    };
+
+    public static RubyClass createProcClass(Ruby runtime) {
+        RubyClass procClass = runtime.defineClass("Proc", runtime.getObject(), PROC_ALLOCATOR);
+        CallbackFactory callbackFactory = runtime.callbackFactory(RubyProc.class);
+        
+        procClass.defineFastMethod("arity", callbackFactory.getFastMethod("arity"));
+        procClass.defineFastMethod("binding", callbackFactory.getFastMethod("binding"));
+        procClass.defineMethod("call", callbackFactory.getOptMethod("call"));
+        procClass.defineAlias("[]", "call");
+        procClass.defineFastMethod("to_proc", callbackFactory.getFastMethod("to_proc"));
+        procClass.defineMethod("initialize", callbackFactory.getOptMethod("initialize"));
+
+        procClass.getMetaClass().defineMethod("new", callbackFactory.getOptSingletonMethod("newInstance"));
+        
+        return procClass;
     }
 
     public Block getBlock() {
         return block;
     }
 
-    public RubyModule getWrapper() {
-        return wrapper;
-    }
-
     // Proc class
 
-    public static RubyProc newProc(IRuby runtime, boolean isLambda) {
-        ThreadContext tc = runtime.getCurrentContext();
+    public static RubyProc newProc(Ruby runtime, boolean isLambda) {
+        return new RubyProc(runtime, runtime.getClass("Proc"), isLambda);
+    }
+    public static RubyProc newProc(Ruby runtime, Block block, boolean isLambda) {
+        RubyProc proc = new RubyProc(runtime, runtime.getClass("Proc"), isLambda);
+        proc.callInit(NULL_ARRAY, block);
         
-        if (!tc.isBlockGiven() && !tc.isFBlockGiven()) {
-            throw runtime.newArgumentError("tried to create Proc object without a block");
+        return proc;
+    }
+    
+    public IRubyObject initialize(IRubyObject[] args, Block procBlock) {
+        Arity.checkArgumentCount(getRuntime(), args, 0, 0);
+        if (procBlock == null) {
+            throw getRuntime().newArgumentError("tried to create Proc object without a block");
         }
         
-        if (isLambda && !tc.isBlockGiven()) {
-        	// TODO: warn "tried to create Proc object without a block"
+        if (isLambda && procBlock == null) {
+            // TODO: warn "tried to create Proc object without a block"
         }
         
-        Block block = (Block) tc.getCurrentBlock();
-        
-        if (!isLambda && block.getBlockObject() instanceof RubyProc) {
-        	return (RubyProc) block.getBlockObject();
-        }
+        block = procBlock.cloneBlock();
+        block.isLambda = isLambda;
+        block.setProcObject(this);
 
-        RubyProc newProc = new RubyProc(runtime, runtime.getClass("Proc"));
-
-        newProc.block = block.cloneBlock();
-        newProc.wrapper = tc.getWrapper();
-        newProc.block.isLambda = isLambda;
-        block.setBlockObject(newProc);
-
-        return newProc;
+        return this;
     }
     
     protected IRubyObject doClone() {
-    	RubyProc newProc = 
-    		new RubyProc(getRuntime(), getRuntime().getClass("Proc"));
+    	RubyProc newProc = new RubyProc(getRuntime(), getRuntime().getClass("Proc"), isLambda);
     	
     	newProc.block = getBlock();
-    	newProc.wrapper = getWrapper();
     	
     	return newProc;
     }
     
+    /**
+     * Create a new instance of a Proc object.  We override this method (from RubyClass)
+     * since we need to deal with special case of Proc.new with no arguments or block arg.  In 
+     * this case, we need to check previous frame for a block to consume.
+     */
+    public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
+        Ruby runtime = recv.getRuntime();
+        IRubyObject obj = ((RubyClass) recv).allocate();
+        
+        // No passed in block, lets check next outer frame for one ('Proc.new')
+        if (!block.isGiven()) {
+            block = runtime.getCurrentContext().getPreviousFrame().getBlock();
+        }
+        
+        obj.callMethod(runtime.getCurrentContext(), "initialize", args, block);
+        return obj;
+    }
+
     public IRubyObject binding() {
         return getRuntime().newBinding(block);
     }
-    
+
     public IRubyObject call(IRubyObject[] args) {
-        return call(args, null);
+        return call(args, null, Block.NULL_BLOCK);
     }
 
-    public IRubyObject call(IRubyObject[] args, IRubyObject self) {
-    	assert args != null;
-    	
-        ThreadContext context = getRuntime().getCurrentContext();
-        RubyModule oldWrapper = context.getWrapper();
-        context.setWrapper(wrapper);
+    // ENEBO: For method def others are Java to java versions
+    public IRubyObject call(IRubyObject[] args, Block unusedBlock) {
+        return call(args, null, Block.NULL_BLOCK);
+    }
+    
+    public IRubyObject call(IRubyObject[] args, IRubyObject self, Block unusedBlock) {
+        assert args != null;
+        
+        Ruby runtime = getRuntime();
+        ThreadContext context = runtime.getCurrentContext();
+        
         try {
-        	if (block.isLambda) {
-        		block.arity().checkArity(getRuntime(), args);
-        	}
-        	
-        	return block.call(args, self);
-        } catch (JumpException je) {
-        	if (je.getJumpType() == JumpException.JumpType.BreakJump) {
-        		if (block.isLambda) {
-	                return (IRubyObject)je.getPrimaryData();
-	            } 
-		        throw getRuntime().newLocalJumpError("unexpected return");
-        	} else if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
-        		Object target = je.getPrimaryData();
-	
-	            if (target == this || block.isLambda) {
-	                return (IRubyObject)je.getSecondaryData();
-	            } else if (target == null) {
-	            	throw getRuntime().newLocalJumpError("unexpected return");
-	            }
-	            throw je;
-        	} else {
-        		throw je;
-        	}
-        } finally {
-            context.setWrapper(oldWrapper);
-        }
+            if (block.isLambda) {
+                block.arity().checkArity(getRuntime(), args);
+            }
+            
+            Block newBlock = block.cloneBlock();
+            if (self != null) newBlock.setSelf(self);
+            
+            // if lambda, set new jump target in (duped) frame for returns
+            if (newBlock.isLambda) newBlock.getFrame().setJumpTarget(this);
+            
+            return newBlock.call(context, args);
+        } catch (JumpException.BreakJump bj) {
+                if (block.isLambda) return (IRubyObject) bj.getValue();
+                
+                throw runtime.newLocalJumpError("break", (IRubyObject)bj.getValue(), "break from proc-closure");
+        } catch (JumpException.ReturnJump rj) {
+            Object target = rj.getTarget();
+
+            if (target == this || block.isLambda) return (IRubyObject) rj.getValue();
+
+            if (target == null) {
+                throw runtime.newLocalJumpError("return", (IRubyObject)rj.getValue(), "unexpected return");
+            }
+            throw rj;
+        } 
     }
 
     public RubyFixnum arity() {

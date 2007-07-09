@@ -31,9 +31,11 @@ package org.jruby.internal.runtime;
 
 import java.util.ArrayList;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyProc;
 import org.jruby.runtime.IAccessor;
+import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.builtin.IRubyObject;
 
 /**
  * 
@@ -48,7 +50,7 @@ public final class GlobalVariable {
         this.accessor = accessor;
     }
     
-    public static GlobalVariable newUndefined(IRuby runtime, String name) {
+    public static GlobalVariable newUndefined(Ruby runtime, String name) {
         GlobalVariable variable = new GlobalVariable(null);
         variable.setAccessor(new UndefinedAccessor(runtime, variable, name));
         return variable;
@@ -62,11 +64,23 @@ public final class GlobalVariable {
         return traces;
     }
 
-    public void addTrace(RubyProc trace) {
+    public void addTrace(RubyProc command) {
         if (traces == null) {
             traces = new ArrayList();
         }
-        traces.add(trace);
+        traces.add(command);
+    }
+
+    public boolean removeTrace(IRubyObject command) {
+        if (traces == null || !traces.contains(command)) {
+            return false;
+        }
+        traces.remove(command);
+        return true;
+    }
+
+    public void removeTraces() {
+        traces = null;
     }
 
     public void setAccessor(IAccessor accessor) {
@@ -74,6 +88,24 @@ public final class GlobalVariable {
     }
     public boolean isTracing() {
         return tracing;
+    }
+    
+    public void trace(IRubyObject value) {
+        if (traces == null) return;
+        
+        ThreadContext context = value.getRuntime().getCurrentContext();
+        
+        if (context.isWithinTrace()) return;
+        
+        try {
+            context.setWithinTrace(true);
+
+            for (int i = 0; i < traces.size(); i++) {
+                ((RubyProc)traces.get(i)).call(new IRubyObject[] {value});
+            }
+        } finally {
+            context.setWithinTrace(false);
+        }
     }
 
 }

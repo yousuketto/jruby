@@ -32,7 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.JRubyFile;
 
@@ -41,8 +43,8 @@ import org.jruby.util.JRubyFile;
  * Implements File::Stat
  */
 public class RubyFileStat extends RubyObject {
-    private static final int READ = 222;
-    private static final int WRITE = 444;
+    private static final int READ = 0222;
+    private static final int WRITE = 0444;
 
     private RubyFixnum blksize;
     private RubyBoolean isDirectory;
@@ -50,60 +52,76 @@ public class RubyFileStat extends RubyObject {
     private RubyString ftype;
     private RubyFixnum mode;
     private RubyTime mtime;
+    private RubyTime ctime;
     private RubyBoolean isReadable;
     private RubyBoolean isWritable;
     private RubyFixnum size;
     private RubyBoolean isSymlink;
 
-    public static RubyClass createFileStatClass(IRuby runtime) {
-        final RubyClass fileStatClass = runtime.getClass("File").defineClassUnder("Stat",runtime.getObject());
+    private static ObjectAllocator ALLOCATOR = new ObjectAllocator() {
+        public IRubyObject allocate(Ruby runtime, RubyClass klass) {
+            return new RubyFileStat(runtime, klass);
+        }
+    };
+
+    public static RubyClass createFileStatClass(Ruby runtime) {
+        // TODO: NOT_ALLOCATABLE_ALLOCATOR is probably ok here. Confirm. JRUBY-415
+        final RubyClass fileStatClass = runtime.getClass("File").defineClassUnder("Stat",runtime.getObject(), ALLOCATOR);
         final CallbackFactory callbackFactory = runtime.callbackFactory(RubyFileStat.class);
+
+        fileStatClass.defineFastMethod("initialize",callbackFactory.getMethod("initialize", RubyKernel.IRUBY_OBJECT));
         //        fileStatClass.defineMethod("<=>", callbackFactory.getMethod(""));
         //        fileStateClass.includeModule(runtime.getModule("Comparable"));
         //        fileStatClass.defineMethod("atime", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("blksize", callbackFactory.getMethod("blksize"));
+        fileStatClass.defineFastMethod("blksize", callbackFactory.getFastMethod("blksize"));
         //        fileStatClass.defineMethod("blockdev?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("blocks", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("chardev?", callbackFactory.getMethod(""));
-        //        fileStatClass.defineMethod("ctime", callbackFactory.getMethod(""));
+        fileStatClass.defineFastMethod("ctime", callbackFactory.getFastMethod("ctime"));
         //        fileStatClass.defineMethod("dev", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("dev_major", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("dev_minor", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("directory?", callbackFactory.getMethod("directory_p"));
+        fileStatClass.defineFastMethod("directory?", callbackFactory.getFastMethod("directory_p"));
         //        fileStatClass.defineMethod("executable?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("executable_real?", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("file?", callbackFactory.getMethod("file_p"));
-        fileStatClass.defineMethod("ftype", callbackFactory.getMethod("ftype"));
+        fileStatClass.defineFastMethod("file?", callbackFactory.getFastMethod("file_p"));
+        fileStatClass.defineFastMethod("ftype", callbackFactory.getFastMethod("ftype"));
         //        fileStatClass.defineMethod("gid", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("grpowned?", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("ino", callbackFactory.getMethod("ino"));
-        fileStatClass.defineMethod("mode", callbackFactory.getMethod("mode"));
-        fileStatClass.defineMethod("mtime", callbackFactory.getMethod("mtime"));
+        fileStatClass.defineFastMethod("ino", callbackFactory.getFastMethod("ino"));
+        fileStatClass.defineFastMethod("mode", callbackFactory.getFastMethod("mode"));
+        fileStatClass.defineFastMethod("mtime", callbackFactory.getFastMethod("mtime"));
         //        fileStatClass.defineMethod("nlink", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("owned?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("pipe?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("rdev", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("rdev_major", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("rdev_minor", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("readable?", callbackFactory.getMethod("readable_p"));
+        fileStatClass.defineFastMethod("readable?", callbackFactory.getFastMethod("readable_p"));
         //        fileStatClass.defineMethod("readable_real?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("setgid?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("setuid?", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("size", callbackFactory.getMethod("size"));
+        fileStatClass.defineFastMethod("size", callbackFactory.getFastMethod("size"));
         //        fileStatClass.defineMethod("size?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("socket?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("sticky?", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("symlink?", callbackFactory.getMethod("symlink_p"));
+        fileStatClass.defineFastMethod("symlink?", callbackFactory.getFastMethod("symlink_p"));
         //        fileStatClass.defineMethod("uid", callbackFactory.getMethod(""));
-        fileStatClass.defineMethod("writable?", callbackFactory.getMethod("writable"));
+        fileStatClass.defineFastMethod("writable?", callbackFactory.getFastMethod("writable"));
         //        fileStatClass.defineMethod("writable_real?", callbackFactory.getMethod(""));
         //        fileStatClass.defineMethod("zero?", callbackFactory.getMethod(""));
     	
         return fileStatClass;
     }
 
-    protected RubyFileStat(IRuby runtime, JRubyFile file) {
-        super(runtime, runtime.getClass("File").getClass("Stat"));
+    protected RubyFileStat(Ruby runtime, RubyClass clazz) {
+        super(runtime, clazz);
+
+    }
+
+    public IRubyObject initialize(IRubyObject fname, Block unusedBlock) {
+        Ruby runtime = getRuntime();
+        JRubyFile file = JRubyFile.create(runtime.getCurrentDirectory(),fname.toString());
 
         if(!file.exists()) {
             throw runtime.newErrnoENOENTError("No such file or directory - " + file.getPath());
@@ -125,11 +143,13 @@ public class RubyFileStat extends RubyObject {
     	}
     	mode = runtime.newFixnum(baseMode);
         mtime = runtime.newTime(file.lastModified());
+        ctime = runtime.newTime(file.getParentFile().lastModified());
         isReadable = runtime.newBoolean(file.canRead());
         isWritable = runtime.newBoolean(file.canWrite());
         size = runtime.newFixnum(file.length());
         // We cannot determine this in Java, so we will always return false (better than blowing up)
         isSymlink = runtime.getFalse();
+        return this;
     }
     
     public RubyFixnum blksize() {
@@ -159,6 +179,10 @@ public class RubyFileStat extends RubyObject {
     
     public IRubyObject mtime() {
         return mtime;
+    }
+
+    public IRubyObject ctime() {
+        return ctime;
     }
     
     public IRubyObject readable_p() {

@@ -18,6 +18,7 @@
  * Copyright (C) 2004-2006 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Evan Buswell <ebuswell@gmail.com>
+ * Copyright (C) 2007 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -40,9 +41,24 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
 import java.nio.channels.Channel;
+import java.nio.channels.Pipe;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 
+import org.jruby.runtime.Arity;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.MethodIndex;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.ByteList;
 import org.jruby.util.IOHandler;
 import org.jruby.util.IOHandlerJavaIO;
 import org.jruby.util.IOHandlerNio;
@@ -51,6 +67,7 @@ import org.jruby.util.IOHandlerProcess;
 import org.jruby.util.IOHandlerSeekable;
 import org.jruby.util.IOHandlerUnseekable;
 import org.jruby.util.IOModes;
+import org.jruby.util.ShellLauncher;
 
 /**
  * 
@@ -61,7 +78,7 @@ public class RubyIO extends RubyObject {
     public static final int STDOUT = 1;
     public static final int STDERR = 2;
     
-    protected IOHandler handler = null;
+    protected IOHandler handler;
     protected IOModes modes = null;
     protected int lineNumber = 0;
     
@@ -73,6 +90,7 @@ public class RubyIO extends RubyObject {
     // when it really isn't.  Keeping track of this yields
     // the right errors.
     protected boolean isOpen = true;
+    private boolean atEOF = false;
 
     /*
      * Random notes:
@@ -159,11 +177,11 @@ public class RubyIO extends RubyObject {
 
     // This should only be called by this and RubyFile.
     // It allows this object to be created without a IOHandler.
-    public RubyIO(IRuby runtime, RubyClass type) {
+    public RubyIO(Ruby runtime, RubyClass type) {
         super(runtime, type);
     }
 
-    public RubyIO(IRuby runtime, OutputStream outputStream) {
+    public RubyIO(Ruby runtime, OutputStream outputStream) {
         super(runtime, runtime.getClass("IO"));
         
         // We only want IO objects with valid streams (better to error now). 
@@ -181,7 +199,25 @@ public class RubyIO extends RubyObject {
         registerIOHandler(handler);
     }
     
-    public RubyIO(IRuby runtime, Channel channel) {
+    public RubyIO(Ruby runtime, InputStream inputStream) {
+        super(runtime, runtime.getClass("IO"));
+        
+        if (inputStream == null) {
+            throw runtime.newIOError("Opening invalid stream");
+        }
+        
+        try {
+            handler = new IOHandlerUnseekable(runtime, inputStream, null);
+        } catch (IOException e) {
+            throw runtime.newIOError(e.getMessage());
+        }
+        
+        modes = handler.getModes();
+        
+        registerIOHandler(handler);
+    }
+    
+    public RubyIO(Ruby runtime, Channel channel) {
         super(runtime, runtime.getClass("IO"));
         
         // We only want IO objects with valid streams (better to error now). 
@@ -199,7 +235,7 @@ public class RubyIO extends RubyObject {
         registerIOHandler(handler);
     }
 
-    public RubyIO(IRuby runtime, Process process) {
+    public RubyIO(Ruby runtime, Process process) {
     	super(runtime, runtime.getClass("IO"));
 
         modes = new IOModes(runtime, "w+");
@@ -214,7 +250,7 @@ public class RubyIO extends RubyObject {
     	registerIOHandler(handler);
     }
     
-    public RubyIO(IRuby runtime, int descriptor) {
+    public RubyIO(Ruby runtime, int descriptor) {
         super(runtime, runtime.getClass("IO"));
 
         try {
@@ -227,11 +263,92 @@ public class RubyIO extends RubyObject {
         registerIOHandler(handler);
     }
     
+    private static ObjectAllocator IO_ALLOCATOR = new ObjectAllocator() {
+        public IRubyObject allocate(Ruby runtime, RubyClass klass) {
+            return new RubyIO(runtime, klass);
+        }
+    };
+
+    public static RubyClass createIOClass(Ruby runtime) {
+        RubyClass ioClass = runtime.defineClass("IO", runtime.getObject(), IO_ALLOCATOR);
+        CallbackFactory callbackFactory = runtime.callbackFactory(RubyIO.class);   
+        RubyClass ioMetaClass = ioClass.getMetaClass();
+
+        ioClass.includeModule(runtime.getModule("Enumerable"));
+        
+        // TODO: Implement tty? and isatty.  We have no real capability to
+        // determine this from java, but if we could set tty status, then
+        // we could invoke jruby differently to allow stdin to return true
+        // on this.  This would allow things like cgi.rb to work properly.
+        
+        ioMetaClass.defineMethod("foreach", callbackFactory.getOptSingletonMethod("foreach"));
+        ioMetaClass.defineMethod("read", callbackFactory.getOptSingletonMethod("read"));
+        ioMetaClass.defineMethod("readlines", callbackFactory.getOptSingletonMethod("readlines"));
+        ioMetaClass.defineMethod("popen", callbackFactory.getOptSingletonMethod("popen"));
+        ioMetaClass.defineFastMethod("select", callbackFactory.getFastOptSingletonMethod("select"));
+        ioMetaClass.defineFastMethod("pipe", callbackFactory.getFastSingletonMethod("pipe"));
+        
+        ioClass.defineFastMethod("<<", callbackFactory.getFastMethod("addString", IRubyObject.class));
+        ioClass.defineFastMethod("binmode", callbackFactory.getFastMethod("binmode"));
+        ioClass.defineFastMethod("close", callbackFactory.getFastMethod("close"));
+        ioClass.defineFastMethod("closed?", callbackFactory.getFastMethod("closed"));
+        ioClass.defineMethod("each", callbackFactory.getOptMethod("each_line"));
+        ioClass.defineMethod("each_byte", callbackFactory.getMethod("each_byte"));
+        ioClass.defineMethod("each_line", callbackFactory.getOptMethod("each_line"));
+        ioClass.defineFastMethod("eof", callbackFactory.getFastMethod("eof"));
+        ioClass.defineAlias("eof?", "eof");
+        ioClass.defineFastMethod("fcntl", callbackFactory.getFastMethod("fcntl", IRubyObject.class, IRubyObject.class));
+        ioClass.defineFastMethod("fileno", callbackFactory.getFastMethod("fileno"));
+        ioClass.defineFastMethod("flush", callbackFactory.getFastMethod("flush"));
+        ioClass.defineFastMethod("fsync", callbackFactory.getFastMethod("fsync"));
+        ioClass.defineFastMethod("getc", callbackFactory.getFastMethod("getc"));
+        ioClass.defineFastMethod("gets", callbackFactory.getFastOptMethod("gets"));
+        ioClass.defineMethod("initialize", callbackFactory.getOptMethod("initialize"));
+        ioClass.defineFastMethod("initialize_copy", callbackFactory.getFastMethod("initialize_copy", IRubyObject.class));
+        ioClass.defineFastMethod("lineno", callbackFactory.getFastMethod("lineno"));
+        ioClass.defineFastMethod("lineno=", callbackFactory.getFastMethod("lineno_set", IRubyObject.class));
+        ioClass.defineFastMethod("pid", callbackFactory.getFastMethod("pid"));
+        ioClass.defineFastMethod("pos", callbackFactory.getFastMethod("pos"));
+        ioClass.defineFastMethod("pos=", callbackFactory.getFastMethod("pos_set", IRubyObject.class));
+        ioClass.defineFastMethod("print", callbackFactory.getFastOptMethod("print"));
+        ioClass.defineFastMethod("printf", callbackFactory.getFastOptMethod("printf"));
+        ioClass.defineFastMethod("putc", callbackFactory.getFastMethod("putc", IRubyObject.class));
+        ioClass.defineFastMethod("puts", callbackFactory.getFastOptMethod("puts"));
+        ioClass.defineFastMethod("readpartial", callbackFactory.getFastOptMethod("readpartial"));
+        ioClass.defineFastMethod("read", callbackFactory.getFastOptMethod("read"));
+        ioClass.defineFastMethod("readchar", callbackFactory.getFastMethod("readchar"));
+        ioClass.defineFastMethod("readline", callbackFactory.getFastOptMethod("readline"));
+        ioClass.defineFastMethod("readlines", callbackFactory.getFastOptMethod("readlines"));
+        ioClass.defineFastMethod("reopen", callbackFactory.getFastOptMethod("reopen"));
+        ioClass.defineFastMethod("rewind", callbackFactory.getFastMethod("rewind"));
+        ioClass.defineFastMethod("seek", callbackFactory.getFastOptMethod("seek"));
+        ioClass.defineFastMethod("sync", callbackFactory.getFastMethod("sync"));
+        ioClass.defineFastMethod("sync=", callbackFactory.getFastMethod("sync_set", IRubyObject.class));
+        ioClass.defineFastMethod("sysread", callbackFactory.getFastOptMethod("sysread"));
+        ioClass.defineFastMethod("syswrite", callbackFactory.getFastMethod("syswrite", IRubyObject.class));
+        ioClass.defineAlias("tell", "pos");
+        ioClass.defineAlias("to_i", "fileno");
+        ioClass.defineFastMethod("to_io", callbackFactory.getFastMethod("to_io"));
+        ioClass.defineFastMethod("ungetc", callbackFactory.getFastMethod("ungetc", IRubyObject.class));
+        ioClass.defineFastMethod("write", callbackFactory.getFastMethod("write", IRubyObject.class));
+        ioClass.defineFastMethod("tty?", callbackFactory.getFastMethod("tty"));
+        ioClass.defineAlias("isatty", "tty?");
+
+        // Constants for seek
+        ioClass.setConstant("SEEK_SET", runtime.newFixnum(IOHandler.SEEK_SET));
+        ioClass.setConstant("SEEK_CUR", runtime.newFixnum(IOHandler.SEEK_CUR));
+        ioClass.setConstant("SEEK_END", runtime.newFixnum(IOHandler.SEEK_END));
+        
+        ioClass.dispatcher = callbackFactory.createDispatcher(ioClass);
+
+        return ioClass;
+    }    
+    
     /**
      * <p>Open a file descriptor, unless it is already open, then return
      * it.</p> 
      */
-    public static IRubyObject fdOpen(IRuby runtime, int descriptor) {
+    public static IRubyObject fdOpen(Ruby runtime, int descriptor) {
         return new RubyIO(runtime, descriptor);
     }
 
@@ -379,26 +496,28 @@ public class RubyIO extends RubyObject {
     public IRubyObject internalGets(IRubyObject[] args) {
         checkReadable();
 
-        IRubyObject sepVal = getRuntime().getGlobalVariables().get("$/");
+        IRubyObject sepVal;
 
         if (args.length > 0) {
             sepVal = args[0];
+        } else {
+            sepVal = getRuntime().getGlobalVariables().get("$/");
         }
 
         
-        String separator = sepVal.isNil() ? null : ((RubyString) sepVal).toString();
+        ByteList separator = sepVal.isNil() ? null : ((RubyString) sepVal).getByteList();
 
-        if (separator != null && separator.length() == 0) {
+        if (separator != null && separator.realSize == 0) {
             separator = IOHandler.PARAGRAPH_DELIMETER;
         }
 
         try {
-            String newLine = handler.gets(separator);
+            ByteList newLine = handler.gets(separator);
 
 		    if (newLine != null) {
 		        lineNumber++;
 		        getRuntime().getGlobalVariables().set("$.", getRuntime().newFixnum(lineNumber));
-		        RubyString result = getRuntime().newString(newLine);
+		        RubyString result = RubyString.newString(getRuntime(), newLine);
 		        result.taint();
 		        
 		        return result;
@@ -414,8 +533,8 @@ public class RubyIO extends RubyObject {
 
     // IO class methods.
 
-    public IRubyObject initialize(IRubyObject[] args) {
-        int count = checkArgumentCount(args, 1, 2);
+    public IRubyObject initialize(IRubyObject[] args, Block unusedBlock) {
+        int count = Arity.checkArgumentCount(getRuntime(), args, 1, 2);
         int newFileno = RubyNumeric.fix2int(args[0]);
         String mode = null;
         
@@ -470,7 +589,15 @@ public class RubyIO extends RubyObject {
 
     public IRubyObject syswrite(IRubyObject obj) {
         try {
-            return getRuntime().newFixnum(handler.syswrite(obj.toString()));
+            if (obj instanceof RubyString) {
+                return getRuntime().newFixnum(handler.syswrite(((RubyString)obj).getByteList()));
+            } else {
+                // FIXME: unlikely to be efficient, but probably correct
+                return getRuntime().newFixnum(
+                        handler.syswrite(
+                        ((RubyString)obj.callMethod(
+                            obj.getRuntime().getCurrentContext(), MethodIndex.TO_S, "to_s")).getByteList()));
+            }
         } catch (IOHandler.BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (IOException e) {
@@ -485,9 +612,15 @@ public class RubyIO extends RubyObject {
         checkWriteable();
 
         try {
-            int totalWritten = handler.write(obj.toString());
-
-            return getRuntime().newFixnum(totalWritten);
+            if (obj instanceof RubyString) {
+                return getRuntime().newFixnum(handler.write(((RubyString)obj).getByteList()));
+            } else {
+                // FIXME: unlikely to be efficient, but probably correct
+                return getRuntime().newFixnum(
+                        handler.write(
+                        ((RubyString)obj.callMethod(
+                            obj.getRuntime().getCurrentContext(), MethodIndex.TO_S, "to_s")).getByteList()));
+            }
         } catch (IOHandler.BadDescriptorException e) {
             return RubyFixnum.zero(getRuntime());
         } catch (IOException e) {
@@ -500,7 +633,7 @@ public class RubyIO extends RubyObject {
      */
     public IRubyObject addString(IRubyObject anObject) {
         // Claims conversion is done via 'to_s' in docs.
-        IRubyObject strObject = anObject.callMethod("to_s");
+        IRubyObject strObject = anObject.callMethod(getRuntime().getCurrentContext(), MethodIndex.TO_S, "to_s");
 
         write(strObject);
         
@@ -548,11 +681,11 @@ public class RubyIO extends RubyObject {
     public IRubyObject pid() {
         int pid = handler.pid();
         
-        if (pid == -1) {
-            return getRuntime().getNil();
-        }
-        
-        return getRuntime().newFixnum(pid);
+        return pid == -1 ? getRuntime().getNil() : getRuntime().newFixnum(pid); 
+    }
+    
+    public boolean hasPendingBuffered() {
+        return handler.hasPendingBuffered();
     }
     
     public RubyFixnum pos() {
@@ -595,27 +728,28 @@ public class RubyIO extends RubyObject {
 
         IRubyObject fs = getRuntime().getGlobalVariables().get("$,");
         IRubyObject rs = getRuntime().getGlobalVariables().get("$\\");
-
+        ThreadContext context = getRuntime().getCurrentContext();
+        
         for (int i = 0; i < args.length; i++) {
             if (i > 0 && !fs.isNil()) {
-                callMethod("write", fs);
+                callMethod(context, "write", fs);
             }
             if (args[i].isNil()) {
-                callMethod("write", getRuntime().newString("nil"));
+                callMethod(context, "write", getRuntime().newString("nil"));
             } else {
-                callMethod("write", args[i]);
+                callMethod(context, "write", args[i]);
             }
         }
         if (!rs.isNil()) {
-            callMethod("write", rs);
+            callMethod(context, "write", rs);
         }
 
         return getRuntime().getNil();
     }
 
     public IRubyObject printf(IRubyObject[] args) {
-    	checkArgumentCount(args, 1, -1);
-        callMethod("write", RubyKernel.sprintf(this, args));
+    	Arity.checkArgumentCount(getRuntime(), args, 1, -1);
+        callMethod(getRuntime().getCurrentContext(), "write", RubyKernel.sprintf(this, args));
         return getRuntime().getNil();
     }
     
@@ -628,13 +762,12 @@ public class RubyIO extends RubyObject {
             if (value.length() > 0) {
                 c = value.charAt(0);
             } else {
-                throw getRuntime().newTypeError(
-                        "Cannot convert String to Integer");
+                throw getRuntime().newTypeError("Cannot convert String to Integer");
             }
         } else if (object.isKindOf(getRuntime().getFixnum())){
             c = RubyNumeric.fix2int(object);
         } else { // What case will this work for?
-            c = RubyNumeric.fix2int(object.callMethod("to_i"));
+            c = RubyNumeric.fix2int(object.callMethod(getRuntime().getCurrentContext(), MethodIndex.TO_I, "to_i"));
         }
 
         try {
@@ -645,7 +778,7 @@ public class RubyIO extends RubyObject {
             return RubyFixnum.zero(getRuntime());
         }
         
-        return getRuntime().newFixnum(c);
+        return object;
     }
     
     // This was a getOpt with one mandatory arg, but it did not work
@@ -737,9 +870,11 @@ public class RubyIO extends RubyObject {
         }
     }
     
-    public RubyIO clone_IO() {
-        RubyIO io = new RubyIO(getRuntime(), getMetaClass());
+    public IRubyObject initialize_copy(IRubyObject original){
+        if (this == original) return this;
 
+        RubyIO originalIO = (RubyIO) original;
+        
         // Two pos pointers?  
         // http://blade.nagaokaut.ac.jp/ruby/ruby-talk/81513
         // So if I understand this correctly, the descriptor level stuff
@@ -751,11 +886,12 @@ public class RubyIO extends RubyObject {
         // behavior (i.e. show how this interface bleeds their 
         // implementation). So our best bet, is to just create a yet another
         // copy of the handler.  In fact, ruby 1.8 must do this as the cloned
-        // resource is in fact a different fileno.  What is clone for again?
-        io.handler = handler;
-        io.modes = (IOModes) modes.clone();
+        // resource is in fact a different fileno.  What is clone for again?        
         
-        return io;
+        handler = originalIO.handler;
+        modes = (IOModes) originalIO.modes.clone();
+        
+        return this;
     }
     
     /** Closes the IO.
@@ -763,8 +899,7 @@ public class RubyIO extends RubyObject {
      * @return The IO.
      */
     public RubyBoolean closed() {
-        return isOpen() ? getRuntime().getFalse() :
-            getRuntime().getTrue();
+        return isOpen() ? getRuntime().getFalse() : getRuntime().getTrue();
     }
 
     /** 
@@ -811,17 +946,13 @@ public class RubyIO extends RubyObject {
     public IRubyObject gets(IRubyObject[] args) {
         IRubyObject result = internalGets(args);
 
-        if (!result.isNil()) {
-            getRuntime().getCurrentContext().setLastline(result);
-        }
+        if (!result.isNil()) getRuntime().getCurrentContext().setLastline(result);
 
         return result;
     }
 
     public boolean getBlocking() {
-        if (!(handler instanceof IOHandlerNio)) {
-            return true;
-        }
+        if (!(handler instanceof IOHandlerNio)) return true;
 
         return ((IOHandlerNio) handler).getBlocking();
      }
@@ -831,26 +962,24 @@ public class RubyIO extends RubyObject {
         
         // FIXME: Arg may also be true, false, and nil and still be valid.  Strangely enough, 
         // protocol conversion is not happening in Ruby on this arg?
-        if (!(arg instanceof RubyNumeric)) {
-            return getRuntime().newFixnum(0);
-        }
+        if (!(arg instanceof RubyNumeric)) return getRuntime().newFixnum(0);
         
         long realArg = ((RubyNumeric)arg).getLongValue();
 
         // Fixme: Only F_SETFL is current supported
         if (realCmd == 1L) {  // cmd is F_SETFL
-            boolean block = false;
+            boolean block = true;
             
-            if((realArg & IOModes.NONBLOCK) == IOModes.NONBLOCK) {
-                block = true;
+            if ((realArg & IOModes.NONBLOCK) == IOModes.NONBLOCK) {
+                block = false;
             }
             
- 	    if(!(handler instanceof IOHandlerNio)) {
- 		// cryptic for the uninitiated...
- 		throw getRuntime().newNotImplementedError("FCNTL only works with Nio based handlers");
- 	    }
- 	
- 	    try {
+            if (!(handler instanceof IOHandlerNio)) {
+                // cryptic for the uninitiated...
+                throw getRuntime().newNotImplementedError("FCNTL only works with Nio based handlers");
+            }
+
+            try {
                 ((IOHandlerNio) handler).setBlocking(block);
             } catch (IOException e) {
                 throw getRuntime().newIOError(e.getMessage());
@@ -861,10 +990,12 @@ public class RubyIO extends RubyObject {
     }
 
     public IRubyObject puts(IRubyObject[] args) {
-    	checkArgumentCount(args, 0, -1);
-    	
+    	Arity.checkArgumentCount(getRuntime(), args, 0, -1);
+        
+    	ThreadContext context = getRuntime().getCurrentContext();
+        
         if (args.length == 0) {
-            callMethod("write", getRuntime().newString("\n"));
+            callMethod(context, "write", getRuntime().newString("\n"));
             return getRuntime().getNil();
         }
 
@@ -878,7 +1009,7 @@ public class RubyIO extends RubyObject {
             } else {
                 line = args[i].toString();
             }
-            callMethod("write", getRuntime().newString(line+
+            callMethod(getRuntime().getCurrentContext(), "write", getRuntime().newString(line+
             		(line.endsWith("\n") ? "" : "\n")));
         }
         return getRuntime().getNil();
@@ -910,7 +1041,7 @@ public class RubyIO extends RubyObject {
         } catch (IOHandler.BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {
-            return getRuntime().getNil();
+            throw getRuntime().newEOFError();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
         }
@@ -933,10 +1064,10 @@ public class RubyIO extends RubyObject {
             throw getRuntime().newNotImplementedError("readpartial only works with Nio based handlers");
         }
     	try {
-            String buf = ((IOHandlerNio)handler).readpartial(RubyNumeric.fix2int(args[0]));
-            IRubyObject strbuf = getRuntime().newString((buf == null ? "" : buf));
+            ByteList buf = ((IOHandlerNio)handler).readpartial(RubyNumeric.fix2int(args[0]));
+            IRubyObject strbuf = RubyString.newString(getRuntime(), buf == null ? new ByteList(ByteList.NULL_ARRAY) : buf);
             if(args.length > 1) {
-                args[1].callMethod("<<",strbuf);
+                args[1].callMethod(getRuntime().getCurrentContext(),MethodIndex.OP_LSHIFT, "<<", strbuf);
                 return args[1];
             } 
 
@@ -950,11 +1081,28 @@ public class RubyIO extends RubyObject {
         }
     }
 
-    public IRubyObject sysread(IRubyObject number) {
+    public IRubyObject sysread(IRubyObject[] args) {
+        Arity.checkArgumentCount(getRuntime(), args, 1, 2);
+
+        int len = (int)RubyNumeric.num2long(args[0]);
+        if (len < 0) throw getRuntime().newArgumentError("Negative size");
+
         try {
-            String buf = handler.sysread(RubyNumeric.fix2int(number));
-        
-            return getRuntime().newString(buf);
+            RubyString str;
+            if (args.length == 1 || args[1].isNil()) {
+                if (len == 0) return RubyString.newString(getRuntime(), "");
+                str = RubyString.newString(getRuntime(), handler.sysread(len));
+            } else {
+                str = args[1].convertToString();
+                if (len == 0) {
+                    str.setValue(new ByteList());
+                    return str;
+                }
+                str.setValue(handler.sysread(len)); // should preserve same instance
+            }
+            str.setTaint(true);
+            return str;
+            
         } catch (IOHandler.BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {
@@ -971,24 +1119,62 @@ public class RubyIO extends RubyObject {
     }
     
     public IRubyObject read(IRubyObject[] args) {
-    	try {
-            String buf = args.length > 0 ? 
-                handler.read(RubyNumeric.fix2int(args[0])) : handler.getsEntireStream();
+               
+        int argCount = Arity.checkArgumentCount(getRuntime(), args, 0, 2);
+        RubyString callerBuffer = null;
+        boolean readEntireStream = (argCount == 0 || args[0].isNil());
 
-            if (buf == null) {
-                if (args.length > 0) {
-                    return getRuntime().getNil();
-                }
-                return getRuntime().newString("");
+        try {
+            // Reads when already at EOF keep us at EOF
+            // We do retain the possibility of un-EOFing if the handler
+            // gets new data
+            if (atEOF && handler.isEOF()) throw new EOFException();
+
+            if (argCount == 2) {
+                callerBuffer = args[1].convertToString(); 
+            }
+
+            ByteList buf;
+            if (readEntireStream) {
+                buf = handler.getsEntireStream();
+            } else {
+                long len = RubyNumeric.num2long(args[0]);
+                if (len < 0) throw getRuntime().newArgumentError("negative length " + len + " given");
+                buf = handler.read((int)len);
+            }
+
+            if (buf == null) throw new EOFException();
+
+            // If we get here then no EOFException was thrown in the handler.  We
+            // might still need to set our atEOF flag back to true depending on
+            // whether we were reading the entire stream (see the finally block below)
+            atEOF = false;
+            if (callerBuffer != null) {
+                callerBuffer.setValue(buf);
+                return callerBuffer;
             }
             
-            return getRuntime().newString(buf);
+            return RubyString.newString(getRuntime(), buf);
         } catch (IOHandler.BadDescriptorException e) {
             throw getRuntime().newErrnoEBADFError();
         } catch (EOFException e) {
-            return getRuntime().getNil();
+            // on EOF, IO#read():
+            // with no args or a nil first arg will return an empty string
+            // with a non-nil first arg will return nil
+            atEOF = true;
+            if (callerBuffer != null) {
+                callerBuffer.setValue("");
+                return readEntireStream ? callerBuffer : getRuntime().getNil();
+            }
+
+            return readEntireStream ? getRuntime().newString("") : getRuntime().getNil();
         } catch (IOException e) {
             throw getRuntime().newIOError(e.getMessage());
+        } finally {
+            // reading the entire stream always puts us at EOF
+            if (readEntireStream) {
+                atEOF = true;
+            }
         }
     }
 
@@ -1001,9 +1187,7 @@ public class RubyIO extends RubyObject {
         try {
             int c = handler.getc();
         
-            if (c == -1) {
-                throw getRuntime().newEOFError();
-            }
+            if (c == -1) throw getRuntime().newEOFError();
         
             return getRuntime().newFixnum(c);
         } catch (IOHandler.BadDescriptorException e) {
@@ -1018,12 +1202,12 @@ public class RubyIO extends RubyObject {
     /** 
      * <p>Invoke a block for each byte.</p>
      */
-    public IRubyObject each_byte() {
+    public IRubyObject each_byte(Block block) {
     	try {
             ThreadContext context = getRuntime().getCurrentContext();
             for (int c = handler.getc(); c != -1; c = handler.getc()) {
                 assert c < 256;
-                context.yield(getRuntime().newFixnum(c));
+                block.yield(context, getRuntime().newFixnum(c));
             }
 
             return getRuntime().getNil();
@@ -1039,11 +1223,21 @@ public class RubyIO extends RubyObject {
     /** 
      * <p>Invoke a block for each line.</p>
      */
-    public RubyIO each_line(IRubyObject[] args) {
-        ThreadContext context = getRuntime().getCurrentContext();
+    public RubyIO each_line(IRubyObject[] args, Block block) {
+        IRubyObject rs;
+        
+        if (args.length == 0) {
+            rs = getRuntime().getGlobalVariables().get("$/");
+        } else {
+            Arity.checkArgumentCount(getRuntime(), args, 1, 1);
+            rs = args[0];
+            if (!rs.isNil()) rs = rs.convertToString();
+        }
+        
+        ThreadContext context = getRuntime().getCurrentContext();        
         for (IRubyObject line = internalGets(args); !line.isNil(); 
         	line = internalGets(args)) {
-            context.yield(line);
+            block.yield(context, line);
         }
         
         return this;
@@ -1078,4 +1272,284 @@ public class RubyIO extends RubyObject {
     public String toString() {
         return "RubyIO(" + modes + ", " + fileno + ")";
     }
+    
+    /* class methods for IO */
+    
+    /** rb_io_s_foreach
+    *
+    */
+   public static IRubyObject foreach(IRubyObject recv, IRubyObject[] args, Block block) {
+       Ruby runtime = recv.getRuntime();
+       int count = Arity.checkArgumentCount(runtime, args, 1, -1);
+       IRubyObject filename = args[0].convertToString();
+       runtime.checkSafeString(filename);
+       RubyIO io = (RubyIO) RubyFile.open(recv, new IRubyObject[] { filename }, false, block);
+       
+       if (!io.isNil() && io.isOpen()) {
+           try {
+               IRubyObject[] newArgs = new IRubyObject[count - 1];
+               System.arraycopy(args, 1, newArgs, 0, count - 1);
+               
+               IRubyObject nextLine = io.internalGets(newArgs);
+               while (!nextLine.isNil()) {
+                   block.yield(runtime.getCurrentContext(), nextLine);
+                   nextLine = io.internalGets(newArgs);
+               }
+           } finally {
+               io.close();
+           }
+       }
+       
+       return runtime.getNil();
+   }
+   
+   private static RubyIO registerSelect(Selector selector, IRubyObject obj, int ops) throws IOException {
+       RubyIO ioObj;
+       
+       if (!(obj instanceof RubyIO)) {
+           // invoke to_io
+           if (!obj.respondsTo("to_io")) return null;
+
+           ioObj = (RubyIO) obj.callMethod(obj.getRuntime().getCurrentContext(), "to_io");
+       } else {
+           ioObj = (RubyIO) obj;
+       }
+       
+       Channel channel = ioObj.getChannel();
+       if (channel == null || !(channel instanceof SelectableChannel)) {
+           return null;
+       }
+       
+       ((SelectableChannel) channel).configureBlocking(false);
+       int real_ops = ((SelectableChannel) channel).validOps() & ops;
+       SelectionKey key = ((SelectableChannel) channel).keyFor(selector);
+       
+       if (key == null) {
+           ((SelectableChannel) channel).register(selector, real_ops, obj);
+       } else {
+           key.interestOps(key.interestOps()|real_ops);
+       }
+       
+       return ioObj;
+   }
+   
+   public static IRubyObject select(IRubyObject recv, IRubyObject[] args) {
+       return select_static(recv.getRuntime(), args);
+   }
+   
+   public static IRubyObject select_static(Ruby runtime, IRubyObject[] args) {
+       try {
+           boolean atLeastOneDescriptor = false;
+           
+           Set pending = new HashSet();
+           Selector selector = Selector.open();
+           if (!args[0].isNil()) {
+               atLeastOneDescriptor = true;
+               
+               // read
+               for (Iterator i = ((RubyArray) args[0]).getList().iterator(); i.hasNext(); ) {
+                   IRubyObject obj = (IRubyObject) i.next();
+                   RubyIO ioObj = registerSelect(selector, obj, 
+                           SelectionKey.OP_READ | SelectionKey.OP_ACCEPT);
+                   
+                   if (ioObj!=null && ioObj.hasPendingBuffered()) pending.add(obj);
+               }
+           }
+           if (args.length > 1 && !args[1].isNil()) {
+               atLeastOneDescriptor = true;
+               // write
+               for (Iterator i = ((RubyArray) args[1]).getList().iterator(); i.hasNext(); ) {
+                   IRubyObject obj = (IRubyObject) i.next();
+                   registerSelect(selector, obj, SelectionKey.OP_WRITE);
+               }
+           }
+           if (args.length > 2 && !args[2].isNil()) {
+               atLeastOneDescriptor = true;
+               // Java's select doesn't do anything about this, so we leave it be.
+           }
+           
+           long timeout = 0;
+           if(args.length > 3 && !args[3].isNil()) {
+               if (args[3] instanceof RubyFloat) {
+                   timeout = Math.round(((RubyFloat) args[3]).getDoubleValue() * 1000);
+               } else {
+                   timeout = Math.round(((RubyFixnum) args[3]).getDoubleValue() * 1000);
+               }
+               
+               if (timeout < 0) {
+                   throw runtime.newArgumentError("negative timeout given");
+               }
+           }
+           
+           if (!atLeastOneDescriptor) {
+               return runtime.getNil();
+           }
+           
+           if (pending.isEmpty()) {
+               if (args.length > 3) {
+                   if (timeout==0) {
+                       selector.selectNow();
+                   } else {
+                       selector.select(timeout);                       
+                   }
+               } else {
+                   selector.select();
+               }
+           } else {
+               selector.selectNow();               
+           }
+           
+           List r = new ArrayList();
+           List w = new ArrayList();
+           List e = new ArrayList();
+           for (Iterator i = selector.selectedKeys().iterator(); i.hasNext(); ) {
+               SelectionKey key = (SelectionKey) i.next();
+               if ((key.interestOps() & key.readyOps()
+                       & (SelectionKey.OP_READ|SelectionKey.OP_ACCEPT|SelectionKey.OP_CONNECT)) != 0) {
+                   r.add(key.attachment());
+                   pending.remove(key.attachment());
+               }
+               if ((key.interestOps() & key.readyOps() & (SelectionKey.OP_WRITE)) != 0) {
+                   w.add(key.attachment());
+               }
+           }
+           r.addAll(pending);
+           
+           // make all sockets blocking as configured again
+           for (Iterator i = selector.keys().iterator(); i.hasNext(); ) {
+               SelectionKey key = (SelectionKey) i.next();
+               SelectableChannel channel = key.channel();
+               synchronized(channel.blockingLock()) {
+                   boolean blocking = ((RubyIO) key.attachment()).getBlocking();
+                   key.cancel();
+                   channel.configureBlocking(blocking);
+               }
+           }
+           selector.close();
+           
+           if (r.size() == 0 && w.size() == 0 && e.size() == 0) {
+               return runtime.getNil();
+           }
+           
+           List ret = new ArrayList();
+           
+           ret.add(RubyArray.newArray(runtime, r));
+           ret.add(RubyArray.newArray(runtime, w));
+           ret.add(RubyArray.newArray(runtime, e));
+           
+           return RubyArray.newArray(runtime, ret);
+       } catch(IOException e) {
+           throw runtime.newIOError(e.getMessage());
+       }
+   }
+   
+   public static IRubyObject read(IRubyObject recv, IRubyObject[] args, Block block) {
+       Ruby runtime = recv.getRuntime();
+       Arity.checkArgumentCount(runtime, args, 1, 3);
+       IRubyObject[] fileArguments = new IRubyObject[] {args[0]};
+       RubyIO file = (RubyIO) RubyKernel.open(recv, fileArguments, block);
+       IRubyObject[] readArguments;
+       
+       if (args.length >= 2) {
+           readArguments = new IRubyObject[] {args[1].convertToType(runtime.getFixnum(), MethodIndex.TO_INT, "to_int", true)};
+       } else {
+           readArguments = new IRubyObject[] {};
+       }
+       
+       try {
+           
+           if (args.length == 3) {
+               file.seek(new IRubyObject[] {args[2].convertToType(runtime.getFixnum(), MethodIndex.TO_INT, "to_int", true)});
+           }
+           
+           return file.read(readArguments);
+       } finally {
+           file.close();
+       }
+   }
+   
+   public static RubyArray readlines(IRubyObject recv, IRubyObject[] args, Block block) {
+       int count = Arity.checkArgumentCount(recv.getRuntime(), args, 1, 2);
+       
+       IRubyObject[] fileArguments = new IRubyObject[] {args[0]};
+       IRubyObject[] separatorArguments = count >= 2 ? new IRubyObject[]{args[1]} : IRubyObject.NULL_ARRAY;
+       RubyIO file = (RubyIO) RubyKernel.open(recv, fileArguments, block);
+       try {
+           return file.readlines(separatorArguments);
+       } finally {
+           file.close();
+       }
+   }
+   
+   //XXX Hacked incomplete popen implementation to make
+   public static IRubyObject popen(IRubyObject recv, IRubyObject[] args, Block block) {
+       Ruby runtime = recv.getRuntime();
+       Arity.checkArgumentCount(runtime, args, 1, 2);
+       IRubyObject cmdObj = args[0].convertToString();
+       runtime.checkSafeString(cmdObj);
+       
+       try {
+           Process process = new ShellLauncher(runtime).run(cmdObj);            
+           RubyIO io = new RubyIO(runtime, process);
+           
+           if (block.isGiven()) {
+               try {
+                   block.yield(runtime.getCurrentContext(), io);
+                   return runtime.getNil();
+               } finally {
+                   io.close();
+                   runtime.getGlobalVariables().set("$?",  RubyProcess.RubyStatus.newProcessStatus(runtime, (process.waitFor() * 256)));
+               }
+           }
+           return io;
+       } catch (IOException e) {
+           throw runtime.newIOErrorFromException(e);
+       } catch (InterruptedException e) {
+           throw runtime.newThreadError("unexpected interrupt");
+       }
+   }
+   
+   // NIO based pipe
+   public static IRubyObject pipe(IRubyObject recv) throws Exception {
+       Ruby runtime = recv.getRuntime();
+       Pipe pipe = Pipe.open();
+       return runtime.newArrayNoCopy(new IRubyObject[]{
+           new RubyIO(runtime, pipe.source()),
+           new RubyIO(runtime, pipe.sink())
+       });
+   }
+   
+   /**
+    * returns non-nil if input available without blocking, false if EOF or not open/readable, otherwise nil.
+    */
+   public IRubyObject ready() {
+       try {
+           if (!handler.isOpen() || !handler.isReadable() || handler.isEOF()) {
+               return getRuntime().getFalse();
+           }
+
+           int avail = handler.ready();
+           if (avail > 0) {
+               return getRuntime().newFixnum(avail);
+           } 
+       } catch (Exception anyEx) {
+           return getRuntime().getFalse();
+       }
+       return getRuntime().getNil();
+   }
+   
+   /**
+    * waits until input available or timed out and returns self, or nil when EOF reached.
+    */
+   public IRubyObject io_wait() {
+       try {
+           if (handler.isEOF()) {
+               return getRuntime().getNil();
+           }
+           handler.waitUntilReady();
+       } catch (Exception anyEx) {
+           return getRuntime().getNil();
+       }
+       return this;
+   }
 }

@@ -12,7 +12,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2006 Tim Azzopardi <tim@tigerfive.com>
- * 
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -35,13 +35,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 
 public class OSEnvironment {
 
 
     /**
-     * Handles exceptions from implementors of {@link IOSEnvironmentReader}, 
+     * Handles exceptions from implementors of {@link IOSEnvironmentReader},
      * converting the exception to a {@link OSEnvironmentReaderExcepton}
      * @param e
      */
@@ -49,52 +49,62 @@ public class OSEnvironment {
         throw (OSEnvironmentReaderExcepton)
         	new OSEnvironmentReaderExcepton().initCause(e);
     }
-    
+
     /**
-    * Returns the OS environment variables as a Map<RubyString,RubyString>. 
-    * If the Java system  property "jruby.env.method" is set then 
-    *   the value is used as the classname of a class than implements the IOSEnvironmentReader 
-    *   interface and the environment is obtained via this class. 
+    * Returns the OS environment variables as a Map<RubyString,RubyString>.
+    * If the Java system  property "jruby.env.method" is set then
+    *   the value is used as the classname of a class than implements the IOSEnvironmentReader
+    *   interface and the environment is obtained via this class.
     * If the "jruby.env.method" is "org.jruby.environment.OSEnvironmentReaderFromFile" then
-    *   the java system property "jruby.envfile" should give the location of a file from which 
-    *   the environment variables can be loaded.  
-    * Otherwise, other default implementations of  IOSEnvironmentReader are tried 
+    *   the java system property "jruby.envfile" should give the location of a file from which
+    *   the environment variables can be loaded.
+    * Otherwise, other default implementations of  IOSEnvironmentReader are tried
     * to obtain the os environment variables.
     * @param runtime
-    * @param System.getProperty("jruby.env.method") 	  
+    * @param System.getProperty("jruby.env.method")
     * @throws OSEnvironmentReaderExcepton
-    */  
-    public Map getEnvironmentVariableMap(IRuby runtime) {
-        String jrubyEnvMethod = System.getProperty("jruby.env.method");
+    */
+    public Map getEnvironmentVariableMap(Ruby runtime) {
+        Map envs = null;
 
-        IOSEnvironmentReader reader;
-        
-        if (jrubyEnvMethod == null || jrubyEnvMethod.length() < 1) {
-            // Try to get environment from Java5 System.getenv()
-            reader = getAccessibleOSEnvironment(runtime, OSEnvironmentReaderFromJava5SystemGetenv.class.getName());
-            // not Java5 so try getting environment using Runtime exec
-            if (reader == null) {
-                reader = getAccessibleOSEnvironment(runtime, OSEnvironmentReaderFromRuntimeExec.class.getName());
-                //runtime.getWarnings().warn("Getting environment variables using Runtime Exec");
-            }  else {
-                //runtime.getWarnings().warn("Getting environment variables using Java5 System.getenv()");
+        if (runtime.getInstanceConfig().getEnvironment() != null) {
+            return getAsMapOfRubyStrings(runtime, runtime.getInstanceConfig().getEnvironment().entrySet());
+        }
+
+        // fall back on empty env when security disallows environment var access (like in an applet)
+        if (Ruby.isSecurityRestricted())
+            envs = new HashMap();
+        else {
+            String jrubyEnvMethod = System.getProperty("jruby.env.method");
+
+            IOSEnvironmentReader reader;
+
+            if (jrubyEnvMethod == null || jrubyEnvMethod.length() < 1) {
+                // Try to get environment from Java5 System.getenv()
+                reader = getAccessibleOSEnvironment(runtime, OSEnvironmentReaderFromJava5SystemGetenv.class.getName());
+                // not Java5 so try getting environment using Runtime exec
+                if (reader == null) {
+                    reader = getAccessibleOSEnvironment(runtime, OSEnvironmentReaderFromRuntimeExec.class.getName());
+                    //runtime.getWarnings().warn("Getting environment variables using Runtime Exec");
+                }  else {
+                    //runtime.getWarnings().warn("Getting environment variables using Java5 System.getenv()");
+                }
+            } else {
+                // get environment from jruby command line property supplied class
+                runtime.getWarnings().warn("Getting environment variables using command line defined method: " + jrubyEnvMethod);
+                reader = getAccessibleOSEnvironment(runtime, jrubyEnvMethod);
             }
-        } else {
-            // get environment from jruby command line property supplied class
-            runtime.getWarnings().warn("Getting environment variables using command line defined method: " + jrubyEnvMethod);
-            reader = getAccessibleOSEnvironment(runtime, jrubyEnvMethod);            
+
+            envs = null;
+            if (reader != null) {
+                Map variables = null;
+                variables = reader.getVariables(runtime);
+                envs = getAsMapOfRubyStrings(runtime,  variables.entrySet());
+            }
         }
 
-    	Map envs = null;
-
-        if (reader != null) {
-        	Map variables = null;
-        	variables = reader.getVariables(runtime);
-			envs = getAsMapOfRubyStrings(runtime,  variables.entrySet());
-        }
-        
         return envs;
-    	
+
     }
 
     /**
@@ -102,37 +112,40 @@ public class OSEnvironment {
      * @param runtime
      * @return the java system properties as a Map<RubyString,RubyString>.
      */
-    public Map getSystemPropertiesMap(IRuby runtime) {
-        return getAsMapOfRubyStrings(runtime, System.getProperties().entrySet());
+    public Map getSystemPropertiesMap(Ruby runtime) {
+        if (Ruby.isSecurityRestricted())
+           return new HashMap();
+       else
+           return getAsMapOfRubyStrings(runtime, System.getProperties().entrySet());
     }
-    
-    
-    private static IOSEnvironmentReader getAccessibleOSEnvironment(IRuby runtime, String classname) {
+
+
+    private static IOSEnvironmentReader getAccessibleOSEnvironment(Ruby runtime, String classname) {
         IOSEnvironmentReader osenvironment = null;
         try {
             osenvironment = (IOSEnvironmentReader)Class.forName(classname).newInstance();
         } catch (Exception e) {
-        	// This should only happen for a command line supplied IOSEnvironmentReader implementation  
+        	// This should only happen for a command line supplied IOSEnvironmentReader implementation
             runtime.getWarnings().warn(e.getMessage());
         }
-        
+
         if (osenvironment != null && osenvironment.isAccessible(runtime)) {
             return osenvironment;
         }
         return null;
     }
 
-    
-    
-	private static Map getAsMapOfRubyStrings(IRuby runtime, Set entrySet) {
+
+
+	private static Map getAsMapOfRubyStrings(Ruby runtime, Set entrySet) {
 		Map envs = new HashMap();
 		for (Iterator iter = entrySet.iterator(); iter.hasNext();) {
 			Map.Entry entry  = (Map.Entry) iter.next();
-            envs.put(runtime.newString((String)entry.getKey()),runtime.newString((String)entry.getValue()));
+            envs.put(runtime.newString(entry.getKey().toString()),runtime.newString(entry.getValue().toString()));
 		}
 		return envs;
 	}
-    
+
 
 	/**
      * Returns a Map of the variables found in the reader of form var=value
@@ -165,6 +178,6 @@ public class OSEnvironment {
     	}
 		return envs;
 	}
-	
-	
+
+
 }

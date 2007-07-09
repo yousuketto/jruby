@@ -31,11 +31,12 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime;
 
-import java.util.HashMap;
+import edu.emory.mathcs.backport.java.util.concurrent.ConcurrentHashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
+import org.jruby.RubyProc;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.runtime.IAccessor;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -45,10 +46,10 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author jpetersen
  */
 public class GlobalVariables {
-    private IRuby runtime;
-    private Map globalVariables = new HashMap();
+    private Ruby runtime;
+    private Map globalVariables = new ConcurrentHashMap();
 
-    public GlobalVariables(IRuby runtime) {
+    public GlobalVariables(Ruby runtime) {
         this.runtime = runtime;
     }
 
@@ -123,8 +124,37 @@ public class GlobalVariables {
 
         GlobalVariable variable = createIfNotDefined(name);
         IRubyObject result = variable.getAccessor().setValue(value);
-        // variable.trace();
+        variable.trace(value);
         return result;
+    }
+    
+    public void setTraceVar(String name, RubyProc proc) {
+        assert name != null;
+        assert name.startsWith("$");
+        
+        GlobalVariable variable = createIfNotDefined(name);
+        variable.addTrace(proc);
+    }
+    
+    public boolean untraceVar(String name, IRubyObject command) {
+        assert name != null;
+        assert name.startsWith("$");
+        
+        if (isDefined(name)) {
+            GlobalVariable variable = (GlobalVariable)globalVariables.get(name);
+            return variable.removeTrace(command);
+        }
+        return false;
+    }
+    
+    public void untraceVar(String name) {
+        assert name != null;
+        assert name.startsWith("$");
+        
+        if (isDefined(name)) {
+            GlobalVariable variable = (GlobalVariable)globalVariables.get(name);
+            variable.removeTraces();
+        }
     }
 
     public Iterator getNames() {

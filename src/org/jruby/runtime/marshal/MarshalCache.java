@@ -14,6 +14,7 @@
  * Copyright (C) 2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
+ * Copyright (C) 2007 Ola Bini <ola.bini@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -30,15 +31,15 @@
 package org.jruby.runtime.marshal;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 import org.jruby.RubySymbol;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class MarshalCache {
-    private Map linkCache = new HashMap();
-    private Map symbolCache = new HashMap();
+    private Map linkCache = new IdentityHashMap();
+    private Map symbolCache = new IdentityHashMap();
 
     public boolean isRegistered(IRubyObject value) {
         return selectCache(value).containsKey(value);
@@ -59,7 +60,7 @@ public class MarshalCache {
 
     public void writeLink(MarshalStream output, IRubyObject value) throws IOException {
         output.write(linkType(value));
-        output.dumpInt(registeredIndex(value));
+        output.writeInt(registeredIndex(value));
     }
 
     private static char linkType(IRubyObject value) {

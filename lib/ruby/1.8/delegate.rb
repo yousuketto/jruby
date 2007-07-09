@@ -140,7 +140,7 @@ class Delegator
 	    rescue Exception
 	      $@.delete_if{|s| /:in `__getobj__'$/ =~ s} #`
 	      $@.delete_if{|s| /^\\(eval\\):/ =~ s}
-	      ::Kernel::raise
+	      Kernel::raise
 	    end
 	  end
 	EOS
@@ -290,7 +290,7 @@ def DelegateClass(superclass)
   }
   for method in methods
     begin
-      klass.module_eval <<-EOS, __FILE__, __LINE__+1
+      klass.module_eval <<-EOS
         def #{method}(*args, &block)
 	  begin
 	    @_dc_obj.__send__(:#{method}, *args, &block)

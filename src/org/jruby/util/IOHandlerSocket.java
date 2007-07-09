@@ -32,21 +32,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.util.IOHandlerUnseekable;
 
 public class IOHandlerSocket extends IOHandlerUnseekable {
-    public IOHandlerSocket(IRuby runtime, InputStream inStream, OutputStream outStream) 
+    public IOHandlerSocket(Ruby runtime, InputStream inStream, OutputStream outStream) 
         throws IOException {
         super(runtime, inStream, outStream);
     }
 
-    public String recv(int len) throws IOException, BadDescriptorException {
+    public ByteList recv(int len) throws IOException, BadDescriptorException {
         if(!isOpen()) {
             throw new IOException("Socket not open");
         }
         if(len < 1) {
-            return "";
+            return new ByteList(ByteList.NULL_ARRAY);
         }
 
         // this should provide blocking until data is available...
@@ -56,9 +56,9 @@ public class IOHandlerSocket extends IOHandlerUnseekable {
         }
         int available = getInputStream().available();
         len = len - 1 < available ? len - 1 : available;
-        StringBuffer buf = new StringBuffer();
-        buf.append((char) c);
-        sysread(buf, len);
-        return buf.toString();
+        ByteList buf = new ByteList(len + 1);
+        buf.append(c);
+        sysread(buf, 1, len);
+        return buf;
     }
 }

@@ -212,6 +212,11 @@ module RDoc
       $stderr.flush
     end
 
+    def remove_private_comments(comment)
+       comment.gsub!(/\/?\*--(.*?)\/?\*\+\+/m, '')
+       comment.sub!(/\/?\*--.*/m, '')
+    end
+
     # remove lines that are commented out that might otherwise get
     # picked up when scanning for classes and methods
 
@@ -262,7 +267,7 @@ module RDoc
     def find_class_comment(class_name, class_meth)
       comment = nil
       if @body =~ %r{((?>/\*.*?\*/\s+))
-                     (static\s+)?void\s+Init_#{class_name}\s*\(\)}xmi
+                     (static\s+)?void\s+Init_#{class_name}\s*(?:_\(\s*)?\(\s*(?:void\s*)?\)}xmi
         comment = $1
       elsif @body =~ %r{Document-(class|module):\s#{class_name}\s*?\n((?>.*?\*/))}m
         comment = $2
@@ -516,7 +521,8 @@ module RDoc
           type = "singleton_method"
         end
         meth_obj = AnyMethod.new("", meth_name)
-        meth_obj.singleton = type == "singleton_method" 
+        meth_obj.singleton =
+	  %w{singleton_method module_function}.include?(type) 
         
         p_count = (Integer(param_count) rescue -1)
         
@@ -551,6 +557,8 @@ module RDoc
               \s*(\(.*?\)).*?^}xm
         comment, params = $1, $2
         body_text = $&
+
+        remove_private_comments(comment) if comment
 
         # see if we can find the whole body
         

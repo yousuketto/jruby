@@ -35,7 +35,14 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
+
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.MethodIndex;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
@@ -45,13 +52,85 @@ import org.jruby.runtime.marshal.UnmarshalStream;
  * @author  jpetersen
  */
 public class RubyFloat extends RubyNumeric {
-    private final double value;
 
-    public RubyFloat(IRuby runtime) {
+    public static RubyClass createFloatClass(Ruby runtime) {
+        RubyClass floatc = runtime.defineClass("Float", runtime.getClass("Numeric"),
+                ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        floatc.index = ClassIndex.FLOAT;
+        
+        CallbackFactory callbackFactory = runtime.callbackFactory(RubyFloat.class);
+        floatc.getSingletonClass().undefineMethod("allocate");
+        floatc.getSingletonClass().undefineMethod("new");
+
+        floatc.getMetaClass().defineFastMethod("induced_from", callbackFactory.getFastSingletonMethod(
+                "induced_from", RubyKernel.IRUBY_OBJECT));
+        floatc.includeModule(runtime.getModule("Precision"));
+
+        // Java Doubles are 64 bit long:            
+        floatc.defineConstant("ROUNDS", RubyFixnum.newFixnum(runtime, 1));
+        floatc.defineConstant("RADIX", RubyFixnum.newFixnum(runtime, 2));
+        floatc.defineConstant("MANT_DIG", RubyFixnum.newFixnum(runtime, 53));
+        floatc.defineConstant("DIG", RubyFixnum.newFixnum(runtime, 15));
+        // Double.MAX_EXPONENT since Java 1.6
+        floatc.defineConstant("MIN_EXP", RubyFixnum.newFixnum(runtime, -1021));
+        // Double.MAX_EXPONENT since Java 1.6            
+        floatc.defineConstant("MAX_EXP", RubyFixnum.newFixnum(runtime, 1024));
+        floatc.defineConstant("MIN_10_EXP", RubyFixnum.newFixnum(runtime, -307));
+        floatc.defineConstant("MAX_10_EXP", RubyFixnum.newFixnum(runtime, -308));
+        floatc.defineConstant("MIN", RubyFloat.newFloat(runtime, Double.MIN_VALUE));
+        floatc.defineConstant("MAX", RubyFloat.newFloat(runtime, Double.MAX_VALUE));
+        floatc.defineConstant("EPSILON", RubyFloat.newFloat(runtime, 2.2204460492503131e-16));
+
+        floatc.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
+        floatc.defineFastMethod("coerce", callbackFactory.getFastMethod("coerce", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("-@", callbackFactory.getFastMethod("uminus"));
+        floatc.defineFastMethod("+", callbackFactory.getFastMethod("plus", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("-", callbackFactory.getFastMethod("minus", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("*", callbackFactory.getFastMethod("mul", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("/", callbackFactory.getFastMethod("fdiv", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("%", callbackFactory.getFastMethod("mod", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("modulo", callbackFactory.getFastMethod("mod", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("divmod", callbackFactory.getFastMethod("divmod", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("**", callbackFactory.getFastMethod("pow", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("==", callbackFactory.getFastMethod("equal", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("<=>", callbackFactory.getFastMethod("cmp", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod(">", callbackFactory.getFastMethod("gt", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod(">=", callbackFactory.getFastMethod("ge", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("<", callbackFactory.getFastMethod("lt", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("<=", callbackFactory.getFastMethod("le", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("eql?", callbackFactory.getFastMethod("eql_p", RubyKernel.IRUBY_OBJECT));
+        floatc.defineFastMethod("hash", callbackFactory.getFastMethod("hash"));
+        floatc.defineFastMethod("to_f", callbackFactory.getFastMethod("to_f"));
+        floatc.defineFastMethod("abs", callbackFactory.getFastMethod("abs"));
+        floatc.defineFastMethod("zero?", callbackFactory.getFastMethod("zero_p"));
+
+        floatc.defineFastMethod("to_i", callbackFactory.getFastMethod("truncate"));
+        floatc.defineFastMethod("to_int", callbackFactory.getFastMethod("truncate"));
+        floatc.defineFastMethod("floor", callbackFactory.getFastMethod("floor"));
+        floatc.defineFastMethod("ceil", callbackFactory.getFastMethod("ceil"));
+        floatc.defineFastMethod("round", callbackFactory.getFastMethod("round"));
+        floatc.defineFastMethod("truncate", callbackFactory.getFastMethod("truncate"));
+
+        floatc.defineFastMethod("nan?", callbackFactory.getFastMethod("nan_p"));
+        floatc.defineFastMethod("infinite?", callbackFactory.getFastMethod("infinite_p"));
+        floatc.defineFastMethod("finite?", callbackFactory.getFastMethod("finite_p"));
+        
+        floatc.dispatcher = callbackFactory.createDispatcher(floatc);
+
+        return floatc;
+    }
+
+    private final double value;
+    
+    public int getNativeTypeIndex() {
+        return ClassIndex.FLOAT;
+    }
+
+    public RubyFloat(Ruby runtime) {
         this(runtime, 0.0);
     }
 
-    public RubyFloat(IRuby runtime, double value) {
+    public RubyFloat(Ruby runtime, double value) {
         super(runtime, runtime.getClass("Float"));
         this.value = value;
     }
@@ -79,406 +158,383 @@ public class RubyFloat extends RubyNumeric {
     	return this;
     }
 
-    public static RubyClass createFloatClass(IRuby runtime) {
-        RubyClass result = runtime.defineClass("Float", runtime.getClass("Numeric"));
-        CallbackFactory callbackFactory = runtime.callbackFactory(RubyFloat.class);
-        
-        result.defineMethod("+", callbackFactory.getMethod("op_plus", IRubyObject.class));
-        result.defineMethod("-", callbackFactory.getMethod("op_minus", IRubyObject.class));
-        result.defineMethod("*", callbackFactory.getMethod("op_mul", IRubyObject.class));
-        result.defineMethod("/", callbackFactory.getMethod("op_div", IRubyObject.class));
-        result.defineMethod("%", callbackFactory.getMethod("op_mod", IRubyObject.class));
-        result.defineMethod("**", callbackFactory.getMethod("op_pow", IRubyObject.class));
-        // Although not explicitly documented in the Pickaxe, Ruby 1.8 Float
-        // does have its own implementations of these relational operators.
-        // These appear to be necessary if for no oher reason than proper NaN
-        // handling.
-        result.defineMethod("==", callbackFactory.getMethod("equal", IRubyObject.class));
-        result.defineMethod("<=>", callbackFactory.getMethod("cmp",
-                IRubyObject.class));
-        result.defineMethod(">", callbackFactory.getMethod("op_gt",
-                IRubyObject.class));
-        result.defineMethod(">=", callbackFactory.getMethod("op_ge", IRubyObject.class));
-        result.defineMethod("<", callbackFactory.getMethod("op_lt", IRubyObject.class));
-        result.defineMethod("<=", callbackFactory.getMethod("op_le", IRubyObject.class));
-        result.defineMethod("ceil", callbackFactory.getMethod("ceil"));
-        result.defineMethod("finite?", callbackFactory.getMethod("finite_p"));
-        result.defineMethod("floor", callbackFactory.getMethod("floor"));
-        result.defineMethod("hash", callbackFactory.getMethod("hash"));
-        result.defineMethod("infinite?", callbackFactory.getMethod("infinite_p"));
-        result.defineMethod("nan?", callbackFactory.getMethod("nan_p"));
-        result.defineMethod("round", callbackFactory.getMethod("round"));
-        result.defineMethod("to_i", callbackFactory.getMethod("to_i"));
-        result.defineAlias("to_int", "to_i");
-        result.defineMethod("to_f", callbackFactory.getMethod("to_f"));
-        result.defineMethod("to_s", callbackFactory.getMethod("to_s"));
-        result.defineMethod("truncate", callbackFactory.getMethod("truncate"));
-
-        result.getMetaClass().undefineMethod("new");
-        result.defineSingletonMethod("induced_from", callbackFactory.getSingletonMethod("induced_from", IRubyObject.class));
-        return result;
-    }
-
     protected int compareValue(RubyNumeric other) {
         double otherVal = other.getDoubleValue();
         return getValue() > otherVal ? 1 : getValue() < otherVal ? -1 : 0;
     }
 
-    public RubyFixnum hash() {
-        return getRuntime().newFixnum(new Double(value).hashCode());
-    }
-
-    // Float methods (flo_*)
-
-    public static RubyFloat newFloat(IRuby runtime, double value) {
+    public static RubyFloat newFloat(Ruby runtime, double value) {
         return new RubyFloat(runtime, value);
     }
 
-    public static RubyFloat induced_from(IRubyObject recv, IRubyObject number) {
+    /*  ================
+     *  Instance Methods
+     *  ================ 
+     */
+
+    /** rb_flo_induced_from
+     * 
+     */
+    public static IRubyObject induced_from(IRubyObject recv, IRubyObject number) {
+        if (number instanceof RubyFixnum || number instanceof RubyBignum) {
+            return number.callMethod(recv.getRuntime().getCurrentContext(), MethodIndex.TO_F, "to_f");
+    }
         if (number instanceof RubyFloat) {
-            return (RubyFloat) number;
-        } else if (number instanceof RubyInteger) {
-            return (RubyFloat) number.callMethod("to_f");
-        } else {
-            throw recv.getRuntime().newTypeError("failed to convert " + number.getMetaClass() + " into Float");
+            return number;
         }
+        throw recv.getRuntime().newTypeError(
+                "failed to convert " + number.getMetaClass() + " into Float");
     }
 
-    public RubyArray coerce(RubyNumeric other) {
-        return getRuntime().newArray(newFloat(getRuntime(), other.getDoubleValue()), this);
-    }
+    private final static DecimalFormat FORMAT = new DecimalFormat("##############0.0##############",
+            new DecimalFormatSymbols(Locale.ENGLISH));
 
-    public RubyInteger ceil() {
-        double val = Math.ceil(getDoubleValue());
-
-        if (val < RubyFixnum.MIN || val > RubyFixnum.MAX) {
-            return RubyBignum.newBignum(getRuntime(), val);
-        }
-		return getRuntime().newFixnum((long) val);
-    }
-
-    public RubyInteger floor() {
-        double val = Math.floor(getDoubleValue());
-
-        if (val < Long.MIN_VALUE || val > Long.MAX_VALUE) {
-            return RubyBignum.newBignum(getRuntime(), val);
-        }
-		return getRuntime().newFixnum((long) val);
-    }
-
-    public RubyInteger round() {
-        double decimal = value % 1;
-        double round = Math.round(value);
-
-        // Ruby rounds differently than java for negative numbers.
-        if (value < 0 && decimal == -0.5) {
-            round -= 1;
+    /** flo_to_s
+     * 
+     */
+    public IRubyObject to_s() {
+        if (Double.isInfinite(value)) {
+            return RubyString.newString(getRuntime(), value < 0 ? "-Infinity" : "Infinity");
         }
 
-        if (value < RubyFixnum.MIN || value > RubyFixnum.MAX) {
-            return RubyBignum.newBignum(getRuntime(), round);
+        if (Double.isNaN(value)) {
+            return RubyString.newString(getRuntime(), "NaN");
         }
-        return getRuntime().newFixnum((long) round);
-    }
 
-    public RubyInteger truncate() {
-        if (value > 0.0) {
-            return floor();
-        } else if (value < 0.0) {
-            return ceil();
-        } else {
-            return RubyFixnum.zero(getRuntime());
+        String val = ""+value;
+
+        if(val.indexOf('E') != -1) {
+            String v2 = FORMAT.format(value);
+            int ix = v2.length()-1;
+            while(v2.charAt(ix) == '0' && v2.charAt(ix-1) != '.') {
+                ix--;
+            }
+            if(ix > 15 || "0.0".equals(v2.substring(0,ix+1))) {
+                val = val.replaceFirst("E(\\d)","e+$1").replaceFirst("E-","e-");
+            } else {
+                val = v2.substring(0,ix+1);
+            }
         }
+
+        return RubyString.newString(getRuntime(), val);
     }
 
-    public RubyNumeric multiplyWith(RubyNumeric other) {
-        return other.multiplyWith(this);
+    /** flo_coerce
+     * 
+     */
+    public IRubyObject coerce(IRubyObject other) {
+        // MRI doesn't type check here either
+        return getRuntime().newArray(
+                newFloat(getRuntime(), ((RubyNumeric) other).getDoubleValue()), this);
+        }
+
+    /** flo_uminus
+     * 
+     */
+    public IRubyObject uminus() {
+        return RubyFloat.newFloat(getRuntime(), -value);
+        }
+
+    /** flo_plus
+     * 
+     */
+    public IRubyObject plus(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            return RubyFloat.newFloat(getRuntime(), value + ((RubyNumeric) other).getDoubleValue());
+        }
+        return coerceBin("+", other);
     }
 
-    public RubyNumeric multiplyWith(RubyFloat other) {
-        return RubyFloat.newFloat(getRuntime(), getDoubleValue() * other.getDoubleValue());
+    /** flo_minus
+     * 
+     */
+    public IRubyObject minus(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            return RubyFloat.newFloat(getRuntime(), value - ((RubyNumeric) other).getDoubleValue());
+    }
+        return coerceBin("-", other);
     }
 
-    public RubyNumeric multiplyWith(RubyInteger other) {
-        return other.multiplyWith(this);
+    /** flo_mul
+     * 
+     */
+    public IRubyObject mul(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            return RubyFloat.newFloat(getRuntime(), value * ((RubyNumeric) other).getDoubleValue());
     }
-
-    public RubyNumeric multiplyWith(RubyBignum other) {
-        return other.multiplyWith(this);
+        return coerceBin("*", other);
     }
     
-    public IRubyObject op_div(IRubyObject other) {
+    /** flo_div
+     * 
+     */
+    public IRubyObject fdiv(IRubyObject other) { // don't override Numeric#div !
     	if (other instanceof RubyNumeric) {
-            return RubyFloat.newFloat(getRuntime(), 
-                getDoubleValue() / ((RubyNumeric) other).getDoubleValue());
+            return RubyFloat.newFloat(getRuntime(), value / ((RubyNumeric) other).getDoubleValue());
     	}
-    	
-    	return callCoerced("/", other);
+        return coerceBin("div", other);
     }
 
-    public IRubyObject op_mod(IRubyObject other) {
+    /** flo_mod
+     * 
+     */
+    public IRubyObject mod(IRubyObject other) {
     	if (other instanceof RubyNumeric) {
-            // Modelled after c ruby implementation (java /,% not same as ruby)
-            double x = getDoubleValue();
             double y = ((RubyNumeric) other).getDoubleValue();
-            double mod = x % y;
+            // Modelled after c ruby implementation (java /,% not same as ruby)
+            double x = value;
 
-            if (mod < 0 && y > 0 || mod > 0 && y < 0) {
+            double mod = Math.IEEEremainder(x, y);
+            if (y * mod < 0) {
                 mod += y;
             }
 
             return RubyFloat.newFloat(getRuntime(), mod);
     	}
-    	
-    	return callCoerced("%", other);
+        return coerceBin("%", other);
     }
 
-    public IRubyObject op_minus(IRubyObject other) {
+    /** flo_divmod
+     * 
+     */
+    public IRubyObject divmod(IRubyObject other) {
     	if (other instanceof RubyNumeric) {
-            return RubyFloat.newFloat(getRuntime(), 
-                getDoubleValue() - ((RubyNumeric) other).getDoubleValue());
+            double y = ((RubyNumeric) other).getDoubleValue();
+            double x = value;
+
+            double mod = Math.IEEEremainder(x, y);
+            double div = (x - mod) / y;
+
+            if (y * mod < 0) {
+                mod += y;
+                div -= 1.0;
     	}
-
-    	return callCoerced("-", other);
+            final Ruby runtime = getRuntime();
+            IRubyObject car = dbl2num(runtime, div);
+            RubyFloat cdr = RubyFloat.newFloat(runtime, mod);
+            return RubyArray.newArray(runtime, car, cdr);
     }
-
-    // TODO: Anders double-dispatch here does not seem like it has much benefit when we need
-    // to dynamically check to see if we need to coerce first.
-    public IRubyObject op_mul(IRubyObject other) {
-    	if (other instanceof RubyNumeric) {
-            return ((RubyNumeric) other).multiplyWith(this);
-    	}
-    	
-    	return callCoerced("*", other);
-    }
-
-    public IRubyObject op_plus(IRubyObject other) {
-    	if (other instanceof RubyNumeric) {
-            return RubyFloat.newFloat(getRuntime(),
-                getDoubleValue() + ((RubyNumeric) other).getDoubleValue());
+        return coerceBin("%", other);
     	}
     	
-    	return callCoerced("+", other);
-    }
-
-    public IRubyObject op_pow(IRubyObject other) {
+    /** flo_pow
+     * 
+     */
+    public IRubyObject pow(IRubyObject other) {
     	if (other instanceof RubyNumeric) {
-            return RubyFloat.newFloat(getRuntime(), 
-                Math.pow(getDoubleValue(), ((RubyNumeric) other).getDoubleValue()));
+            return RubyFloat.newFloat(getRuntime(), Math.pow(value, ((RubyNumeric) other)
+                    .getDoubleValue()));
     	}
-    	
-    	return callCoerced("**", other);
+        return coerceBin("/", other);
     }
 
-    public IRubyObject op_uminus() {
-        return RubyFloat.newFloat(getRuntime(), -value);
+    /** flo_eq
+     * 
+     */
+    public IRubyObject equal(IRubyObject other) {
+        if (Double.isNaN(value)) {
+            return getRuntime().getFalse();
+    }
+        if (other instanceof RubyNumeric) {
+            return RubyBoolean.newBoolean(getRuntime(), value == ((RubyNumeric) other)
+                    .getDoubleValue());
+    }
+        // Numeric.equal            
+        return super.equal(other);
+
     }
 
-    public IRubyObject to_s() {
-        return getRuntime().newString("" + getValue());
-    }
-
-    public RubyFloat to_f() {
-        return this;
-    }
-
-    public RubyInteger to_i() {
-    	if (value > Integer.MAX_VALUE) {
-    		return RubyBignum.newBignum(getRuntime(), getValue());
+    /** flo_cmp
+     * 
+     */
+    public IRubyObject cmp(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            double b = ((RubyNumeric) other).getDoubleValue();
+            return dbl_cmp(getRuntime(), value, b);
     	}
-        return getRuntime().newFixnum(getLongValue());
+        return coerceCmp("<=>", other);
     }
 
-    public IRubyObject infinite_p() {
-        if (getValue() == Double.POSITIVE_INFINITY) {
-            return getRuntime().newFixnum(1);
-        } else if (getValue() == Double.NEGATIVE_INFINITY) {
-            return getRuntime().newFixnum(-1);
-        } else {
-            return getRuntime().getNil();
+    /** flo_gt
+     * 
+     */
+    public IRubyObject gt(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            double b = ((RubyNumeric) other).getDoubleValue();
+            return RubyBoolean.newBoolean(getRuntime(), !Double.isNaN(b) && value > b);
         }
+        return coerceRelOp(">", other);
     }
 
-    public RubyBoolean finite_p() {
-        if (! infinite_p().isNil()) {
+    /** flo_ge
+     * 
+     */
+    public IRubyObject ge(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            double b = ((RubyNumeric) other).getDoubleValue();
+            return RubyBoolean.newBoolean(getRuntime(), !Double.isNaN(b) && value >= b);
+        }
+        return coerceRelOp(">=", other);
+        }
+
+    /** flo_lt
+     * 
+     */
+    public IRubyObject lt(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            double b = ((RubyNumeric) other).getDoubleValue();
+            return RubyBoolean.newBoolean(getRuntime(), !Double.isNaN(b) && value < b);
+    }
+        return coerceRelOp("<", other);
+    }
+
+    /** flo_le
+     * 
+     */
+    public IRubyObject le(IRubyObject other) {
+        if (other instanceof RubyNumeric) {
+            double b = ((RubyNumeric) other).getDoubleValue();
+            return RubyBoolean.newBoolean(getRuntime(), !Double.isNaN(b) && value <= b);
+		}
+        return coerceRelOp("<=", other);
+	}
+	
+    /** flo_eql
+     * 
+     */
+    public IRubyObject eql_p(IRubyObject other) {
+        if (other instanceof RubyFloat) {
+            double b = ((RubyFloat) other).value;
+            if (Double.isNaN(value) || Double.isNaN(b)) {
             return getRuntime().getFalse();
         }
-        if (nan_p().isTrue()) {
+            if (value == b) {
+                return getRuntime().getTrue();
+    }
+            }
+            return getRuntime().getFalse();
+        }
+
+    /** flo_hash
+     * 
+     */
+    public RubyFixnum hash() {
+        return getRuntime().newFixnum(hashCode());
+    }
+
+    public final int hashCode() {
+        long l = Double.doubleToLongBits(value);
+        return (int)(l ^ l >>> 32);
+    }    
+
+    /** flo_fo 
+     * 
+     */
+    public IRubyObject to_f() {
+        return this;
+        }
+        
+    /** flo_abs
+     * 
+     */
+    public IRubyObject abs() {
+        if (value < 0) {
+            return RubyFloat.newFloat(getRuntime(), Math.abs(value));
+        }
+        return this;
+    }
+    
+    /** flo_zero_p
+     * 
+     */
+    public IRubyObject zero_p() {
+        return RubyBoolean.newBoolean(getRuntime(), value == 0.0);
+        }
+
+    /** flo_truncate
+     * 
+     */
+    public IRubyObject truncate() {
+        double f = value;
+        if (f > 0.0) {
+            f = Math.floor(f);
+            }
+        if (f > 0.0) {
+            f = Math.ceil(f);
+        }
+        return dbl2num(getRuntime(), f);
+        }
+        
+    /** loor
+     * 
+     */
+    public IRubyObject floor() {
+        return dbl2num(getRuntime(), Math.floor(value));
+    }
+
+    /** flo_ceil
+     * 
+     */
+    public IRubyObject ceil() {
+        return dbl2num(getRuntime(), Math.ceil(value));
+        }
+
+    /** flo_round
+     * 
+     */
+    public IRubyObject round() {
+        double f = value;
+        if (f > 0.0) {
+            f = Math.floor(f + 0.5);
+            }
+        if (f < 0.0) {
+            f = Math.ceil(f - 0.5);
+        }
+        return dbl2num(getRuntime(), f);
+        }
+        
+    /** flo_is_nan_p
+     * 
+     */
+    public IRubyObject nan_p() {
+        return RubyBoolean.newBoolean(getRuntime(), Double.isNaN(value));
+    }
+
+    /** flo_is_infinite_p
+     * 
+     */
+    public IRubyObject infinite_p() {
+        if (Double.isInfinite(value)) {
+            return RubyFixnum.newFixnum(getRuntime(), value < 0 ? -1 : 1);
+        }
+        return getRuntime().getNil();
+            }
+            
+    /** flo_is_finite_p
+     * 
+     */
+    public IRubyObject finite_p() {
+        if (Double.isInfinite(value) || Double.isNaN(value)) {
             return getRuntime().getFalse();
         }
         return getRuntime().getTrue();
     }
 
-    public RubyBoolean nan_p() {
-        return getRuntime().newBoolean(Double.isNaN(getValue()));
+    public static void marshalTo(RubyFloat aFloat, MarshalStream output) throws java.io.IOException {
+        String strValue = aFloat.toString();
+    
+        if (Double.isInfinite(aFloat.value)) {
+            strValue = aFloat.value < 0 ? "-inf" : "inf";
+        } else if (Double.isNaN(aFloat.value)) {
+            strValue = "nan";
+        }
+        output.writeString(strValue);
     }
-
-    public RubyBoolean zero_p() {
-        return getRuntime().newBoolean(getValue() == 0);
-    }
-
-	public void marshalTo(MarshalStream output) throws java.io.IOException {
-		output.write('f');
-		String strValue = this.toString();
-
-		if (Double.isInfinite(value)) {
-			strValue = value < 0 ? "-inf" : "inf";
-		} else if (Double.isNaN(value)) {
-			strValue = "nan";
-		}
-		output.dumpString(strValue);
-	}
-	
+        
     public static RubyFloat unmarshalFrom(UnmarshalStream input) throws java.io.IOException {
-        return RubyFloat.newFloat(input.getRuntime(),
-                                    Double.parseDouble(input.unmarshalString()));
-    }
-    
-    /* flo_eq */
-    public IRubyObject equal(IRubyObject other) {
-        if (!(other instanceof RubyNumeric)) {
-            return other.callMethod("==", this);
-        }
-
-        double otherValue = ((RubyNumeric) other).getDoubleValue();
-        
-        if (other instanceof RubyFloat && Double.isNaN(otherValue)) {
-            return getRuntime().getFalse();
-        }
-        
-        return (value == otherValue) ? getRuntime().getTrue() : getRuntime().getFalse();
-    }
-    
-
-    /* flo_cmp */
-    public IRubyObject cmp(IRubyObject other) {
-        if (!(other instanceof RubyNumeric)) {
-            IRubyObject[] tmp = getCoerced(other, false);
-            if (tmp == null) {
-                return getRuntime().getNil();
-            }
-            return tmp[1].callMethod("<=>", tmp[0]);
-        }
-
-        return doubleCompare(((RubyNumeric) other).getDoubleValue());
-    }
-
-    
-    private void cmperr(IRubyObject other) {
-        String message = "comparison of " + this.getType() + " with " + other.getType() + " failed";
-
-        throw this.getRuntime().newArgumentError(message);
-    }
-
-    /* flo_gt */
-    public IRubyObject op_gt(IRubyObject other) {
-        if (Double.isNaN(value)) {
-            return getRuntime().getFalse();
-        }
-
-        if (!(other instanceof RubyNumeric)) {
-            IRubyObject[] tmp = getCoerced(other, false);
-            if (tmp == null) {
-                cmperr(other);
-            }
-            
-            return tmp[1].callMethod("<=>", tmp[0]);
-        }
-        
-        double oth = ((RubyNumeric) other).getDoubleValue();
-        
-        if (other instanceof RubyFloat && Double.isNaN(oth)) { 
-            return getRuntime().getFalse();
-        }
-        
-        return value > oth ? getRuntime().getTrue() : getRuntime().getFalse();
-    }
-    
-    /* flo_ge */
-    public IRubyObject op_ge(IRubyObject other) {
-        if (Double.isNaN(value)) {
-            return getRuntime().getFalse();
-        }
-
-        if (!(other instanceof RubyNumeric)) {
-            IRubyObject[] tmp = getCoerced(other, false);
-            if (tmp == null) {
-                cmperr(other);
-            }
-            
-            return tmp[1].callMethod("<=>", tmp[0]);
-        }
-        
-        double oth = ((RubyNumeric) other).getDoubleValue();
-        
-        if (other instanceof RubyFloat && Double.isNaN(oth)) { 
-            return getRuntime().getFalse();
-        }
-        
-        return value >= oth ? getRuntime().getTrue() : getRuntime().getFalse();
-    }
-
-    /* flo_lt */
-    public IRubyObject op_lt(IRubyObject other) {
-        if (Double.isNaN(value)) {
-            return getRuntime().getFalse();
-        }
-
-        if (!(other instanceof RubyNumeric)) {
-            IRubyObject[] tmp = getCoerced(other, false);
-            if (tmp == null) {
-                cmperr(other);
-            }
-            
-            return tmp[1].callMethod("<=>", tmp[0]);
-        }
-        
-        double oth = ((RubyNumeric) other).getDoubleValue();
-        
-        if (other instanceof RubyFloat && Double.isNaN(oth)) { 
-            return getRuntime().getFalse();
-        }
-        
-        return value < oth ? getRuntime().getTrue() : getRuntime().getFalse();
-    }
-
-    
-    /* flo_le */
-    public IRubyObject op_le(IRubyObject other) {
-        if (Double.isNaN(value)) {
-            return getRuntime().getFalse();
-        }
-
-        if (!(other instanceof RubyNumeric)) {
-            IRubyObject[] tmp = getCoerced(other, false);
-            if (tmp == null) {
-                cmperr(other);
-            }
-            
-            return tmp[1].callMethod("<=>", tmp[0]);
-        }
-        
-        double oth = ((RubyNumeric) other).getDoubleValue();
-        
-        if (other instanceof RubyFloat && Double.isNaN(oth)) { 
-            return getRuntime().getFalse();
-        }
-        
-        return value <= oth ? getRuntime().getTrue() : getRuntime().getFalse();
-    }
-
-    
-    /* dbl_cmp */
-    private IRubyObject doubleCompare(double oth) {
-        if (Double.isNaN(value) || Double.isNaN(oth)) {
-            return getRuntime().getNil();
-        }
-        
-        if (value == oth) {
-            return getRuntime().newFixnum(0);
-        }
-        
-        return value > oth ? getRuntime().newFixnum(1) : getRuntime().newFixnum(-1);
+        RubyFloat result = RubyFloat.newFloat(input.getRuntime(), org.jruby.util.Convert.byteListToDouble(input.unmarshalString(),false));
+        input.registerLinkTarget(result);
+        return result;
     }
     
 }

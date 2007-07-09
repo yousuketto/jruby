@@ -34,13 +34,25 @@ package org.jruby;
 
 import java.util.HashMap;
 import java.util.Map;
-
 import org.jruby.exceptions.RaiseException;
 import org.jruby.exceptions.ThreadKill;
+import org.jruby.internal.runtime.FutureThread;
 import org.jruby.internal.runtime.NativeThread;
+import org.jruby.internal.runtime.RubyNativeThread;
+import org.jruby.internal.runtime.RubyRunnable;
+import org.jruby.internal.runtime.ThreadLike;
 import org.jruby.internal.runtime.ThreadService;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+
+import edu.emory.mathcs.backport.java.util.concurrent.ExecutionException;
+import edu.emory.mathcs.backport.java.util.concurrent.TimeoutException;
+import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
+import org.jruby.runtime.Arity;
+import org.jruby.runtime.ObjectMarshal;
 
 /**
  * Implementation of Ruby's <code>Thread</code> class.  Each Ruby thread is
@@ -52,102 +64,88 @@ import org.jruby.runtime.builtin.IRubyObject;
  * <code>Symbol</code> (such as <code>:name</code>).
  * 
  * Note: For CVS history, see ThreadClass.java.
- *
- * @author Jason Voegele (jason@jvoegele.com)
  */
 public class RubyThread extends RubyObject {
-    private NativeThread threadImpl;
+    private ThreadLike threadImpl;
     private Map threadLocalVariables = new HashMap();
     private boolean abortOnException;
+    private IRubyObject finalResult;
     private RaiseException exitingException;
     private IRubyObject receivedException;
     private RubyThreadGroup threadGroup;
 
     private ThreadService threadService;
-    private Object hasStartedLock = new Object();
-    private boolean hasStarted = false;
     private volatile boolean isStopped = false;
     public Object stopLock = new Object();
     
     private volatile boolean killed = false;
     public Object killLock = new Object();
-    private RubyThread joinedByCriticalThread;
     
-    public static RubyClass createThreadClass(IRuby runtime) {
-        RubyClass threadClass = runtime.defineClass("Thread", runtime.getObject());
+    public final ReentrantLock lock = new ReentrantLock();
+    
+    private static boolean USE_POOLING;
+    
+    private static final boolean DEBUG = false;
+    
+   static {
+       if (Ruby.isSecurityRestricted()) USE_POOLING = false;
+       else USE_POOLING = Boolean.getBoolean("jruby.thread.pooling");
+   }
+   
+    public static RubyClass createThreadClass(Ruby runtime) {
+        // FIXME: In order for Thread to play well with the standard 'new' behavior,
+        // it must provide an allocator that can create empty object instances which
+        // initialize then fills with appropriate data.
+        RubyClass threadClass = runtime.defineClass("Thread", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyThread.class);
 
-        threadClass.defineMethod("[]", 
-                callbackFactory.getMethod("aref", IRubyObject.class));
-        threadClass.defineMethod("[]=", 
-                callbackFactory.getMethod("aset", IRubyObject.class, IRubyObject.class));
-        threadClass.defineMethod("abort_on_exception", 
-                callbackFactory.getMethod("abort_on_exception"));
-        threadClass.defineMethod("abort_on_exception=", 
-                callbackFactory.getMethod("abort_on_exception_set", IRubyObject.class));
-        threadClass.defineMethod("alive?", 
-                callbackFactory.getMethod("is_alive"));
-        threadClass.defineMethod("group", 
-                callbackFactory.getMethod("group"));
-        threadClass.defineMethod("join", 
-                callbackFactory.getMethod("join"));
-        threadClass.defineMethod("key?", 
-                callbackFactory.getMethod("has_key", IRubyObject.class));
-        threadClass.defineMethod("priority", 
-                callbackFactory.getMethod("priority"));
-        threadClass.defineMethod("priority=", 
-                callbackFactory.getMethod("priority_set", IRubyObject.class));
-        threadClass.defineMethod("raise", 
-                callbackFactory.getMethod("raise", IRubyObject.class));
-        threadClass.defineMethod("run",
-        		callbackFactory.getMethod("run"));
-        threadClass.defineMethod("status", 
-                callbackFactory.getMethod("status"));
-        threadClass.defineMethod("stop?", 
-                callbackFactory.getMethod("isStopped"));
-        threadClass.defineMethod("wakeup", 
-                callbackFactory.getMethod("wakeup"));
-        threadClass.defineMethod("kill", 
-                callbackFactory.getMethod("kill"));
-        threadClass.defineMethod("exit",
-        		callbackFactory.getMethod("exit"));
+        threadClass.defineFastMethod("[]", callbackFactory.getFastMethod("aref", RubyKernel.IRUBY_OBJECT));
+        threadClass.defineFastMethod("[]=", callbackFactory.getFastMethod("aset", RubyKernel.IRUBY_OBJECT, RubyKernel.IRUBY_OBJECT));
+        threadClass.defineFastMethod("abort_on_exception", callbackFactory.getFastMethod("abort_on_exception"));
+        threadClass.defineFastMethod("abort_on_exception=", callbackFactory.getFastMethod("abort_on_exception_set", RubyKernel.IRUBY_OBJECT));
+        threadClass.defineFastMethod("alive?", callbackFactory.getFastMethod("is_alive"));
+        threadClass.defineFastMethod("group", callbackFactory.getFastMethod("group"));
+        threadClass.defineFastMethod("join", callbackFactory.getFastOptMethod("join"));
+        threadClass.defineFastMethod("value", callbackFactory.getFastMethod("value"));
+        threadClass.defineMethod("initialize", callbackFactory.getOptMethod("initialize"));
+        threadClass.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
+        threadClass.defineFastMethod("key?", callbackFactory.getFastMethod("has_key", RubyKernel.IRUBY_OBJECT));
+        threadClass.defineFastMethod("keys", callbackFactory.getFastMethod("keys"));
+        threadClass.defineFastMethod("priority", callbackFactory.getFastMethod("priority"));
+        threadClass.defineFastMethod("priority=", callbackFactory.getFastMethod("priority_set", RubyKernel.IRUBY_OBJECT));
+        threadClass.defineMethod("raise", callbackFactory.getOptMethod("raise"));
+        //threadClass.defineFastMethod("raise", callbackFactory.getFastMethod("raise", RubyKernel.IRUBY_OBJECT));
+        threadClass.defineFastMethod("run", callbackFactory.getFastMethod("run"));
+        threadClass.defineFastMethod("status", callbackFactory.getFastMethod("status"));
+        threadClass.defineFastMethod("stop?", callbackFactory.getFastMethod("isStopped"));
+        threadClass.defineFastMethod("wakeup", callbackFactory.getFastMethod("wakeup"));
+        //        threadClass.defineMethod("value", 
+        //                callbackFactory.getMethod("value"));
+        threadClass.defineFastMethod("kill", callbackFactory.getFastMethod("kill"));
+        threadClass.defineFastMethod("exit", callbackFactory.getFastMethod("exit"));
         
-        threadClass.defineSingletonMethod("current",
-                callbackFactory.getSingletonMethod("current"));
-        threadClass.defineSingletonMethod("fork",
-                callbackFactory.getOptSingletonMethod("newInstance"));
-        threadClass.defineSingletonMethod("new",
-                callbackFactory.getOptSingletonMethod("newInstance"));
-        threadClass.defineSingletonMethod("list",
-                callbackFactory.getSingletonMethod("list"));
-        threadClass.defineSingletonMethod("pass",
-                callbackFactory.getSingletonMethod("pass"));
-        threadClass.defineSingletonMethod("start",
-                callbackFactory.getOptSingletonMethod("start"));
-        threadClass.defineSingletonMethod("critical=", 
-                callbackFactory.getSingletonMethod("critical_set", RubyBoolean.class));
-        threadClass.defineSingletonMethod("critical", 
-                callbackFactory.getSingletonMethod("critical"));
-        threadClass.defineSingletonMethod("stop", 
-                callbackFactory.getSingletonMethod("stop"));
-        threadClass.defineSingletonMethod("kill", 
-                callbackFactory.getSingletonMethod("s_kill", RubyThread.class));
-        threadClass.defineSingletonMethod("exit", 
-                callbackFactory.getSingletonMethod("s_exit"));
-        threadClass.defineSingletonMethod("abort_on_exception",
-                callbackFactory.getSingletonMethod("abort_on_exception"));
-        threadClass.defineSingletonMethod("abort_on_exception=",
-                callbackFactory.getSingletonMethod("abort_on_exception_set", IRubyObject.class));
+        threadClass.getMetaClass().defineFastMethod("current", callbackFactory.getFastSingletonMethod("current"));
+        threadClass.getMetaClass().defineMethod("fork", callbackFactory.getOptSingletonMethod("newInstance"));
+        threadClass.getMetaClass().defineMethod("new", callbackFactory.getOptSingletonMethod("newInstance"));
+        threadClass.getMetaClass().defineFastMethod("list", callbackFactory.getFastSingletonMethod("list"));
+        threadClass.getMetaClass().defineFastMethod("pass", callbackFactory.getFastSingletonMethod("pass"));
+        threadClass.getMetaClass().defineMethod("start", callbackFactory.getOptSingletonMethod("start"));
+        threadClass.getMetaClass().defineFastMethod("critical=", callbackFactory.getFastSingletonMethod("critical_set", RubyBoolean.class));
+        threadClass.getMetaClass().defineFastMethod("critical", callbackFactory.getFastSingletonMethod("critical"));
+        threadClass.getMetaClass().defineFastMethod("stop", callbackFactory.getFastSingletonMethod("stop"));
+        threadClass.getMetaClass().defineMethod("kill", callbackFactory.getSingletonMethod("s_kill", RubyThread.class));
+        threadClass.getMetaClass().defineMethod("exit", callbackFactory.getSingletonMethod("s_exit"));
+        threadClass.getMetaClass().defineFastMethod("abort_on_exception", callbackFactory.getFastSingletonMethod("abort_on_exception"));
+        threadClass.getMetaClass().defineFastMethod("abort_on_exception=", callbackFactory.getFastSingletonMethod("abort_on_exception_set", RubyKernel.IRUBY_OBJECT));
 
         RubyThread rubyThread = new RubyThread(runtime, threadClass);
-        // set hasStarted to true, otherwise Thread.main.status freezes
-        rubyThread.hasStarted = true;
         // TODO: need to isolate the "current" thread from class creation
         rubyThread.threadImpl = new NativeThread(rubyThread, Thread.currentThread());
         runtime.getThreadService().setMainThread(rubyThread);
         
-        threadClass.defineSingletonMethod("main",
-        		callbackFactory.getSingletonMethod("main"));
+        threadClass.getMetaClass().defineFastMethod("main", callbackFactory.getFastSingletonMethod("main"));
+        
+        threadClass.setMarshal(ObjectMarshal.NOT_MARSHALABLE_MARSHAL);
         
         return threadClass;
     }
@@ -168,8 +166,8 @@ public class RubyThread extends RubyObject {
      * </pre>
      * <i>produces:</i> abxyzc
      */
-    public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args) {
-        return startThread(recv, args, true);
+    public static IRubyObject newInstance(IRubyObject recv, IRubyObject[] args, Block block) {
+        return startThread(recv, args, true, block);
     }
 
     /**
@@ -177,118 +175,104 @@ public class RubyThread extends RubyObject {
      * subclassed, then calling start in that subclass will not invoke the
      * subclass's initialize method.
      */
-    public static RubyThread start(IRubyObject recv, IRubyObject[] args) {
-        return startThread(recv, args, false);
+    public static RubyThread start(IRubyObject recv, IRubyObject[] args, Block block) {
+        return startThread(recv, args, false, block);
     }
     
     public static RubyThread adopt(IRubyObject recv, Thread t) {
-        return adoptThread(recv, t);
+        return adoptThread(recv, t, Block.NULL_BLOCK);
     }
 
-    private static RubyThread adoptThread(final IRubyObject recv, Thread t) {
-        final IRuby runtime = recv.getRuntime();
-        final RubyThread rubyThread = new RubyThread(runtime, (RubyClass) recv, false);
+    private static RubyThread adoptThread(final IRubyObject recv, Thread t, Block block) {
+        final Ruby runtime = recv.getRuntime();
+        final RubyThread rubyThread = new RubyThread(runtime, (RubyClass) recv);
         
         rubyThread.threadImpl = new NativeThread(rubyThread, t);
         runtime.getThreadService().registerNewThread(rubyThread);
         
         runtime.getCurrentContext().preAdoptThread();
-        
-        rubyThread.callInit(new IRubyObject[0]);
-        
-        rubyThread.notifyStarted();
-        
-        return rubyThread;
-    }
 
-    private static RubyThread startThread(final IRubyObject recv, final IRubyObject[] args, boolean callInit) {
-        final IRuby runtime = recv.getRuntime();
-        if (!runtime.getCurrentContext().isBlockGiven()) {
-            throw runtime.newThreadError("must be called with a block");
+        // adoptThread does not call init, since init expects a block to be passed in
+        if (USE_POOLING) {
+            rubyThread.threadImpl = new FutureThread(rubyThread, new RubyRunnable(rubyThread, IRubyObject.NULL_ARRAY, block));
+        } else {
+            rubyThread.threadImpl = new NativeThread(rubyThread, new RubyNativeThread(rubyThread, IRubyObject.NULL_ARRAY, block));
         }
-        final RubyThread rubyThread = new RubyThread(runtime, (RubyClass) recv);
-        if (callInit) {
-            rubyThread.callInit(args);
-        }
-
-        rubyThread.threadImpl = new NativeThread(rubyThread, args);
         rubyThread.threadImpl.start();
         
-        // make sure the thread has started before continuing, so it will appear "runnable" to the rest of Ruby
-        rubyThread.ensureStarted();
+        return rubyThread;
+    }
+    
+    public IRubyObject initialize(IRubyObject[] args, Block block) {
+        if (!block.isGiven()) throw getRuntime().newThreadError("must be called with a block");
+
+        if (USE_POOLING) {
+            threadImpl = new FutureThread(this, new RubyRunnable(this, args, block));
+        } else {
+            threadImpl = new NativeThread(this, new RubyNativeThread(this, args, block));
+        }
+        threadImpl.start();
+        
+        return this;
+    }
+
+    private static RubyThread startThread(final IRubyObject recv, final IRubyObject[] args, boolean callInit, Block block) {
+        RubyThread rubyThread = new RubyThread(recv.getRuntime(), (RubyClass) recv);
+        
+        if (callInit) {
+            rubyThread.callInit(args, block);
+        } else {
+            // for Thread::start, which does not call the subclass's initialize
+            rubyThread.initialize(args, block);
+        }
         
         return rubyThread;
     }
     
-    public void cleanTerminate() {
-    	try {
-    		isStopped = true;
-    		waitIfCriticalized();
-    	} catch (InterruptedException ie) {
-    		// ignore
-    	}
-    }
-	
-	public void waitIfCriticalized() throws InterruptedException {
-        RubyThread criticalThread = getRuntime().getThreadService().getCriticalThread();
-		if (criticalThread != null && criticalThread != this && criticalThread != joinedByCriticalThread) {
-			synchronized (criticalThread) {
-                criticalThread.wait();
-			}
-		}
-	}
-    
-    public void notifyStarted() {
-        assert isCurrent();
-        synchronized (hasStartedLock) {
-            hasStarted = true;
-            hasStartedLock.notifyAll();
+    private void ensureCurrent() {
+        if (this != getRuntime().getCurrentContext().getThread()) {
+            throw new RuntimeException("internal thread method called from another thread");
         }
+    }
+    
+    private void ensureNotCurrent() {
+        if (this == getRuntime().getCurrentContext().getThread()) {
+            throw new RuntimeException("internal thread method called from another thread");
+        }
+    }
+    
+    public void cleanTerminate(IRubyObject result) {
+        finalResult = result;
+        isStopped = true;
     }
 
     public void pollThreadEvents() {
-        // Asserts.isTrue(isCurrent());
-        pollReceivedExceptions();
-        
-        // TODO: should exceptions trump thread control, or vice versa?
-        criticalizeOrDieIfKilled();
-    }
+        // check for criticalization *before* locking ourselves
+        threadService.waitForCritical();
 
-    private void pollReceivedExceptions() {
+        ensureCurrent();
+
+        if (DEBUG) System.out.println("thread " + Thread.currentThread() + " before");
+        if (killed) throw new ThreadKill();
+
+        if (DEBUG) System.out.println("thread " + Thread.currentThread() + " after");
         if (receivedException != null) {
             // clear this so we don't keep re-throwing
             IRubyObject raiseException = receivedException;
             receivedException = null;
             RubyModule kernelModule = getRuntime().getModule("Kernel");
-            kernelModule.callMethod("raise", raiseException);
+            if (DEBUG) System.out.println("thread " + Thread.currentThread() + " before propagating exception: " + killed);
+            kernelModule.callMethod(getRuntime().getCurrentContext(), "raise", raiseException);
         }
     }
 
-    public void criticalizeOrDieIfKilled() {
-    	try {
-    		waitIfCriticalized();
-    	} catch (InterruptedException ie) {
-    		throw new ThreadKill();
-    	}
-    	dieIfKilled();
-    }
-
-    private RubyThread(IRuby runtime, RubyClass type) {
+    private RubyThread(Ruby runtime, RubyClass type) {
         super(runtime, type);
         this.threadService = runtime.getThreadService();
         // set to default thread group
         RubyThreadGroup defaultThreadGroup = (RubyThreadGroup)runtime.getClass("ThreadGroup").getConstant("Default");
-        defaultThreadGroup.add(this);
-        
-    }
-
-    private RubyThread(IRuby runtime, RubyClass type, boolean narf) {
-        super(runtime, type);
-        this.threadService = runtime.getThreadService();
-        
-        // set to default thread group
-        RubyThreadGroup defaultThreadGroup = (RubyThreadGroup)runtime.getClass("ThreadGroup").getConstant("Default");
-        defaultThreadGroup.add(this);
+        defaultThreadGroup.add(this, Block.NULL_BLOCK);
+        finalResult = runtime.getNil();
     }
 
     /**
@@ -298,7 +282,7 @@ public class RubyThread extends RubyObject {
      * Thread.abort_on_exception= .
      */
     public static RubyBoolean abort_on_exception(IRubyObject recv) {
-    	IRuby runtime = recv.getRuntime();
+    	Ruby runtime = recv.getRuntime();
         return runtime.isGlobalAbortOnExceptionEnabled() ? recv.getRuntime().getTrue() : recv.getRuntime().getFalse();
     }
 
@@ -316,22 +300,15 @@ public class RubyThread extends RubyObject {
     }
 
     public static IRubyObject pass(IRubyObject recv) {
-        IRuby runtime = recv.getRuntime();
+        Ruby runtime = recv.getRuntime();
         ThreadService ts = runtime.getThreadService();
-        RubyThread criticalThread = ts.getCriticalThread();
-        RubyThread currentThread = ts.getCurrentContext().getThread();
+        boolean critical = ts.getCritical();
         
-        if (criticalThread == currentThread) {
-            // we're currently the critical thread; decriticalize for pass
-            ts.setCritical(false);
-        }
+        ts.setCritical(false);
         
         Thread.yield();
         
-        if (criticalThread != null) {
-            // recriticalize
-            ts.setCritical(true);
-        }
+        ts.setCritical(critical);
         
         return recv.getRuntime().getNil();
     }
@@ -339,33 +316,36 @@ public class RubyThread extends RubyObject {
     public static RubyArray list(IRubyObject recv) {
     	RubyThread[] activeThreads = recv.getRuntime().getThreadService().getActiveRubyThreads();
         
-        return recv.getRuntime().newArray(activeThreads);
+        return recv.getRuntime().newArrayNoCopy(activeThreads);
+    }
+    
+    private IRubyObject getSymbolKey(IRubyObject originalKey) {
+        if (originalKey instanceof RubySymbol) {
+            return originalKey;
+        } else if (originalKey instanceof RubyString) {
+            return RubySymbol.newSymbol(getRuntime(), originalKey.asSymbol());
+        } else if (originalKey instanceof RubyFixnum) {
+            getRuntime().getWarnings().warn("Do not use Fixnums as Symbols");
+            throw getRuntime().newArgumentError(originalKey + " is not a symbol");
+        } else {
+            throw getRuntime().newArgumentError(originalKey + " is not a symbol");
+        }
     }
 
     public IRubyObject aref(IRubyObject key) {
-        String name = keyName(key);
-        if (!threadLocalVariables.containsKey(name)) {
+        key = getSymbolKey(key);
+        
+        if (!threadLocalVariables.containsKey(key)) {
             return getRuntime().getNil();
         }
-        return (IRubyObject) threadLocalVariables.get(name);
+        return (IRubyObject) threadLocalVariables.get(key);
     }
 
     public IRubyObject aset(IRubyObject key, IRubyObject value) {
-        String name = keyName(key);
-        threadLocalVariables.put(name, value);
+        key = getSymbolKey(key);
+        
+        threadLocalVariables.put(key, value);
         return value;
-    }
-
-    private String keyName(IRubyObject key) {
-        String name;
-        if (key instanceof RubySymbol) {
-            name = key.asSymbol();
-        } else if (key instanceof RubyString) {
-            name = ((RubyString) key).toString();
-        } else {
-            throw getRuntime().newArgumentError(key.inspect() + " is not a symbol");
-        }
-        return name;
     }
 
     public RubyBoolean abort_on_exception() {
@@ -381,26 +361,45 @@ public class RubyThread extends RubyObject {
         return threadImpl.isAlive() ? getRuntime().getTrue() : getRuntime().getFalse();
     }
 
-    public RubyThread join() {
+    public RubyThread join(IRubyObject[] args) {
+        long timeoutMillis = 0;
+        if (args.length > 0) {
+            if (args.length > 1) {
+                throw getRuntime().newArgumentError(args.length,1);
+            }
+            // MRI behavior: value given in seconds; converted to Float; less
+            // than or equal to zero returns immediately; returns nil
+            timeoutMillis = (long)(1000.0D * args[0].convertToFloat().getValue());
+            if (timeoutMillis <= 0) {
+                return null;
+            }
+        }
         if (isCurrent()) {
             throw getRuntime().newThreadError("thread tried to join itself");
         }
-        ensureStarted();
         try {
-            RubyThread criticalThread = getRuntime().getThreadService().getCriticalThread();
-            if (criticalThread != null) {
-                // set the target thread's joinedBy, so it knows it can execute during a critical section
-                joinedByCriticalThread = criticalThread;
+            if (threadService.getCritical()) {
                 threadImpl.interrupt(); // break target thread out of critical
             }
-            threadImpl.join();
+            threadImpl.join(timeoutMillis);
         } catch (InterruptedException iExcptn) {
+            assert false : iExcptn;
+        } catch (TimeoutException iExcptn) {
+            assert false : iExcptn;
+        } catch (ExecutionException iExcptn) {
             assert false : iExcptn;
         }
         if (exitingException != null) {
             throw exitingException;
         }
-        return this;
+        return null;
+    }
+
+    public IRubyObject value() {
+        join(new IRubyObject[0]);
+        synchronized (this) {
+            return finalResult;
+        }
     }
 
     public IRubyObject group() {
@@ -414,10 +413,40 @@ public class RubyThread extends RubyObject {
     void setThreadGroup(RubyThreadGroup rubyThreadGroup) {
     	threadGroup = rubyThreadGroup;
     }
+    
+    public IRubyObject inspect() {
+        // FIXME: There's some code duplication here with RubyObject#inspect
+        StringBuffer part = new StringBuffer();
+        String cname = getMetaClass().getRealClass().getName();
+        part.append("#<").append(cname).append(":0x");
+        part.append(Integer.toHexString(System.identityHashCode(this)));
+        
+        if (threadImpl.isAlive()) {
+            if (isStopped) {
+                part.append(getRuntime().newString(" sleep"));
+            } else if (killed) {
+                part.append(getRuntime().newString(" aborting"));
+            } else {
+                part.append(getRuntime().newString(" run"));
+            }
+        } else {
+            part.append(" dead");
+        }
+        
+        part.append(">");
+        return getRuntime().newString(part.toString());
+    }
 
     public RubyBoolean has_key(IRubyObject key) {
-        String name = keyName(key);
-        return getRuntime().newBoolean(threadLocalVariables.containsKey(name));
+        key = getSymbolKey(key);
+        
+        return getRuntime().newBoolean(threadLocalVariables.containsKey(key));
+    }
+
+    public RubyArray keys() {
+        IRubyObject[] keys = new IRubyObject[threadLocalVariables.size()];
+        
+        return RubyArray.newArrayNoCopy(getRuntime(), (IRubyObject[])threadLocalVariables.keySet().toArray(keys));
     }
     
     public static IRubyObject critical_set(IRubyObject receiver, RubyBoolean value) {
@@ -427,41 +456,41 @@ public class RubyThread extends RubyObject {
     }
 
     public static IRubyObject critical(IRubyObject receiver) {
-    	return receiver.getRuntime().newBoolean(receiver.getRuntime().getThreadService().getCriticalThread() != null);
-    }
-
-    public static IRubyObject stop(IRubyObject receiver) {
-    	RubyThread rubyThread = receiver.getRuntime().getThreadService().getCurrentContext().getThread();
-    	Object stopLock = rubyThread.stopLock;
-    	
-    	synchronized (stopLock) {
-    		try {
-    			rubyThread.isStopped = true;
-    			// attempt to decriticalize all if we're the critical thread
-    			receiver.getRuntime().getThreadService().setCritical(false);
-
-    			stopLock.wait();
-    		} catch (InterruptedException ie) {
-    			// ignore, continue;
-    		}
-    		rubyThread.isStopped = false;
-    	}
-    	
-    	return receiver.getRuntime().getNil();
+    	return receiver.getRuntime().newBoolean(receiver.getRuntime().getThreadService().getCritical());
     }
     
-    public static IRubyObject s_kill(IRubyObject receiver, RubyThread rubyThread) {
-    	return rubyThread.kill();
+    public static IRubyObject stop(IRubyObject receiver) {
+        RubyThread rubyThread = receiver.getRuntime().getThreadService().getCurrentContext().getThread();
+        Object stopLock = rubyThread.stopLock;
+        
+        synchronized (stopLock) {
+            try {
+                rubyThread.isStopped = true;
+                // attempt to decriticalize all if we're the critical thread
+                receiver.getRuntime().getThreadService().setCritical(false);
+                
+                stopLock.wait();
+            } catch (InterruptedException ie) {
+                // ignore, continue;
+            }
+            rubyThread.isStopped = false;
+        }
+        
+        return receiver.getRuntime().getNil();
     }
-
-    public static IRubyObject s_exit(IRubyObject receiver) {
-    	RubyThread rubyThread = receiver.getRuntime().getThreadService().getCurrentContext().getThread();
-    	
-		rubyThread.killed = true;
-		// attempt to decriticalize all if we're the critical thread
-		receiver.getRuntime().getThreadService().setCritical(false);
-		
-		throw new ThreadKill();
+    
+    public static IRubyObject s_kill(IRubyObject receiver, RubyThread rubyThread, Block block) {
+        return rubyThread.kill();
+    }
+    
+    public static IRubyObject s_exit(IRubyObject receiver, Block block) {
+        RubyThread rubyThread = receiver.getRuntime().getThreadService().getCurrentContext().getThread();
+        
+        rubyThread.killed = true;
+        // attempt to decriticalize all if we're the critical thread
+        receiver.getRuntime().getThreadService().setCritical(false);
+        
+        throw new ThreadKill();
     }
 
     public RubyBoolean isStopped() {
@@ -495,41 +524,96 @@ public class RubyThread extends RubyObject {
         return priority;
     }
 
-    public IRubyObject raise(IRubyObject exc) {
-        receivedException = exc;
+    public IRubyObject raise(IRubyObject[] args, Block block) {
+        ensureNotCurrent();
+        Ruby runtime = getRuntime();
+        
+        if (DEBUG) System.out.println("thread " + Thread.currentThread() + " before raising");
+        RubyThread currentThread = getRuntime().getCurrentContext().getThread();
+        try {
+            while (!(currentThread.lock.tryLock() && this.lock.tryLock())) {
+                if (currentThread.lock.isHeldByCurrentThread()) currentThread.lock.unlock();
+            }
 
-        // FIXME: correct raise call
+            currentThread.pollThreadEvents();
+            if (DEBUG) System.out.println("thread " + Thread.currentThread() + " raising");
+            receivedException = prepareRaiseException(runtime, args, block);
 
-        // FIXME: call the IRaiseListener#exceptionRaised method
+            // interrupt the target thread in case it's blocking or waiting
+            threadImpl.interrupt();
+        } finally {
+            if (currentThread.lock.isHeldByCurrentThread()) currentThread.lock.unlock();
+            if (this.lock.isHeldByCurrentThread()) this.lock.unlock();
+        }
 
         return this;
     }
+
+    private IRubyObject prepareRaiseException(Ruby runtime, IRubyObject[] args, Block block) {
+        Arity.checkArgumentCount(getRuntime(), args, 0, 3); 
+
+        if(args.length == 0) {
+            IRubyObject lastException = runtime.getGlobalVariables().get("$!");
+            if(lastException.isNil()) {
+                return new RaiseException(runtime, runtime.getClass("RuntimeError"), "", false).getException();
+            } 
+            return lastException;
+        }
+
+        IRubyObject exception;
+        ThreadContext context = getRuntime().getCurrentContext();
+        
+        if(args.length == 1) {
+            if(args[0] instanceof RubyString) {
+                return runtime.getClass("RuntimeError").newInstance(args, block);
+            }
+            
+            if(!args[0].respondsTo("exception")) {
+                return runtime.newTypeError("exception class/object expected").getException();
+            }
+            exception = args[0].callMethod(context, "exception");
+        } else {
+            if (!args[0].respondsTo("exception")) {
+                return runtime.newTypeError("exception class/object expected").getException();
+            }
+            
+            exception = args[0].callMethod(context, "exception", args[1]);
+        }
+        
+        if (!exception.isKindOf(runtime.getClass("Exception"))) {
+            return runtime.newTypeError("exception object expected").getException();
+        }
+        
+        if (args.length == 3) {
+            ((RubyException) exception).set_backtrace(args[2]);
+        }
+        
+        return exception;
+    }
     
     public IRubyObject run() {
-    	// if stopped, unstop
-    	if (isStopped) {
-    		synchronized (stopLock) {
-    			isStopped = false;
-    			stopLock.notifyAll();
-    		}
-    	}
-    	
-    	// Abort any sleep()s
-    	// CON: Sleep now waits on the same stoplock, so it will have been woken up by the notify above
-    	//threadImpl.interrupt();
+        // if stopped, unstop
+        synchronized (stopLock) {
+            if (isStopped) {
+                isStopped = false;
+                stopLock.notifyAll();
+            }
+        }
     	
     	return this;
     }
     
     public void sleep(long millis) throws InterruptedException {
-    	try {
-	    	synchronized (stopLock) {
-	    		isStopped = true;
-	    		stopLock.wait(millis);
-	    	}
-    	} finally {
-    		isStopped = false;
-    	}
+        ensureCurrent();
+        synchronized (stopLock) {
+            try {
+                isStopped = true;
+                stopLock.wait(millis);
+            } finally {
+                isStopped = false;
+                pollThreadEvents();
+            }
+        }
     }
 
     public IRubyObject status() {
@@ -550,76 +634,63 @@ public class RubyThread extends RubyObject {
 
     public IRubyObject kill() {
     	// need to reexamine this
-    	synchronized (this) {
-    		if (killed) return this;
-    		
-    		killed = true;
-            
-    		threadImpl.interrupt(); // break out of wait states and blocking IO
-    		try {
-    			if (!threadImpl.isInterrupted()) {
-                    // we did not interrupt the thread, so wait for it to complete
-                    // TODO: test that this is correct...should killer wait for killee to die?
-                    threadImpl.join();
-    			}
-    		} catch (InterruptedException ie) {
-    			throw new ThreadKill();
-    		}
-    	}
+        RubyThread currentThread = getRuntime().getCurrentContext().getThread();
+        
+        try {
+            if (DEBUG) System.out.println("thread " + Thread.currentThread() + " trying to kill");
+            while (!(currentThread.lock.tryLock() && this.lock.tryLock())) {
+                if (currentThread.lock.isHeldByCurrentThread()) currentThread.lock.unlock();
+            }
 
-    	return this;
+            currentThread.pollThreadEvents();
+
+            if (DEBUG) System.out.println("thread " + Thread.currentThread() + " succeeded with kill");
+            killed = true;
+
+            threadImpl.interrupt(); // break out of wait states and blocking IO
+        } finally {
+            if (currentThread.lock.isHeldByCurrentThread()) currentThread.lock.unlock();
+            if (this.lock.isHeldByCurrentThread()) this.lock.unlock();
+        }
+        
+        try {
+            threadImpl.join();
+        } catch (InterruptedException ie) {
+            // we were interrupted, check thread events again
+            currentThread.pollThreadEvents();
+        } catch (ExecutionException ie) {
+            // we were interrupted, check thread events again
+            currentThread.pollThreadEvents();
+        }
+        
+        return this;
     }
     
     public IRubyObject exit() {
     	return kill();
-    }
-    
-    public void dieIfKilled() {
-    	if (killed) throw new ThreadKill();
     }
 
     private boolean isCurrent() {
         return threadImpl.isCurrent();
     }
 
-    private void ensureStarted() {
-        // The JVM's join() method may return immediately
-        // and isAlive() give the wrong result if the thread
-        // hasn't started yet. We give it a chance to start
-        // before we try to do anything.
-
-
-        // Yes, I know double-check locking is broken.
-        if (!hasStarted) {
-            synchronized (hasStartedLock) {
-                if (!hasStarted) {
-                    try {
-                        hasStartedLock.wait();
-                    } catch (InterruptedException iExcptn) {
-                        assert false : iExcptn;
-                    }
-                }
-            }
-        }
-    }
-
     public void exceptionRaised(RaiseException exception) {
         assert isCurrent();
 
-        IRuby runtime = exception.getException().getRuntime();
+        Ruby runtime = exception.getException().getRuntime();
         if (abortOnException(runtime)) {
             // FIXME: printError explodes on some nullpointer
             //getRuntime().getRuntime().printError(exception.getException());
         	// TODO: Doesn't SystemExit have its own method to make this less wordy..
             RubyException re = RubyException.newException(getRuntime(), getRuntime().getClass("SystemExit"), exception.getMessage());
             re.setInstanceVariable("status", getRuntime().newFixnum(1));
-            threadService.getMainThread().raise(re);
+            threadService.getMainThread().raise(new IRubyObject[]{re}, Block.NULL_BLOCK);
         } else {
             exitingException = exception;
         }
     }
 
-    private boolean abortOnException(IRuby runtime) {
+    private boolean abortOnException(Ruby runtime) {
         return (runtime.isGlobalAbortOnExceptionEnabled() || abortOnException);
     }
 

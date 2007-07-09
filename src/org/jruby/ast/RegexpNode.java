@@ -31,13 +31,14 @@
 package org.jruby.ast;
 
 import java.util.List;
-import java.util.regex.Pattern;
+import jregex.Pattern;
 
 import org.jruby.RegexpTranslator;
 import org.jruby.ast.types.ILiteralNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.util.ByteList;
 
 /** Represents a simple regular expression literal.
  *
@@ -49,12 +50,15 @@ public class RegexpNode extends Node implements ILiteralNode {
     private static final RegexpTranslator translator = new RegexpTranslator();
     
     private Pattern pattern;
-    private final String value;
+    private int flags;
+    private final ByteList value;
     private final int options;
+
+    public org.jruby.RubyRegexp literal;
     
-    public RegexpNode(ISourcePosition position, String value, int options) {
+    public RegexpNode(ISourcePosition position, ByteList value, int options) {
         super(position, NodeTypes.REGEXPNODE);
-        
+
         this.value = value;
         this.options = options;
     }
@@ -73,15 +77,24 @@ public class RegexpNode extends Node implements ILiteralNode {
 
     /**
      * Gets the value.
-     * @return Returns a String
+     * @return Returns a ByteList
      */
-    public String getValue() {
+    public ByteList getValue() {
         return value;
     }
     
-    public Pattern getPattern() {
+    public int getFlags(int extra_options) {
         if (pattern == null) {
-            pattern = translator.translate(value, options, Pattern.UNIX_LINES);
+            flags = RegexpTranslator.translateFlags(options | extra_options);
+            pattern = translator.translate(value, options, flags);
+        }
+        return flags;
+    }
+
+    public Pattern getPattern(int extra_options) {
+        if (pattern == null) {
+            flags = RegexpTranslator.translateFlags(options | extra_options);
+            pattern = translator.translate(value, options, flags);
         }
         return pattern;
     }

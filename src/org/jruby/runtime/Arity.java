@@ -32,8 +32,12 @@ package org.jruby.runtime;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.jruby.IRuby;
+import org.jruby.Ruby;
+import org.jruby.ast.ArrayNode;
+import org.jruby.ast.AttrAssignNode;
+import org.jruby.ast.CallNode;
+import org.jruby.ast.Node;
+import org.jruby.ast.types.IArityNode;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -43,12 +47,43 @@ public final class Arity implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Map arities = new HashMap();
     private final int value;
+    
+    public final static Arity NO_ARGUMENTS = newArity(0);
+    public final static Arity ONE_ARGUMENT = newArity(1);
+    public final static Arity TWO_ARGUMENTS = newArity(2);
+    public final static Arity THREE_ARGUMENTS = newArity(3);
+    public final static Arity OPTIONAL = newArity(-1);
+    public final static Arity ONE_REQUIRED = newArity(-2);
+    public final static Arity TWO_REQUIRED = newArity(-3);
+    public final static Arity THREE_REQUIRED = newArity(-3);
 
     private Arity(int value) {
         this.value = value;
     }
 
     public static Arity createArity(int value) {
+        switch (value) {
+        case -4:
+            return THREE_REQUIRED;
+        case -3:
+            return TWO_REQUIRED;
+        case -2:
+            return ONE_REQUIRED;
+        case -1:
+            return OPTIONAL;
+        case 0:
+            return NO_ARGUMENTS;
+        case 1:
+            return ONE_ARGUMENT;
+        case 2:
+            return TWO_ARGUMENTS;
+        case 3:
+            return THREE_ARGUMENTS;
+        }
+        return newArity(value);
+    }
+    
+    private static Arity newArity(int value) {
         Integer integerValue = new Integer(value);
         Arity result;
         synchronized (arities) {
@@ -67,7 +102,7 @@ public final class Arity implements Serializable {
     }
 
     public static Arity optional() {
-        return createArity(-1);
+        return OPTIONAL;
     }
 
     public static Arity required(int minimum) {
@@ -76,22 +111,39 @@ public final class Arity implements Serializable {
     }
 
     public static Arity noArguments() {
-        return createArity(0);
+        return NO_ARGUMENTS;
     }
 
     public static Arity singleArgument() {
-        return createArity(1);
+        return ONE_ARGUMENT;
     }
 
-	public static Arity twoArguments() {
-		return createArity(2);
-	}
+    public static Arity twoArguments() {
+        return TWO_ARGUMENTS;
+    }
+    
+    public static Arity procArityOf(Node node) {
+        if (node instanceof AttrAssignNode && node != null) {
+            node = ((AttrAssignNode) node).getArgsNode();
+        }
+        if (node == null) {
+            return Arity.optional();
+        } else if (node instanceof IArityNode) {
+            return ((IArityNode) node).getArity();
+        } else if (node instanceof CallNode) {
+            return Arity.singleArgument();
+        } else if (node instanceof ArrayNode) {
+            return Arity.singleArgument();
+        }
+
+        throw new Error("unexpected type " + node.getClass() + " at " + node.getPosition());
+    }
 
     public int getValue() {
         return value;
     }
 
-    public void checkArity(IRuby runtime, IRubyObject[] args) {
+    public void checkArity(Ruby runtime, IRubyObject[] args) {
         if (isFixed()) {
             if (args.length != required()) {
                 throw runtime.newArgumentError("wrong number of arguments(" + args.length + " for " + required() + ")");
@@ -107,11 +159,11 @@ public final class Arity implements Serializable {
         return value >= 0;
     }
 
-    private int required() {
+    public int required() {
         if (value < 0) {
             return -(1 + value);
         }
-		return value;
+        return value;
     }
 
     public boolean equals(Object other) {
@@ -120,5 +172,39 @@ public final class Arity implements Serializable {
 
     public int hashCode() {
         return value;
+    }
+
+    public String toString() {
+        if(isFixed()) {
+            return "Fixed" + required();
+        } else {
+            return "Opt";
+        }
+    }
+
+    // Some helper functions:
+
+    public static int checkArgumentCount(Ruby runtime, IRubyObject[] args, int min, int max) {
+        if (args.length < min) {
+            throw runtime.newArgumentError("wrong number of arguments (" + args.length + " for " + min + ")");
+        }
+        if (max > -1 && args.length > max) {
+            throw runtime.newArgumentError("wrong number of arguments (" + args.length + " for " + max + ")");
+        }
+        return args.length;
+    }
+
+    /**
+     * @see org.jruby.runtime.builtin.IRubyObject#scanArgs()
+     */
+    public static IRubyObject[] scanArgs(Ruby runtime, IRubyObject[] args, int required, int optional) {
+        int total = required+optional;
+        int real = checkArgumentCount(runtime, args,required,total);
+        IRubyObject[] narr = new IRubyObject[total];
+        System.arraycopy(args,0,narr,0,real);
+        for(int i=real; i<total; i++) {
+            narr[i] = runtime.getNil();
+        }
+        return narr;
     }
 }

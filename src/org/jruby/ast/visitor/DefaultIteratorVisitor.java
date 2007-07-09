@@ -14,7 +14,7 @@
  * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
  * Copyright (C) 2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2007 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * 
  * Alternatively, the contents of this file may be used under the terms of
@@ -31,13 +31,13 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast.visitor;
 
-import java.util.Iterator;
-
 import org.jruby.ast.AliasNode;
 import org.jruby.ast.AndNode;
 import org.jruby.ast.ArgsCatNode;
 import org.jruby.ast.ArgsNode;
+import org.jruby.ast.ArgsPushNode;
 import org.jruby.ast.ArrayNode;
+import org.jruby.ast.AttrAssignNode;
 import org.jruby.ast.BackRefNode;
 import org.jruby.ast.BeginNode;
 import org.jruby.ast.BignumNode;
@@ -90,7 +90,6 @@ import org.jruby.ast.MultipleAsgnNode;
 import org.jruby.ast.NewlineNode;
 import org.jruby.ast.NextNode;
 import org.jruby.ast.NilNode;
-import org.jruby.ast.Node;
 import org.jruby.ast.NotNode;
 import org.jruby.ast.NthRefNode;
 import org.jruby.ast.OpAsgnAndNode;
@@ -106,9 +105,9 @@ import org.jruby.ast.RescueBodyNode;
 import org.jruby.ast.RescueNode;
 import org.jruby.ast.RetryNode;
 import org.jruby.ast.ReturnNode;
+import org.jruby.ast.RootNode;
 import org.jruby.ast.SClassNode;
 import org.jruby.ast.SValueNode;
-import org.jruby.ast.ScopeNode;
 import org.jruby.ast.SelfNode;
 import org.jruby.ast.SplatNode;
 import org.jruby.ast.StrNode;
@@ -171,7 +170,6 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 		return null;
 	}
 
-	// XXXEnebo - Just guessed.
 	public Instruction visitArgsCatNode(ArgsCatNode iVisited) {
 		iVisited.accept(_Payload);
 		if (iVisited.getFirstNode() != null) {
@@ -183,12 +181,34 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 		return null;
 	}
 
-	public Instruction visitArrayNode(ArrayNode iVisited) {
+    public Instruction visitArgsPushNode(ArgsPushNode iVisited) {
+        iVisited.accept(_Payload);
+        if (iVisited.getFirstNode() != null) {
+            iVisited.getFirstNode().accept(this);
+        }
+        if (iVisited.getSecondNode() != null) {
+            iVisited.getSecondNode().accept(this);
+        }
+        return null;
+    }
+    
+    public Instruction visitAttrAssignNode(AttrAssignNode iVisited) {
+        iVisited.accept(_Payload);
+        if(iVisited.getArgsNode() != null) {
+        	iVisited.getArgsNode().accept(this);
+        }
+        if(iVisited.getReceiverNode() != null) {
+        	iVisited.getReceiverNode().accept(this);
+        }
+        return null;
+    }
+
+    public Instruction visitArrayNode(ArrayNode iVisited) {
 		iVisited.accept(_Payload);
-		Iterator iterator = iVisited.iterator();
-		while (iterator.hasNext()) {
-			((Node) iterator.next()).accept(this);
-		}
+                
+                for (int i = 0; i < iVisited.size(); i++) {
+                    iVisited.get(i).accept(this);
+                }
 
 		return null;
 	}
@@ -210,10 +230,11 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 
 	public Instruction visitBlockNode(BlockNode iVisited) {
 		iVisited.accept(_Payload);
-		Iterator iterator = iVisited.iterator();
-		while (iterator.hasNext()) {
-			((Node) iterator.next()).accept(this);
-		}
+                
+                for (int i = 0; i < iVisited.size(); i++) {
+                    iVisited.get(i).accept(this);
+                }
+                
 		return null;
 	}
 
@@ -249,16 +270,14 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 		return null;
 	}
 
-	/**
-	 * @fixme iteration not correctly defined
-	 */
 	public Instruction visitCallNode(CallNode iVisited) {
 		iVisited.getReceiverNode().accept(this);
-		//  FIXME
-		/*
-		 * for (Node node = iVisited.getArgsNode(); node != null; node =
-		 * node.getNextNode()) { node.getHeadNode().accept(this); }
-		 */
+		if(iVisited.getArgsNode() != null) {
+			iVisited.getArgsNode().accept(this);
+		}
+		if(iVisited.getIterNode() != null) {
+			iVisited.getIterNode().accept(this);
+		}
 		iVisited.accept(_Payload);
 		return null;
 	}
@@ -364,14 +383,14 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 		return null;
 	}
 
-	/** @fixme iteration not correctly defined */
 	public Instruction visitFCallNode(FCallNode iVisited) {
 		iVisited.accept(_Payload);
-		// FIXME
-		/*
-		 * for (Node node = iVisited.getArgsNode(); node != null; node =
-		 * node.getNextNode()) { node.getHeadNode().accept(this); }
-		 */
+		if(iVisited.getArgsNode() != null) {
+			iVisited.getArgsNode().accept(this);
+		}
+		if(iVisited.getIterNode() != null) {
+			iVisited.getIterNode().accept(this);
+		}
 		return null;
 	}
 
@@ -563,6 +582,12 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 		iVisited.accept(_Payload);
 		return null;
 	}
+    
+    public Instruction visitRootNode(RootNode iVisited) {
+        iVisited.accept(_Payload);
+        iVisited.getBodyNode().accept(this);
+        return null;
+    }
 
 	public Instruction visitReturnNode(ReturnNode iVisited) {
 		iVisited.accept(_Payload);
@@ -571,14 +596,6 @@ public class DefaultIteratorVisitor implements NodeVisitor {
 
 	public Instruction visitSClassNode(SClassNode iVisited) {
 		iVisited.accept(_Payload);
-		return null;
-	}
-
-	public Instruction visitScopeNode(ScopeNode iVisited) {
-		iVisited.accept(_Payload);
-		if (iVisited.getBodyNode() != null) {
-			iVisited.getBodyNode().accept(this);
-		}
 		return null;
 	}
 

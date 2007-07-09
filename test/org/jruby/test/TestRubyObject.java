@@ -31,13 +31,13 @@ package org.jruby.test;
 
 import junit.framework.TestCase;
 
-import org.jruby.IRuby;
 import org.jruby.Ruby;
 import org.jruby.RubyObject;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class TestRubyObject extends TestCase {
-    private IRuby runtime;
+    private Ruby runtime;
     private IRubyObject rubyObject;
 
     public TestRubyObject(String name) {
@@ -62,7 +62,7 @@ public class TestRubyObject extends TestCase {
     }
 
     public void testClone() {
-        assertTrue(rubyObject.rbClone().getType() == rubyObject.getType());
+        assertTrue(rubyObject.rbClone(Block.NULL_BLOCK).getType() == rubyObject.getType());
     }
 
     public void testDup() {

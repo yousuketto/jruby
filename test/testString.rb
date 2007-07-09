@@ -14,6 +14,13 @@ test_equal(9, "alphabetagamma" =~ /gamma$/)
 test_equal(nil, "alphabetagamma" =~ /GAMMA$/)
 test_equal(false, "foo" == :foo)
 
+test_equal(11, "\v"[0])
+test_equal(27, "\e"[0])
+# Test round trip of each ASCII character
+0.upto(255) do |ch|
+  test_equal(ch,eval(ch.chr.inspect)[0])
+end
+
 ##### [] (aref) ######
 s = "hello there"
 
@@ -29,6 +36,7 @@ test_equal("", s[6..2])
 t = ""
 test_equal(nil, t[6..2])
 test_equal(nil, t[-2..-4])
+test_equal("", t[0...-1])
 test_equal("ell", s[/[aeiow](.)\1/])
 test_equal("ell", s[/[aeiow](.)\1/, 0])
 test_equal("l", s[/[aeiow](.)\1/, 1])
@@ -156,8 +164,10 @@ test_equal("", "".gsub(/\r\n|\n/, "\n"))
 testcase='toto'
 test_ok(1 == idx = testcase.index('o'))
 test_ok(3 == testcase.index('o',idx.succ))
+test_ok(nil == "hello".index('', 100))
 test_ok(3 == idx = testcase.rindex('o'))
 test_ok(1 == testcase.rindex('o', idx-1))
+test_ok(0 == testcase.rindex('', 0))
 
 ##### insert #####
 
@@ -202,6 +212,9 @@ test_equal("hi123412341", "hi".ljust(11, "1234"))
 
 # zero width padding
 test_exception(ArgumentError)  { "hello".ljust(11, "") }
+
+# using a substring
+test_equal("ho  ", "hiho"[2..3].ljust(4))
 
 test_equal("hello", "hello".rjust(4))
 test_equal("      hello", "hello".rjust(11))
@@ -363,6 +376,13 @@ test_equal(2, "\001\001\000".sum)
 test_equal(1408, "now is the time".sum)
 test_equal(128, "now is the time".sum(8))
 test_equal(128, "\x80".sum)
+test_equal(414, "asdf".sum)
+test_exception(ArgumentError) do
+    "hello".sum(5, 6)
+end
+test_equal(414, "asdf".sum(-1))
+test_equal(414, "asdf".sum(0))
+test_equal(0, "asdf".sum(1))
 
 def check_sum(str, bits=16)
   sum = 0
@@ -428,12 +448,173 @@ test_equal(" 5", '%02s' % '5')
 test_equal("05", '%02d' % '5')
 test_equal("05", '%02g' % '5')
 test_equal("05", '%02G' % '5')
+test_equal("  ", '%2s' % nil)
 
 # test that extensions of the base classes are typed correctly
 class StringExt < String
+  def [](arg)
+    arg
+  end
 end
 test_equal(StringExt, StringExt.new.class)
 test_equal(StringExt, StringExt.new("test").class)
 
+# test that methods are overridden correctly
+test_equal(2, StringExt.new[2])
+
 test_equal("foa3VCPbMb8XQ", "foobar".crypt("foo"))
+
+test_exception(TypeError) { "this" =~ "that" }
+
+# UTF behavior around inspect, to_s, and split
+# NOTE: the "ffi" in the lines below is a single unicode character "ﬃ"; do not replace it with the normalized characters.
+
+old_code = $KCODE
+x = "eﬃcient"
+test_equal("\"e\\357\\254\\203cient\"", x.inspect)
+test_equal("eﬃcient", x.to_s)
+test_equal(["e", "\357", "\254", "\203", "c", "i", "e", "n", "t"], x.split(//))
+
+$KCODE = "UTF8"
+
+test_equal("\"eﬃcient\"", x.inspect)
+test_equal("eﬃcient", x.to_s)
+test_equal(["e", "ﬃ", "c", "i", "e", "n", "t"], x.split(//))
+
+# splitting by character should fall back on raw bytes when it's not valid unicode
+
+x2 = "\270\236\b\210\245"
+
+test_equal(["\270", "\236", "\b", "\210", "\245"], x2.split(//u))
+
+$KCODE = old_code
+
+# unpack("U*") should raise ArgumentError when the string is not valid UTF8
+test_exception(ArgumentError) { x2.unpack("U*") }
+
+# and just for kicks, make sure we're returning appropriate byte values for each_byte!
+
+bytes = []
+x2.each_byte { |b| bytes << b }
+test_equal([184, 158, 8, 136, 165], bytes)
+
+# JRUBY-280
+test_equal("1234567890.51",("%01.2f" % 1234567890.506))
+
+# test protocol conversion
+class GooStr < String
+end
+
+f = GooStr.new("AAAA")
+g= f.to_str
+test_ok(f.object_id != g.object_id)
+test_equal(String, g.class)
+test_equal("AAAA", g)
+
+class MyString
+  include Comparable
+
+  def to_str
+    "foo"
+  end
+
+  def <=>(other)
+    return "foo".<=>(other)
+  end
+end
+
+# String#== should call other.==(str) when other respond_to "to_str"
+test_equal("foo", MyString.new)
+
+# ...but .eql? should still fail, since it only does a strict comparison between strings
+test_ok(!"foo".eql?(MyString.new))
+
+class FooStr < String
+  # Should not get called
+  def to_str
+    123
+  end
+end
+
+f = FooStr.new("AAAA")
+
+test_equal("AAAA", [f].join(','))
+
+# test coercion for multiple methods
+class Foo
+  def to_int
+    3
+  end
+  def to_str
+    "hello"
+  end
+end
+
+class Five
+  def to_str
+    "5"
+  end
+end
+
+class Unpack
+  def to_str
+    "A"
+  end
+end
+
+test_equal("strstrstr", "str" * Foo.new)
+test_equal("strhello", "str" + Foo.new)
+test_equal("hello", "str".replace(Foo.new))
+test_equal(0, "hello".casecmp(Foo.new))
+test_equal("heXHujxX8gm/M", "str".crypt(Foo.new))
+test_equal("shellor", "str".gsub("t", Foo.new))
+test_equal("str", "shellor".gsub(Foo.new, "t"))
+test_equal(108, "shellor"[Foo.new])
+x = "sxxxxxr"
+x[1, 5] = Foo.new
+test_equal("shellor", x)
+x = "str"
+x[/t/, 0] = Foo.new
+test_equal("shellor", x)
+x = "str"
+x[1] = Foo.new
+test_equal("shellor", x)
+x = "str"
+x[/t/] = Foo.new
+test_equal("shellor", x)
+x = "str"
+x["t"] = Foo.new
+test_equal("shellor", x)
+x = "shellor"
+z = Foo.new
+x[z] = "t"
+test_equal("shetlor", x)
+x = "str"
+x[1..2] = Foo.new
+test_equal("shello", x)
+x = []
+"1".upto(Five.new) {|y| x << y}
+test_equal(["1", "2", "3", "4", "5"], x)
+test_ok("shellor".include?(Foo.new))
+test_equal(["s", "r"], "shellor".split(Foo.new))
+test_equal(5, "shellor".count(Foo.new))
+test_equal("sr", "shellor".delete(Foo.new))
+test_equal("sr", "shellor".delete!(Foo.new))
+test_equal("shelor", "shellor".squeeze(Foo.new))
+test_equal("shelor", "shellor".squeeze!(Foo.new))
+# JRUBY-734
+test_equal("sgoddbr", "shellor".tr(Foo.new, "goodbye"))
+test_equal("shlllooor", "sgoodbyer".tr("goodbye", Foo.new))
+a = []
+"shellor".each_line(Foo.new) { |x| a << x }
+test_equal(["shello", "r"], a)
+test_equal(["a"], s.unpack(Unpack.new))
+test_equal(291, "123".to_i(IntClass.new(16)))
+test_equal(345, "str".sum(IntClass.new(16)))
+
+# JRUBY-816
+test_exception(TypeError) { "s" << -1 }
+test_exception(TypeError) { "s" << 256 }
+test_equal("s\001", "s" << 1)
+test_exception(NoMethodError) { +"s" }
 

@@ -40,19 +40,22 @@ import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
 
 /**
- * local variable assignment node.
- * @author  jpetersen
+ * An assignment to a local variable.
  */
 public class LocalAsgnNode extends AssignableNode implements INameNode {
     static final long serialVersionUID = 1118108700098164006L;
 
-    private final int count;
+    // The name of the variable
     private String name;
+    
+    // A scoped location of this variable (high 16 bits is how many scopes down and low 16 bits
+    // is what index in the right scope to set the value.
+    private final int location;
 
-    public LocalAsgnNode(ISourcePosition position, String name, int count, Node valueNode) {
+    public LocalAsgnNode(ISourcePosition position, String name, int location, Node valueNode) {
         super(position, NodeTypes.LOCALASGNNODE);
         this.name = name.intern();
-        this.count = count;
+        this.location = location;
         setValueNode(valueNode);
     }
     
@@ -77,13 +80,32 @@ public class LocalAsgnNode extends AssignableNode implements INameNode {
     public String getName() {
         return name;
     }
+    
+    /**
+     * Change the name of this local assignment (for refactoring)
+     * @param name
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
 
     /**
-     * Gets the count.
-     * @return Returns a int
+     * How many scopes should we burrow down to until we need to set the block variable value.
+     * 
+     * @return 0 for current scope, 1 for one down, ...
      */
-    public int getCount() {
-        return count;
+    public int getDepth() {
+        return location >> 16;
+    }
+    
+    /**
+     * Gets the index within the scope construct that actually holds the eval'd value
+     * of this local variable
+     * 
+     * @return Returns an int offset into storage structure
+     */
+    public int getIndex() {
+        return location & 0xffff;
     }
     
     public List childNodes() {

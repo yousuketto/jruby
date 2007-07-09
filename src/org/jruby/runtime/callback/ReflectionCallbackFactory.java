@@ -28,8 +28,11 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime.callback;
 
+import org.jruby.RubyClass;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.CompiledBlockCallback;
+import org.jruby.runtime.Dispatcher;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class ReflectionCallbackFactory extends CallbackFactory {
@@ -41,35 +44,83 @@ public class ReflectionCallbackFactory extends CallbackFactory {
 	}
 	
     public Callback getMethod(String method) {
-        return new ReflectionCallback(type, method, NULL_CLASS_ARRAY, false, false, Arity.noArguments());
+        return new ReflectionCallback(type, method, NULL_CLASS_ARRAY, false, false, Arity.noArguments(), false);
+    }
+    
+    public Callback getFastMethod(String method) {
+        return new ReflectionCallback(type, method, NULL_CLASS_ARRAY, false, false, Arity.noArguments(), true);
+    }
+    
+    public Callback getFastMethod(String rubyName, String method) {
+        return new ReflectionCallback(type, method, NULL_CLASS_ARRAY, false, false, Arity.noArguments(), true);
     }
 
     public Callback getMethod(String method, Class arg1) {
-        return new ReflectionCallback(type, method, new Class[] { arg1 }, false, false, Arity.singleArgument());
+        return new ReflectionCallback(type, method, new Class[] { arg1 }, false, false, Arity.singleArgument(), false);
+    }
+
+    public Callback getFastMethod(String method, Class arg1) {
+        return new ReflectionCallback(type, method, new Class[] { arg1 }, false, false, Arity.singleArgument(), true);
+    }
+
+    public Callback getFastMethod(String rubyName, String method, Class arg1) {
+        return new ReflectionCallback(type, method, new Class[] { arg1 }, false, false, Arity.singleArgument(), true);
     }
 
     public Callback getMethod(String method, Class arg1, Class arg2) {
-        return new ReflectionCallback(type, method, new Class[] { arg1, arg2 }, false, false, Arity.fixed(2));
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2 }, false, false, Arity.fixed(2), false);
     }
-    
+
+    public Callback getFastMethod(String method, Class arg1, Class arg2) {
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2 }, false, false, Arity.fixed(2), true);
+    }
+
+    public Callback getFastMethod(String rubyName, String method, Class arg1, Class arg2) {
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2 }, false, false, Arity.fixed(2), true);
+    }
+
     public Callback getMethod(String method, Class arg1, Class arg2, Class arg3) {
-        return new ReflectionCallback(type, method, new Class[] { arg1, arg2, arg3 }, false, false, Arity.fixed(3));
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2, arg3 }, false, false, Arity.fixed(3), false);
+    }
+
+    public Callback getFastMethod(String method, Class arg1, Class arg2, Class arg3) {
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2, arg3 }, false, false, Arity.fixed(3), true);
+    }
+
+    public Callback getFastMethod(String rubyName, String method, Class arg1, Class arg2, Class arg3) {
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2, arg3 }, false, false, Arity.fixed(3), true);
     }
 
     public Callback getSingletonMethod(String method) {
-        return new ReflectionCallback(type, method, NULL_CLASS_ARRAY, false, true, Arity.noArguments());
+        return new ReflectionCallback(type, method, NULL_CLASS_ARRAY, false, true, Arity.noArguments(), false);
+    }
+
+    public Callback getFastSingletonMethod(String method) {
+        return new ReflectionCallback(type, method, NULL_CLASS_ARRAY, false, true, Arity.noArguments(), true);
     }
 
     public Callback getSingletonMethod(String method, Class arg1) {
-        return new ReflectionCallback(type, method, new Class[] { arg1 }, false, true, Arity.singleArgument());
+        return new ReflectionCallback(type, method, new Class[] { arg1 }, false, true, Arity.singleArgument(), false);
+    }
+
+    public Callback getFastSingletonMethod(String method, Class arg1) {
+        return new ReflectionCallback(type, method, new Class[] { arg1 }, false, true, Arity.singleArgument(), true);
     }
 
     public Callback getSingletonMethod(String method, Class arg1, Class arg2) {
-        return new ReflectionCallback(type, method, new Class[] { arg1, arg2 }, false, true, Arity.fixed(2));
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2 }, false, true, Arity.fixed(2), false);
+    }
+
+    public Callback getFastSingletonMethod(String method, Class arg1, Class arg2) {
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2 }, false, true, Arity.fixed(2), true);
     }
 
     public Callback getSingletonMethod(String method, Class arg1, Class arg2, Class arg3) {
-        return new ReflectionCallback(type, method, new Class[] { arg1, arg2, arg3 }, false, true, Arity.fixed(3));
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2, arg3 }, false, true, Arity.fixed(3), false);
+    }
+
+    public Callback getFastSingletonMethod(String method, Class arg1, Class arg2, Class arg3) {
+        return new ReflectionCallback(type, method, new Class[] { arg1, arg2, arg3 }, false, true, Arity.fixed(3), true);
     }
 
     public Callback getBlockMethod(String method) {
@@ -79,14 +130,34 @@ public class ReflectionCallbackFactory extends CallbackFactory {
             new Class[] { IRubyObject.class, IRubyObject.class },
             false,
             true,
-            Arity.fixed(2));
+            Arity.fixed(2), false);
+    }
+    
+    public CompiledBlockCallback getBlockCallback(String method) {
+        throw new RuntimeException("not implemented");
     }
 
     public Callback getOptSingletonMethod(String method) {
-        return new ReflectionCallback(type, method, new Class[] { IRubyObject[].class }, true, true, Arity.optional());
+        return new ReflectionCallback(type, method, new Class[] { IRubyObject[].class }, true, true, Arity.optional(), false);
+    }
+
+    public Callback getFastOptSingletonMethod(String method) {
+        return new ReflectionCallback(type, method, new Class[] { IRubyObject[].class }, true, true, Arity.optional(), true);
     }
 
     public Callback getOptMethod(String method) {
-        return new ReflectionCallback(type, method, new Class[] { IRubyObject[].class }, true, false, Arity.optional());
+        return new ReflectionCallback(type, method, new Class[] { IRubyObject[].class }, true, false, Arity.optional(), false);
+    }
+
+    public Callback getFastOptMethod(String method) {
+        return new ReflectionCallback(type, method, new Class[] { IRubyObject[].class }, true, false, Arity.optional(), true);
+    }
+
+    public Callback getFastOptMethod(String rubyName, String method) {
+        return new ReflectionCallback(type, method, new Class[] { IRubyObject[].class }, true, false, Arity.optional(), true);
+    }
+    
+    public Dispatcher createDispatcher(RubyClass metaClass) {
+        return Dispatcher.DEFAULT_DISPATCHER;
     }
 }

@@ -1,3 +1,5 @@
+#--
+#
 # Author:: Nathaniel Talbott.
 # Copyright:: Copyright (c) 2000-2003 Nathaniel Talbott. All rights reserved.
 # License:: Ruby license.
@@ -88,11 +90,14 @@ module Test
           end
           
           def test_started(name)
+@_t_now = Time.now
             output_single(name + ": ", VERBOSE)
           end
           
           def test_finished(name)
             output_single(".", PROGRESS_ONLY) unless (@already_outputted)
+__elapsed = Time.now - @_t_now
+            output_single(" #{__elapsed}", VERBOSE)
             nl(VERBOSE)
             @already_outputted = false
           end

@@ -12,7 +12,7 @@
 
 warn "Warning:#{caller[0].sub(/:in `.*'\z/, '')}: parsearg is deprecated after Ruby 1.8.1; use optparse instead"
 
-$RCS_ID=%q$Header$
+$RCS_ID=%q$Header: /src/ruby/lib/parsearg.rb,v 1.2.2.2 2006/08/04 22:00:21 drbrain Exp $
 
 require "getopts"
 
@@ -56,6 +56,8 @@ def setExpression(ex, opt, op)
   end
   return ex
 end
+
+# parseArgs is obsolete.  Use OptionParser instead.
 
 def parseArgs(argc, nopt, single_opts, *opts)
   if (noOptions = getopts(single_opts, *opts)) == nil

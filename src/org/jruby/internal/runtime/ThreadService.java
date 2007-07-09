@@ -30,34 +30,40 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime;
 
+import edu.emory.mathcs.backport.java.util.concurrent.locks.ReentrantLock;
+import java.lang.ref.WeakReference;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyThread;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.util.collections.WeakHashSet;
 
 public class ThreadService {
-    private IRuby runtime;
+    private Ruby runtime;
     private ThreadContext mainContext;
     private ThreadLocal localContext;
     private ThreadGroup rubyThreadGroup;
-    private List rubyThreadList;
+    private Set rubyThreadList;
     private Thread mainThread;
-    private RubyThread criticalThread;
+    
+    private ReentrantLock criticalLock = new ReentrantLock();
 
-    public ThreadService(IRuby runtime) {
+    public ThreadService(Ruby runtime) {
         this.runtime = runtime;
-        this.mainContext = new ThreadContext(runtime);
+        this.mainContext = ThreadContext.newContext(runtime);
         this.localContext = new ThreadLocal();
         this.rubyThreadGroup = new ThreadGroup("Ruby Threads#" + runtime.hashCode());
-        this.rubyThreadList = Collections.synchronizedList(new ArrayList());
+        this.rubyThreadList = Collections.synchronizedSet(new WeakHashSet());
         
         // Must be called from main thread (it is currently, but this bothers me)
         mainThread = Thread.currentThread();
-        localContext.set(mainContext);
+        localContext.set(new WeakReference(mainContext));
         rubyThreadList.add(mainThread);
     }
 
@@ -66,21 +72,31 @@ public class ThreadService {
     }
 
     public ThreadContext getCurrentContext() {
-        ThreadContext tc = (ThreadContext) localContext.get();
+        WeakReference wr = null;
+        ThreadContext context = null;
         
-        if (tc == null) {
-            tc = adoptCurrentThread();
+        while (context == null) {
+            // loop until a context is available, to clean up weakrefs that might get collected
+            if ((wr = (WeakReference)localContext.get()) == null) {
+                wr = adoptCurrentThread();
+                context = (ThreadContext)wr.get();
+            } else {
+                context = (ThreadContext)wr.get();
+            }
+            if (context == null) {
+                localContext.set(null);
+            }
         }
-        
-        return tc;
+
+        return context;
     }
     
-    private ThreadContext adoptCurrentThread() {
+    private WeakReference adoptCurrentThread() {
         Thread current = Thread.currentThread();
         
         RubyThread.adopt(runtime.getClass("Thread"), current);
         
-        return (ThreadContext) localContext.get();
+        return (WeakReference) localContext.get();
     }
 
     public RubyThread getMainThread() {
@@ -93,22 +109,24 @@ public class ThreadService {
     
     public synchronized RubyThread[] getActiveRubyThreads() {
     	// all threads in ruby thread group plus main thread
+
+        synchronized(rubyThreadList) {
+            List rtList = new ArrayList(rubyThreadList.size());
         
-        List rtList = new ArrayList(rubyThreadList.size());
-        
-        for (Iterator iter = rubyThreadList.iterator(); iter.hasNext();) {
-            Thread t = (Thread)iter.next();
+            for (Iterator iter = rubyThreadList.iterator(); iter.hasNext();) {
+                Thread t = (Thread)iter.next();
             
-            if (!t.isAlive()) continue;
+                if (!t.isAlive()) continue;
             
-            RubyThread rt = getRubyThreadFromThread(t);
-            rtList.add(rt);
-        }
+                RubyThread rt = getRubyThreadFromThread(t);
+                rtList.add(rt);
+            }
         
-        RubyThread[] rubyThreads = new RubyThread[rtList.size()];
-        rtList.toArray(rubyThreads);
+            RubyThread[] rubyThreads = new RubyThread[rtList.size()];
+            rtList.toArray(rubyThreads);
     	
-    	return rubyThreads;
+            return rubyThreads;
+        }
     }
     
     public ThreadGroup getRubyThreadGroup() {
@@ -116,59 +134,55 @@ public class ThreadService {
     }
 
     public synchronized void registerNewThread(RubyThread thread) {
-        localContext.set(new ThreadContext(runtime));
+        localContext.set(new WeakReference(ThreadContext.newContext(runtime)));
         getCurrentContext().setThread(thread);
         // This requires register to be called from within the registree thread
         rubyThreadList.add(Thread.currentThread());
     }
     
-    public synchronized void setCritical(boolean critical) {
-        RubyThread currentThread = getCurrentContext().getThread();
-        
-    	// TODO: this implementation is obviously dependent on native threads
-    	if (criticalThread != null) {
-            // currently in a critical section
-    		if (critical) {
-                // enabling critical, do nothing
-				return;
-			}
-            if (criticalThread != currentThread) {
-                // we're not the critical thread, do nothing (TODO: or perhaps wait on the critical thread here?)
-                return;
-            }
-            
-            // clear the critical thread and notify all waiting on it
-            synchronized (criticalThread) {
-                RubyThread critThread = criticalThread;
-                criticalThread = null;
-                critThread.notifyAll();
-            }
-    	} else {
-            // not in a critical section
-    		if (!critical) {
-                // not asking for critical, do nothing
-				return;
-			}
-            
-            // set the critical thread!
-            criticalThread = currentThread;
-    	}
+    public synchronized void unregisterThread(RubyThread thread) {
+        rubyThreadList.remove(Thread.currentThread());
+        getCurrentContext().setThread(null);
+        localContext.set(null);
     }
     
-	private RubyThread getRubyThreadFromThread(Thread activeThread) {
-		RubyThread rubyThread;
-		if (activeThread instanceof RubyNativeThread) {
-			RubyNativeThread rubyNativeThread = (RubyNativeThread)activeThread;
-			rubyThread = rubyNativeThread.getRubyThread();
-		} else {
-			// main thread
-			rubyThread = mainContext.getThread();
-		}
-		return rubyThread;
-	}
-
-	public RubyThread getCriticalThread() {
-    	return criticalThread;
+    private RubyThread getRubyThreadFromThread(Thread activeThread) {
+        RubyThread rubyThread;
+        if (activeThread instanceof RubyNativeThread) {
+            RubyNativeThread rubyNativeThread = (RubyNativeThread)activeThread;
+            rubyThread = rubyNativeThread.getRubyThread();
+        } else {
+            // main thread
+            rubyThread = mainContext.getThread();
+        }
+        return rubyThread;
+    }
+    
+    public synchronized void setCritical(boolean critical) {
+        if (criticalLock.isHeldByCurrentThread()) {
+            if (critical) {
+                // do nothing
+            } else {
+                criticalLock.unlock();
+            }
+        } else {
+            if (critical) {
+                criticalLock.lock();
+            } else {
+                // do nothing
+            }
+        }
+    }
+    
+    public synchronized boolean getCritical() {
+        return criticalLock.isHeldByCurrentThread();
+    }
+    
+    public void waitForCritical() {
+        if (criticalLock.isLocked()) {
+            criticalLock.lock();
+            criticalLock.unlock();
+        }
     }
 
 }

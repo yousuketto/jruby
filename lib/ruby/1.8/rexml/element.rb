@@ -713,7 +713,7 @@ module REXML
 
 		private
     def __to_xpath_helper node
-      rv = node.expanded_name
+      rv = node.expanded_name.clone
       if node.parent
         results = node.parent.find_all {|n| 
           n.kind_of?(REXML::Element) and n.expanded_name == node.expanded_name 
@@ -1224,5 +1224,20 @@ module REXML
 			rv.each{ |attr| attr.remove }
 			return rv
 		end
+    
+    # The +get_attribute_ns+ method retrieves a method by its namespace
+    # and name. Thus it is possible to reliably identify an attribute
+    # even if an XML processor has changed the prefix.
+    # 
+    # Method contributed by Henrik Martensson
+    def get_attribute_ns(namespace, name)
+      each_attribute() { |attribute|
+        if name == attribute.name &&
+           namespace == attribute.namespace()
+          return attribute
+        end
+      }
+      nil
+    end
 	end
 end

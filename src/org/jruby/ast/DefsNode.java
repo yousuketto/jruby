@@ -30,38 +30,27 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
-import java.io.IOException;
 import java.util.List;
 
+import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.parser.StaticScope;
 
 /** Represents a singleton method definition.
  *
  * @author  jpetersen
  */
-public class DefsNode extends Node {
+public class DefsNode extends MethodDefNode implements INameNode {
     static final long serialVersionUID = -4472719020304670080L;
 
     private final Node receiverNode;
-    private String name;
-    private final Node argsNode;
-    private final ScopeNode bodyNode;
-
-    public DefsNode(ISourcePosition position, Node receiverNode, String name, Node argsNode, ScopeNode bodyNode) {
-        super(position, NodeTypes.DEFSNODE);
-        this.receiverNode = receiverNode;
-        this.name = name.intern();
-        this.argsNode = argsNode;
-        this.bodyNode = bodyNode;
-    }
-    
-    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
-        in.defaultReadObject();
+    public DefsNode(ISourcePosition position, Node receiverNode, ArgumentNode nameNode, ArgsNode argsNode, 
+            StaticScope scope, Node bodyNode) {
+        super(position, nameNode, argsNode, scope, bodyNode, NodeTypes.DEFSNODE);
         
-        // deserialized strings are not interned; intern it now
-        name = name.intern();
+        this.receiverNode = receiverNode;
     }
 
     /**
@@ -73,30 +62,6 @@ public class DefsNode extends Node {
     }
 
     /**
-     * Gets the argsNode.
-     * @return Returns a Node
-     */
-    public Node getArgsNode() {
-        return argsNode;
-    }
-
-    /**
-     * Gets the bodyNode.
-     * @return Returns a ScopeNode
-     */
-    public ScopeNode getBodyNode() {
-        return bodyNode;
-    }
-
-    /**
-     * Gets the name.
-     * @return Returns a String
-     */
-    public String getName() {
-        return name;
-    }
-
-    /**
      * Gets the receiverNode.
      * @return Returns a Node
      */
@@ -104,8 +69,15 @@ public class DefsNode extends Node {
         return receiverNode;
     }
     
+    /**
+     * Gets the name of this method
+     */
+    public String getName() {
+        return nameNode.getName();
+    }
+    
     public List childNodes() {
-        return Node.createList(receiverNode, argsNode, bodyNode);
+        return Node.createList(receiverNode, nameNode, argsNode, bodyNode);
     }
 
 }

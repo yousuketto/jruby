@@ -29,16 +29,11 @@
 package org.jruby.environment;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Map;
 
-import org.jruby.IRuby;
-import org.jruby.RubyKernel;
-import org.jruby.RubyString;
-import org.jruby.exceptions.RaiseException;
-import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.Ruby;
 
 class OSEnvironmentReaderFromRuntimeExec implements IOSEnvironmentReader {
 
@@ -47,7 +42,7 @@ class OSEnvironmentReaderFromRuntimeExec implements IOSEnvironmentReader {
     /* (non-Javadoc)
      * @see org.jruby.IOSEnvironment#isAccessible()
      */
-    public boolean isAccessible(IRuby runtime) {
+    public boolean isAccessible(Ruby runtime) {
     	return true;
     }
     
@@ -77,23 +72,17 @@ class OSEnvironmentReaderFromRuntimeExec implements IOSEnvironmentReader {
 	 * 
 	 * @see org.jruby.IOSEnvironment#getVariables()
 	 */
-    public Map getVariables(IRuby runtime) {
-
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        
+    public Map getVariables(Ruby runtime) {
         try {
-			RubyKernel.runInShell(
-					runtime,
-					new IRubyObject[] {RubyString.newString(runtime, getEnvCommand())},
-					output);
-		} catch (RaiseException e) {
-			environmentReader.handleException(e);
-		}
-
-        BufferedReader reader = new BufferedReader(
-        		new InputStreamReader(new ByteArrayInputStream(output.toByteArray())));
+            Process process = Runtime.getRuntime().exec(getEnvCommand());
+            return environmentReader.getVariablesFrom(
+                    new BufferedReader(new InputStreamReader(process.getInputStream()))
+                    );
+		} catch (IOException e) {
+            environmentReader.handleException(e);
+        }
         
-        return environmentReader.getVariablesFrom(reader);
+        return null;
     }
 
 }

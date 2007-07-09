@@ -32,10 +32,11 @@
 package org.jruby;
 
 import org.jruby.exceptions.JumpException;
-import org.jruby.internal.runtime.methods.IterateCallable;
+import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
-import org.jruby.runtime.ICallable;
+import org.jruby.runtime.MethodBlock;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -54,33 +55,31 @@ public class RubyMethod extends RubyObject {
     protected String methodName;
     protected RubyModule originModule;
     protected String originName;
-    protected ICallable method;
+    protected DynamicMethod method;
     protected IRubyObject receiver;
 
-    protected RubyMethod(IRuby runtime, RubyClass rubyClass) {
+    protected RubyMethod(Ruby runtime, RubyClass rubyClass) {
         super(runtime, rubyClass);
     }
 
     /** Create the RubyMethod class and add it to the Ruby runtime.
      * 
      */
-    public static RubyClass createMethodClass(IRuby runtime) {
-		RubyClass methodClass = runtime.defineClass("Method", runtime.getObject());
-    	
-		CallbackFactory callbackFactory = runtime.callbackFactory(RubyMethod.class);
+    public static RubyClass createMethodClass(Ruby runtime) {
+        // TODO: NOT_ALLOCATABLE_ALLOCATOR is probably ok here. Confirm. JRUBY-415
+        RubyClass methodClass = runtime.defineClass("Method", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         
-		methodClass.defineMethod("arity", 
-				callbackFactory.getMethod("arity"));
-		methodClass.defineMethod("to_proc", 
-				callbackFactory.getMethod("to_proc"));
-		methodClass.defineMethod("unbind", 
-				callbackFactory.getMethod("unbind"));
-		methodClass.defineMethod("call", 
-				callbackFactory.getOptMethod("call"));
-		methodClass.defineMethod("[]", 
-				callbackFactory.getOptMethod("call"));
-
-		return methodClass;
+        CallbackFactory callbackFactory = runtime.callbackFactory(RubyMethod.class);
+        
+        methodClass.defineFastMethod("arity", callbackFactory.getFastMethod("arity"));
+        methodClass.defineMethod("to_proc", callbackFactory.getMethod("to_proc"));
+        methodClass.defineMethod("unbind", callbackFactory.getMethod("unbind"));
+        methodClass.defineMethod("call", callbackFactory.getOptMethod("call"));
+        methodClass.defineMethod("[]", callbackFactory.getOptMethod("call"));
+        methodClass.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
+        methodClass.defineFastMethod("to_s", callbackFactory.getFastMethod("inspect"));
+        
+        return methodClass;
     }
 
     public static RubyMethod newMethod(
@@ -88,16 +87,16 @@ public class RubyMethod extends RubyObject {
         String methodName,
         RubyModule originModule,
         String originName,
-        ICallable method,
+        DynamicMethod method,
         IRubyObject receiver) {
-        IRuby runtime = implementationModule.getRuntime();
+        Ruby runtime = implementationModule.getRuntime();
         RubyMethod newMethod = new RubyMethod(runtime, runtime.getClass("Method"));
 
         newMethod.implementationModule = implementationModule;
         newMethod.methodName = methodName;
         newMethod.originModule = originModule;
         newMethod.originName = originName;
-        newMethod.method = method;
+        newMethod.method = method.getRealMethod();
         newMethod.receiver = receiver;
 
         return newMethod;
@@ -106,19 +105,14 @@ public class RubyMethod extends RubyObject {
     /** Call the method.
      * 
      */
-    public IRubyObject call(IRubyObject[] args) {
+    public IRubyObject call(IRubyObject[] args, Block block) {
     	assert args != null;
         ThreadContext tc = getRuntime().getCurrentContext();
 
     	method.getArity().checkArity(getRuntime(), args);
         
-        tc.setIfBlockAvailable();
-        try {
-            // FIXME: should lastClass be implementation module for a Method?
-            return method.call(getRuntime(), receiver, implementationModule, methodName, args, false);
-        } finally {
-            tc.clearIfBlockAvailable();
-        }
+        // FIXME: should lastClass be implementation module for a Method?
+        return method.call(tc, receiver, implementationModule, methodName, args, false, block);
     }
 
     /** Returns the number of arguments a method accepted.
@@ -132,33 +126,25 @@ public class RubyMethod extends RubyObject {
     /** Create a Proc object.
      * 
      */
-    public IRubyObject to_proc() {
-    	CallbackFactory f = getRuntime().callbackFactory(RubyMethod.class);
-		IRuby r = getRuntime();
+    public IRubyObject to_proc(Block unusedBlock) {
+        CallbackFactory f = getRuntime().callbackFactory(RubyMethod.class);
+        Ruby r = getRuntime();
         ThreadContext tc = r.getCurrentContext();
-        tc.preToProc(Block.createBlock(null, new IterateCallable(f.getBlockMethod("bmcall"), this), r.getTopSelf()));
-		
-		try {
-		    while (true) {
-		        try {
-		            return f.getSingletonMethod("mproc").execute(getRuntime().getNil(), IRubyObject.NULL_ARRAY);
-		        } catch (JumpException je) {
-		        	if (je.getJumpType() == JumpException.JumpType.BreakJump) {
-		                IRubyObject breakValue = (IRubyObject)je.getPrimaryData();
-		                
-		                return breakValue == null ? r.getNil() : breakValue;
-		        	} else if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
-		        		return (IRubyObject)je.getPrimaryData();
-		        	} else if (je.getJumpType() == JumpException.JumpType.RetryJump) {
-		        		// Execute iterateMethod again.
-		        	} else {
-		        		throw je;
-		        	}
-		        }
-		    }
-		} finally {
-            tc.postToProc();
-		}
+        Block block = MethodBlock.createMethodBlock(tc, tc.getCurrentScope().cloneScope(), f.getBlockMethod("bmcall"), this, r.getTopSelf());
+        
+        while (true) {
+            try {
+                // FIXME: We should not be regenerating this over and over
+                return f.getSingletonMethod("mproc").execute(getRuntime().getNil(), 
+                        IRubyObject.NULL_ARRAY, block);
+            } catch (JumpException.BreakJump bj) {
+                    return (IRubyObject) bj.getValue();
+            } catch (JumpException.ReturnJump rj) {
+                    return (IRubyObject) rj.getValue();
+            } catch (JumpException.RetryJump rj) {
+                    // Execute iterateMethod again.
+            }
+        }
     }
 
     /** Create a Proc object which is called like a ruby method.
@@ -166,14 +152,14 @@ public class RubyMethod extends RubyObject {
      * Used by the RubyMethod#to_proc method.
      *
      */
-    public static IRubyObject mproc(IRubyObject recv) {
-    	IRuby runtime = recv.getRuntime();
+    public static IRubyObject mproc(IRubyObject recv, Block block) {
+    	Ruby runtime = recv.getRuntime();
     	ThreadContext tc = runtime.getCurrentContext();
         
         tc.preMproc();
         
         try {
-            return RubyKernel.proc(recv);
+            return RubyKernel.proc(recv, block);
         } finally {
             tc.postMproc();
         }
@@ -184,20 +170,29 @@ public class RubyMethod extends RubyObject {
      * Used by the RubyMethod#to_proc method.
      *
      */
-    public static IRubyObject bmcall(IRubyObject blockArg, IRubyObject arg1, IRubyObject self) {
+    public static IRubyObject bmcall(IRubyObject blockArg, IRubyObject arg1, IRubyObject self, Block unusedBlock) {
         if (blockArg instanceof RubyArray) {
-            return ((RubyMethod) arg1).call(((RubyArray) blockArg).toJavaArray());
+            // ENEBO: Very wrong
+            return ((RubyMethod) arg1).call(((RubyArray) blockArg).toJavaArray(), Block.NULL_BLOCK);
         }
-        return ((RubyMethod) arg1).call(new IRubyObject[] { blockArg });
+        // ENEBO: Very wrong
+        return ((RubyMethod) arg1).call(new IRubyObject[] { blockArg }, Block.NULL_BLOCK);
     }
 
-    public RubyUnboundMethod unbind() {
+    public RubyUnboundMethod unbind(Block unusedBlock) {
         RubyUnboundMethod unboundMethod =
         	RubyUnboundMethod.newUnboundMethod(implementationModule, methodName, originModule, originName, method);
         unboundMethod.receiver = this;
         unboundMethod.infectBy(this);
         
         return unboundMethod;
+    }
+    
+    public IRubyObject inspect() {
+        String cname = getMetaClass().getRealClass().getName();
+        RubyString str = getRuntime().newString("#<" + cname + ": " + originModule.getName() + "#" + methodName + ">");
+        str.setTaint(isTaint());
+        return str;
     }
 }
 

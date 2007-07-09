@@ -46,7 +46,7 @@ import org.jruby.lexer.yacc.ISourcePosition;
 public class BignumNode extends Node implements ILiteralNode {
     static final long serialVersionUID = -8646636291868912747L;
 
-    private final BigInteger value;
+    private BigInteger value;
 
     public BignumNode(ISourcePosition position, BigInteger value) {
         super(position, NodeTypes.BIGNUMNODE);
@@ -67,6 +67,10 @@ public class BignumNode extends Node implements ILiteralNode {
     
     public List childNodes() {
         return EMPTY_LIST;
+    }
+
+    public void setValue(BigInteger value) {
+        this.value = value;
     }
 
 }

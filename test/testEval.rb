@@ -69,3 +69,110 @@ test_equal "bar: hi", g.result("hi")
 
 test_equal "foo: bye", f.result("bye")
 test_equal "bar: bye", g.result("bye")
+
+# JRUBY-214 - eval should call to_str on arg 0
+class Bar
+  def to_str
+    "magic_number"
+  end
+end
+magic_number = 1
+test_equal(magic_number, eval(Bar.new))
+
+test_exception(TypeError) { eval(Object.new) }
+
+# JRUBY-386 tests
+# need at least one arg
+test_exception(ArgumentError) { eval }
+test_exception(ArgumentError) {self.class.module_eval}
+test_exception(ArgumentError) {self.class.class_eval}
+test_exception(ArgumentError) {3.instance_eval}
+
+# args must respond to #to_str
+test_exception(TypeError) {eval 3}
+test_exception(TypeError) {self.class.module_eval 3}
+test_exception(TypeError) {self.class.class_eval 4}
+test_exception(TypeError) {3.instance_eval 4}
+
+begin
+  eval 'return'
+rescue LocalJumpError => e
+  test_ok(e.message =~ /unexpected return$/)
+end
+
+begin
+  eval 'break'
+rescue LocalJumpError => e
+  test_ok(e.message =~ /unexpected break$/)
+end
+
+begin
+  "".instance_eval 'break'
+rescue LocalJumpError => e
+  test_ok(e.message =~ /unexpected break$/)
+end
+
+begin
+  "".instance_eval 'return'
+rescue LocalJumpError => e
+  test_ok(e.message =~ /unexpected return$/)
+end
+
+# If getBindingRubyClass isn't used, this test case will fail,
+# since when eval gets called, Kernel will get pushed on the
+# parent-stack, and this will always become the RubyClass for
+# the evaled string, which is incorrect.
+class AbcTestFooAbc
+  eval <<-ENDT
+  def foofoo_foofoo
+  end
+ENDT
+end
+
+test_equal ["foofoo_foofoo"], AbcTestFooAbc.instance_methods.grep(/foofoo_foofoo/)
+test_equal [], Object.instance_methods.grep(/foofoo_foofoo/)
+
+# test Binding.of_caller
+def foo
+  x = 1
+  bar
+end
+
+def bar
+  eval "x + 1", Binding.of_caller
+end
+
+test_equal(2, foo)
+
+# test returns within an eval
+def foo
+  eval 'return 1'
+  return 2
+end
+def foo2
+  x = "blah"
+  x.instance_eval "return 1"
+  return 2
+end
+
+test_equal(1, foo)
+# this case is still broken
+test_equal(1, foo2)
+
+$a = 1
+eval 'BEGIN { $a = 2 }'
+test_equal(1, $a)
+
+$b = nil
+class Foo
+  $b = binding
+end
+
+a = Object.new
+main = self
+b = binding
+a.instance_eval { 
+  eval("test_equal(a, self)") 
+  eval("test_equal(main,self)", b)
+  eval("test_equal(Foo, self)", $b)
+}

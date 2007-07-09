@@ -33,26 +33,33 @@ package org.jruby.ast;
 
 import java.io.IOException;
 import java.util.List;
-
 import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.runtime.MethodIndex;
 
-/** Represents a method call with self as receiver.
- *
- * @author  jpetersen
+/** 
+ * Represents a method call with self as an implicit receiver.
  */
-public class FCallNode extends Node implements INameNode {
+public class FCallNode extends Node implements INameNode, IArgumentNode, BlockAcceptingNode {
     static final long serialVersionUID = 3590332973770104094L;
 
     private String name;
-    private final Node argsNode;
+    public final int index;
+    private Node argsNode;
+    private Node iterNode;
 
     public FCallNode(ISourcePosition position, String name, Node argsNode) {
+        this(position, name, argsNode, null);
+    }
+    
+    public FCallNode(ISourcePosition position, String name, Node argsNode, Node iterNode) {
         super(position, NodeTypes.FCALLNODE);
         this.name = name.intern();
-        this.argsNode = argsNode;
+        setArgsNode(argsNode);
+        this.iterNode = iterNode;
+        this.index = MethodIndex.getIndex(this.name);
     }
     
     private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
@@ -69,6 +76,17 @@ public class FCallNode extends Node implements INameNode {
     public Instruction accept(NodeVisitor iVisitor) {
         return iVisitor.visitFCallNode(this);
     }
+    
+    /**
+     * Get the node that represents a block or a block variable.
+     */
+    public Node getIterNode() {
+        return iterNode;
+    }
+    
+    public void setIterNode(Node iterNode) {
+        this.iterNode = iterNode;
+    }
 
     /**
      * Gets the argsNode.
@@ -76,6 +94,19 @@ public class FCallNode extends Node implements INameNode {
      */
     public Node getArgsNode() {
         return argsNode;
+    }
+
+    /**
+     * Set the argsNode
+     * 
+     * @param argsNode set the arguments for this node.
+     */
+    public void setArgsNode(Node argsNode) {
+        this.argsNode = argsNode;
+        // If we have more than one arg, make sure the array created to contain them is not ObjectSpaced
+        if (argsNode instanceof ArrayNode) {
+            ((ArrayNode)argsNode).setLightweight(true);
+        }
     }
 
     /**
@@ -87,7 +118,10 @@ public class FCallNode extends Node implements INameNode {
     }
     
     public List childNodes() {
-        return createList(argsNode);
+        return createList(argsNode, iterNode);
     }
 
+    public String toString() {
+        return "FCallNode: " + getName();
+    }
 }

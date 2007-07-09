@@ -14,7 +14,7 @@
  * Copyright (C) 2001-2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2001-2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -34,35 +34,32 @@ import java.util.List;
 
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
-import org.jruby.internal.runtime.methods.EvaluateCallable;
 import org.jruby.lexer.yacc.ISourcePosition;
-import org.jruby.runtime.ICallable;
+import org.jruby.parser.StaticScope;
 
 /**
+ * Represents a block.  
  *
- * @see ForNode
- * @author  jpetersen
  */
 public class IterNode extends Node {
     static final long serialVersionUID = -9181965000180892184L;
 
     private final Node varNode;
     private final Node bodyNode;
-    private Node iterNode;
-    private transient ICallable callable;
+    
+    // What static scoping relationship exists when it comes into being.
+    private StaticScope scope;
 
-    public IterNode(ISourcePosition position, Node varNode, Node bodyNode, Node iterNode) {
-        super(position, NodeTypes.ITERNODE);
-        this.varNode = varNode;
-        this.bodyNode = bodyNode;
-        this.iterNode = iterNode;
+    public IterNode(ISourcePosition position, Node varNode, StaticScope scope, Node bodyNode) {
+        this(position, varNode, scope, bodyNode, NodeTypes.ITERNODE);
     }
-
-    public IterNode(ISourcePosition position, Node varNode, Node bodyNode, Node iterNode, int id) {
+    
+    public IterNode(ISourcePosition position, Node varNode, StaticScope scope, Node bodyNode, 
+            int id) {
         super(position, id);
         this.varNode = varNode;
+        this.scope = scope;
         this.bodyNode = bodyNode;
-        this.iterNode = iterNode;
     }
 
     /**
@@ -71,6 +68,10 @@ public class IterNode extends Node {
      **/
     public Instruction accept(NodeVisitor iVisitor) {
         return iVisitor.visitIterNode(this);
+    }
+    
+    public StaticScope getScope() {
+        return scope;
     }
 
     /**
@@ -82,22 +83,6 @@ public class IterNode extends Node {
     }
 
     /**
-     * Gets the iterNode.
-     * @return Returns a Node
-     */
-    public Node getIterNode() {
-        return iterNode;
-    }
-
-    /**
-     * Sets the iterNode.
-     * @param iterNode The iterNode to set
-     */
-    public void setIterNode(Node iterNode) {
-        this.iterNode = iterNode;
-    }
-
-    /**
      * Gets the varNode.
      * @return Returns a Node
      */
@@ -106,10 +91,6 @@ public class IterNode extends Node {
     }
     
     public List childNodes() {
-        return Node.createList(varNode, bodyNode, iterNode);
-    }
-
-    public ICallable getCallable() {
-        return callable == null ? callable = new EvaluateCallable(bodyNode, varNode) : callable;
+        return Node.createList(varNode, bodyNode);
     }
 }

@@ -27,7 +27,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime.load;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -35,5 +35,6 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author jpetersen
  */
 public interface IAutoloadMethod {
-    public IRubyObject load(IRuby runtime, String name);
+    public String file();
+    public IRubyObject load(Ruby runtime, String name);
 }

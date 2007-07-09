@@ -32,14 +32,13 @@ package org.jruby.parser;
 
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.List;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyFile;
 import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.SyntaxException;
-import org.jruby.runtime.Iter;
+import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.util.collections.SinglyLinkedList;
 
@@ -47,39 +46,37 @@ import org.jruby.util.collections.SinglyLinkedList;
  * Serves as a simple facade for all the parsing magic.
  */
 public class Parser {
-    private final IRuby runtime;
+    private final Ruby runtime;
 
-    public Parser(IRuby runtime) {
+    public Parser(Ruby runtime) {
         this.runtime = runtime;
     }
 
-    public Node parse(String file, String content) {
-        return parse(file, new StringReader(content));
-    }
-
-    public Node parse(String file, Reader content) {
-        return parse(file, content, new RubyParserConfiguration(), 
-            runtime.getObject().getCRef());
+    public Node parse(String file, String content, DynamicScope blockScope, int lineNumber, 
+            boolean extraPositionInformation) {
+        return parse(file, new StringReader(content), blockScope, lineNumber, 
+                extraPositionInformation, false);
     }
     
-    public Node parse(String file, String content, SinglyLinkedList cref) {
-        return parse(file, new StringReader(content), new RubyParserConfiguration(), cref);
+    public Node parse(String file, String content, DynamicScope blockScope, int lineNumber) {
+        return parse(file, new StringReader(content), blockScope, lineNumber, false, false);
+    }
+    
+    public Node parse(String file, Reader content, DynamicScope blockScope, int lineNumber) {
+        return parse(file, content, blockScope, lineNumber, false, false);
     }
 
-    private Node parse(String file, Reader content, RubyParserConfiguration config, 
-        SinglyLinkedList cref) {
+    public Node parse(String file, Reader content, DynamicScope blockScope, int lineNumber, 
+            boolean extraPositionInformation, boolean eOptionParse) {
+        RubyParserConfiguration configuration = new RubyParserConfiguration(eOptionParse); 
+        SinglyLinkedList cref = runtime.getObject().getCRef();
         ThreadContext tc = runtime.getCurrentContext();
-        config.setLocalVariables(tc.getFrameScope().getLocalNames());
-        
-        // FIXME: hack; search for an ITER_CUR; this lets us know we're parsing from within a block and should bring dvars along
-        Iter[] iters = tc.getIterStack();
-        for (int i = 0; i < iters.length; i++) {
-            Iter iter = iters[i];
-            
-            if (iter == Iter.ITER_CUR) {
-                config.setDynamicVariables(tc.getCurrentDynamicVars().names());
-                break;
-            }
+
+        // We only need to pass in current scope if we are evaluating as a block (which
+        // is only done for evals).  We need to pass this in so that we can appropriately scope
+        // down to captured scopes when we are parsing.
+        if (blockScope != null) {
+            configuration.parseAsBlock(blockScope);
         }
         
         DefaultRubyParser parser = null;
@@ -87,55 +84,39 @@ public class Parser {
         try {
             parser = RubyParserPool.getInstance().borrowParser();
             parser.setWarnings(runtime.getWarnings());
-            parser.init(config);
             tc.setCRef(cref);
-            LexerSource lexerSource = LexerSource.getSource(file, content);
-            result = parser.parse(lexerSource);
+            LexerSource lexerSource = 
+                LexerSource.getSource(file, content, lineNumber, extraPositionInformation);
+            result = parser.parse(configuration, lexerSource);
             if (result.isEndSeen()) {
+                org.jruby.runtime.builtin.IRubyObject verbose = runtime.getVerbose();
+                runtime.setVerbose(runtime.getNil());
             	runtime.defineGlobalConstant("DATA", new RubyFile(runtime, file, content));
+                runtime.setVerbose(verbose);
             	result.setEndSeen(false);
             }
         } catch (SyntaxException e) {
             StringBuffer buffer = new StringBuffer(100);
             buffer.append(e.getPosition().getFile()).append(':');
-            buffer.append(e.getPosition().getEndLine()).append(": ");
+            buffer.append(e.getPosition().getEndLine() + 1).append(": ");
             buffer.append(e.getMessage());
             throw runtime.newSyntaxError(buffer.toString());
         } finally {
             RubyParserPool.getInstance().returnParser(parser);
             tc.unsetCRef();
         }
-
-        if (hasNewLocalVariables(result)) {
-            expandLocalVariables(result.getLocalVariables());
+        
+        // If variables were added then we may need to grow the dynamic scope to match the static
+        // one.
+        // FIXME: Make this so we only need to check this for blockScope != null.  We cannot
+        // currently since we create the DynamicScope for a LocalStaticScope before parse begins.
+        // Refactoring should make this fixable.
+        if (result.getScope() != null) {
+            result.getScope().growIfNeeded();
         }
-        result.addAppendBeginAndEndNodes();
+
+        // FIXME: We should move this into ParserSupport.addRootNode since actual parser should do this.
+        result.addAppendBeginNodes();
         return result.getAST();
-    }
-
-    private void expandLocalVariables(List localVariables) {
-        int oldSize = 0;
-        ThreadContext tc = runtime.getCurrentContext();
-        if (tc.getFrameScope().getLocalNames() != null) {
-            oldSize = tc.getFrameScope().getLocalNames().length;
-        }
-        List newNames = localVariables.subList(oldSize, localVariables.size());
-        String[] newNamesArray = new String[newNames.size()];
-        newNames.toArray(newNamesArray);
-        tc.getFrameScope().addLocalVariables(newNamesArray);
-    }
-
-    private boolean hasNewLocalVariables(RubyParserResult result) {
-        int newSize = 0;
-        ThreadContext tc = runtime.getCurrentContext();
-       
-        if (result.getLocalVariables() != null) {
-            newSize = result.getLocalVariables().size();
-        }
-        int oldSize = 0;
-        if (tc.getFrameScope().hasLocalVariables()) {
-            oldSize = tc.getFrameScope().getLocalNames().length;
-        }
-        return newSize > oldSize;
     }
 }

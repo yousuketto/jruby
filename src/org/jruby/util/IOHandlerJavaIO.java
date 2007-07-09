@@ -16,7 +16,7 @@
  * Copyright (C) 2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Evan Buswell <evan@heron.sytes.net>
- * 
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -36,79 +36,79 @@ import java.io.OutputStream;
 import java.io.IOException;
 import java.io.EOFException;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 
 /**
  */
 public abstract class IOHandlerJavaIO extends IOHandler {
-    // Last char to be 'ungot'.  <0 indicates nothing waiting to be re-got  
-    private int ungotc = -1;
-    
-    protected IOHandlerJavaIO(IRuby runtime) {
-	super(runtime);
+    // Last char to be 'ungot'.  <0 indicates nothing waiting to be re-got
+    protected int ungotc = -1;
+
+    protected IOHandlerJavaIO(Ruby runtime) {
+    super(runtime);
     }
 
-    public String gets(String separatorString) throws IOException, BadDescriptorException {
+    public ByteList gets(ByteList separatorString) throws IOException, BadDescriptorException {
         checkReadable();
-        
+
         if (separatorString == null) {
             return getsEntireStream();
         }
-        
-        final char[] separator = separatorString.equals(PARAGRAPH_DELIMETER) ?
-	    "\n\n".toCharArray() : separatorString.toCharArray();
-	
-        int c = read();
+
+        final ByteList separator = (separatorString == PARAGRAPH_DELIMETER) ?
+            ByteList.create("\n\n") : separatorString;
+
+        byte c = (byte)read();
         if (c == -1) {
             return null;
         }
-	
-        StringBuffer buffer = new StringBuffer();
-	
+
+        ByteList buffer = new ByteList();
+
         LineLoop : while (true) {
-            while (c != separator[0] && c != -1) {
-                buffer.append((char) c);
-                c = read();
+            while (c != separator.bytes[separator.begin] && c != -1) {
+                buffer.append(c);
+                c = (byte)read();
             }
-            for (int i = 0; i < separator.length; i++) {
+            for (int i = 0; i < separator.realSize; i++) {
                 if (c == -1) {
                     break LineLoop;
-                } else if (c != separator[i]) {
+                } else if (c != separator.bytes[separator.begin + i]) {
                     continue LineLoop;
                 }
-                buffer.append((char) c);
-                if (i < separator.length - 1) {
-                    c = read();
+                buffer.append(c);
+                if (i < separator.realSize - 1) {
+                    c = (byte)read();
                 }
             }
             break;
         }
-        
-        if (separatorString.equals(PARAGRAPH_DELIMETER)) {
-            while (c == separator[0]) {
-                c = read();
+
+        if (separatorString == PARAGRAPH_DELIMETER) {
+            while (c == separator.bytes[separator.begin]) {
+                c = (byte)read();
             }
             ungetc(c);
         }
-        
-        return buffer.toString();
+
+        return buffer;
     }
 
-    public String getsEntireStream() throws IOException {
-        StringBuffer result = new StringBuffer();
+    public ByteList getsEntireStream() throws IOException {
+        ByteList result = new ByteList();
         int c;
-        while ((c = read()) != -1) {
-            result.append((char) c);
+        while ((c = (byte)read()) != -1) {
+            result.append(c);
         }
-        
+
         // We are already at EOF
-        if (result.length() == 0) {
+        if (result.realSize == 0) {
             return null;
         }
-        
-        return result.toString();
+
+        return result;
     }
-    
+
     public int read() throws IOException {
         try {
             if (ungotc >= 0) {
@@ -116,7 +116,7 @@ public abstract class IOHandlerJavaIO extends IOHandler {
                 ungotc = -1;
                 return c;
             }
-            
+
             return sysread();
         } catch (EOFException e) {
             return -1;
@@ -125,24 +125,24 @@ public abstract class IOHandlerJavaIO extends IOHandler {
 
     public int getc() throws IOException, BadDescriptorException {
         checkReadable();
-        
+
         int c = read();
-        
+
         if (c == -1) {
             return c;
         }
         return c & 0xff;
     }
-    
-    public String read(int number) throws IOException, BadDescriptorException {
+
+    public ByteList read(int number) throws IOException, BadDescriptorException {
         try {
-            
+
             if (ungotc >= 0) {
-                String buf2 = sysread(number - 1);
-                int c = ungotc;
+                ByteList buf2 = sysread(number - 1);
+                buf2.prepend((byte)ungotc);
                 ungotc = -1;
-                return c + buf2;
-            } 
+                return buf2;
+            }
 
             return sysread(number);
         } catch (EOFException e) {
@@ -160,64 +160,69 @@ public abstract class IOHandlerJavaIO extends IOHandler {
     public void putc(int c) throws IOException, BadDescriptorException {
         try {
             syswrite(c);
+            flush();
         } catch (IOException e) {
         }
     }
-    
-    public int write(String string) throws IOException, BadDescriptorException {
+
+    public int write(ByteList string) throws IOException, BadDescriptorException {
         return syswrite(string);
     }
 
-    protected int sysread(StringBuffer buf, int length) throws IOException {
+    protected int sysread(ByteList buf, int length) throws IOException {
         if (buf == null) {
             throw new IOException("sysread2: Buf is null");
         }
-        
+
         int i = 0;
         for (;i < length; i++) {
             int c = sysread();
-            
+
             if (c == -1) {
                 if (i <= 0) {
                     return -1;
                 }
                 break;
             }
-            
-            buf.append((char) c);
+
+            buf.append(c);
         }
-        
+
         return i;
     }
 
     // Question: We should read bytes or chars?
-    public String sysread(int number) throws IOException, BadDescriptorException {
+    public ByteList sysread(int number) throws IOException, BadDescriptorException {
         if (!isOpen()) {
             throw new IOException("File not open");
         }
         checkReadable();
-        
-        StringBuffer buf = new StringBuffer();
+
+        ByteList buf = new ByteList(number);
         int position = 0;
-        
+
         while (position < number) {
             int s = sysread(buf, number - position);
-                
+
             if (s == -1) {
                 if (position <= 0) {
                     throw new EOFException();
                 }
                 break;
             }
-                
+
             position += s;
         }
-            
-        return buf.toString();
+
+        return buf;
     }
 
     public abstract int sysread() throws IOException;
 
     public abstract InputStream getInputStream();
     public abstract OutputStream getOutputStream();
+    
+    public int ready() throws IOException {
+        return getInputStream().available();
+    }
 }

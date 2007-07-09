@@ -32,22 +32,25 @@ package org.jruby.javasupport;
 
 import java.lang.reflect.Array;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyInteger;
 import org.jruby.RubyModule;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class JavaArray extends JavaObject {
 
-    public JavaArray(IRuby runtime, Object array) {
-        super(runtime, runtime.getModule("Java").getClass("JavaArray"), array);
+    public JavaArray(Ruby runtime, Object array) {
+        super(runtime, runtime.getJavaSupport().getJavaArrayClass(), array);
         assert array.getClass().isArray();
     }
 
-    public static RubyClass createJavaArrayClass(IRuby runtime, RubyModule javaModule) {
-        return javaModule.defineClassUnder("JavaArray", javaModule.getClass("JavaObject"));
+    public static RubyClass createJavaArrayClass(Ruby runtime, RubyModule javaModule) {
+        // FIXME: NOT_ALLOCATABLE_ALLOCATOR is probably not right here, since we might
+        // eventually want JavaArray to be marshallable. JRUBY-414
+        return javaModule.defineClassUnder("JavaArray", javaModule.getClass("JavaObject"), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
     }
 
     public RubyFixnum length() {
@@ -86,6 +89,36 @@ public class JavaArray extends JavaObject {
         Object javaObject = ((JavaObject) value).getValue();
         try {
             Array.set(getValue(), intIndex, javaObject);
+        } catch (IndexOutOfBoundsException e) {
+            throw getRuntime().newArgumentError(
+                                    "index out of bounds for java array (" + intIndex +
+                                    " for length " + getLength() + ")");
+        } catch (ArrayStoreException e) {
+            throw getRuntime().newArgumentError(
+                                    "wrong element type " + javaObject.getClass() + "(array is " +
+                                    getValue().getClass() + ")");
+        }
+        return value;
+    }
+
+    public IRubyObject afill(IRubyObject beginIndex, IRubyObject endIndex, IRubyObject value) {
+        if (! (beginIndex instanceof RubyInteger)) {
+            throw getRuntime().newTypeError(beginIndex, getRuntime().getClass("Integer"));
+        }
+        int intIndex = (int) ((RubyInteger) beginIndex).getLongValue();
+        if (! (endIndex instanceof RubyInteger)) {
+            throw getRuntime().newTypeError(endIndex, getRuntime().getClass("Integer"));
+        }
+        int intEndIndex = (int) ((RubyInteger) endIndex).getLongValue();
+        if (! (value instanceof JavaObject)) {
+            throw getRuntime().newTypeError("not a java object:" + value);
+        }
+        Object javaObject = ((JavaObject) value).getValue();
+        Object self = getValue();
+        try {
+          for ( ; intIndex < intEndIndex; intIndex++) {
+            Array.set(self, intIndex, javaObject);
+          }
         } catch (IndexOutOfBoundsException e) {
             throw getRuntime().newArgumentError(
                                     "index out of bounds for java array (" + intIndex +

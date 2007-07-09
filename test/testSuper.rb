@@ -258,4 +258,111 @@ test_equal(9, Optional3.new.single(9))
   # call Base#single with 1 argument; the arg is supplied
 test_equal(1, Optional3.new.single)
 
+class SuperBase
+  def create_table(a)
+     test_equal(true, block_given?)
+  end
+end
 
+class SuperDerived < SuperBase
+  def create_table(name)
+    super("HEH")
+  end
+end
+
+SuperDerived.new.create_table("A") {  }
+
+
+class AZsuper
+  def foo
+    block_given?
+  end
+
+  def bar
+    test_equal(true, block_given?)
+  end
+
+  def gar
+     block_given?
+  end
+end
+
+class BZsuper < AZsuper
+  def foo
+    super { puts "A" }
+  end
+
+  def bar
+    super { puts "A" }
+  end
+
+  def gar
+    super
+  end
+end
+
+class CZsuper < BZsuper
+  def gar
+    super
+  end
+end
+
+test_equal(true, BZsuper.new.foo)
+BZsuper.new.bar
+test_equal(true,  CZsuper.new.gar { puts "B" })
+
+
+
+#JRUBY-713
+
+$__val = "123foobar"
+
+class FOOZSuper
+  def cc(arg1, arg2)
+    $__val = arg2
+  end
+end
+
+class BARZSuper < FOOZSuper
+  def cc(arg1, arg2)
+    arg2 = "intervention"
+    super
+  end
+end
+
+test_equal "123foobar", $__val
+BARZSuper.new.cc "one","two"
+test_equal "intervention", $__val
+
+class Foo111
+  def bar(*args)
+    $__val = args
+  end
+end
+
+class Bar111 < Foo111
+  def bar(*args)
+    args[0] = "barbar"
+    super
+  end
+end
+
+#This is a bug, we should support this:
+=begin
+Bar111.new.bar "one", "two", "three"
+test_equal "barbar", $__val[0]
+=end
+
+# Test weird likely-a-bug where method() will repurpose where super goes to
+class Foo222
+  def a; 'a'; end
+  def b; 'b'; end
+end
+
+class Bar222 < Foo222
+  def a; super; end
+  alias b a
+end
+
+test_equal('a', Bar222.new.b)
+test_equal('b', Bar222.new.method(:b).call)

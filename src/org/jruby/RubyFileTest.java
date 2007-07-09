@@ -35,50 +35,57 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.JRubyFile;
 
 public class RubyFileTest {
-    public static RubyModule createFileTestModule(IRuby runtime) {
+    public static RubyModule createFileTestModule(Ruby runtime) {
         RubyModule fileTestModule = runtime.defineModule("FileTest");
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyFileTest.class);
 
-        fileTestModule.defineSingletonMethod("file?", callbackFactory.getSingletonMethod("file_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("directory?", callbackFactory.getSingletonMethod("directory_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("exist?", callbackFactory.getSingletonMethod("exist_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("exists?", callbackFactory.getSingletonMethod("exist_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("readable?", callbackFactory.getSingletonMethod("readable_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("readable_real?", callbackFactory.getSingletonMethod("readable_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("size", callbackFactory.getSingletonMethod("size", RubyString.class));
-        fileTestModule.defineSingletonMethod("writable?", callbackFactory.getSingletonMethod("writable_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("writable_real?", callbackFactory.getSingletonMethod("writable_p", RubyString.class));
-        fileTestModule.defineSingletonMethod("zero?", callbackFactory.getSingletonMethod("zero_p", RubyString.class));
+        fileTestModule.defineFastModuleFunction("file?", callbackFactory.getFastSingletonMethod("file_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("directory?", callbackFactory.getFastSingletonMethod("directory_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("executable?", callbackFactory.getFastSingletonMethod("executable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("exist?", callbackFactory.getFastSingletonMethod("exist_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("exists?", callbackFactory.getFastSingletonMethod("exist_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("readable?", callbackFactory.getFastSingletonMethod("readable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("readable_real?", callbackFactory.getFastSingletonMethod("readable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("size", callbackFactory.getFastSingletonMethod("size", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("writable?", callbackFactory.getFastSingletonMethod("writable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("writable_real?", callbackFactory.getFastSingletonMethod("writable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastModuleFunction("zero?", callbackFactory.getFastSingletonMethod("zero_p", RubyKernel.IRUBY_OBJECT));
         
-        fileTestModule.defineMethod("file?", callbackFactory.getSingletonMethod("file_p", RubyString.class));
-        fileTestModule.defineMethod("directory?", callbackFactory.getSingletonMethod("directory_p", RubyString.class));
-        fileTestModule.defineMethod("exist?", callbackFactory.getSingletonMethod("exist_p", RubyString.class));
-        fileTestModule.defineMethod("exists?", callbackFactory.getSingletonMethod("exist_p", RubyString.class));
-        fileTestModule.defineMethod("readable?", callbackFactory.getSingletonMethod("readable_p", RubyString.class));
-        fileTestModule.defineMethod("readable_real?", callbackFactory.getSingletonMethod("readable_p", RubyString.class));
-        fileTestModule.defineMethod("size", callbackFactory.getSingletonMethod("size", RubyString.class));
-        fileTestModule.defineMethod("writable?", callbackFactory.getSingletonMethod("writable_p", RubyString.class));
-        fileTestModule.defineMethod("writable_real?", callbackFactory.getSingletonMethod("writable_p", RubyString.class));
-        fileTestModule.defineMethod("zero?", callbackFactory.getSingletonMethod("zero_p", RubyString.class));
+        fileTestModule.defineFastMethod("file?", callbackFactory.getFastSingletonMethod("file_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("directory?", callbackFactory.getFastSingletonMethod("directory_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("executable?", callbackFactory.getFastSingletonMethod("executable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("exist?", callbackFactory.getFastSingletonMethod("exist_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("exists?", callbackFactory.getFastSingletonMethod("exist_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("readable?", callbackFactory.getFastSingletonMethod("readable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("readable_real?", callbackFactory.getFastSingletonMethod("readable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("size", callbackFactory.getFastSingletonMethod("size", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("writable?", callbackFactory.getFastSingletonMethod("writable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("writable_real?", callbackFactory.getFastSingletonMethod("writable_p", RubyKernel.IRUBY_OBJECT));
+        fileTestModule.defineFastMethod("zero?", callbackFactory.getFastSingletonMethod("zero_p", RubyKernel.IRUBY_OBJECT));
         
         return fileTestModule;
     }
     
-    public static RubyBoolean directory_p(IRubyObject recv, RubyString filename) {
+    public static RubyBoolean directory_p(IRubyObject recv, IRubyObject filename) {
         return recv.getRuntime().newBoolean(newFile(filename).isDirectory());
     }
     
-    public static IRubyObject exist_p(IRubyObject recv, RubyString filename) {
+    public static IRubyObject exist_p(IRubyObject recv, IRubyObject filename) {
         return recv.getRuntime().newBoolean(newFile(filename).exists());
     }
 
     // We do both readable and readable_real through the same method because
     // in our java process effective and real userid will always be the same.
-    public static RubyBoolean readable_p(IRubyObject recv, RubyString filename) {
+    public static RubyBoolean readable_p(IRubyObject recv, IRubyObject filename) {
         return filename.getRuntime().newBoolean(newFile(filename).canRead());
     }
+
+    public static IRubyObject executable_p(IRubyObject recv, IRubyObject filename) {
+        recv.getRuntime().getWarnings().warn("executable? does not work on JRuby and will return a dummy value");
+        return exist_p(recv, filename);
+    }
     
-    public static IRubyObject size(IRubyObject recv, RubyString filename) {
+    public static IRubyObject size(IRubyObject recv, IRubyObject filename) {
         JRubyFile file = newFile(filename);
         
         if (!file.exists()) {
@@ -89,23 +96,23 @@ public class RubyFileTest {
     
     // We do both writable and writable_real through the same method because
     // in our java process effective and real userid will always be the same.
-    public static RubyBoolean writable_p(IRubyObject recv, RubyString filename) {
+    public static RubyBoolean writable_p(IRubyObject recv, IRubyObject filename) {
         return filename.getRuntime().newBoolean(newFile(filename).canWrite());
     }
     
-    public static RubyBoolean zero_p(IRubyObject recv, RubyString filename) {
+    public static RubyBoolean zero_p(IRubyObject recv, IRubyObject filename) {
         JRubyFile file = newFile(filename);
         
         return filename.getRuntime().newBoolean(file.exists() && file.length() == 0L);
     }
 
-    public static RubyBoolean file_p(IRubyObject recv, RubyString filename) {
+    public static RubyBoolean file_p(IRubyObject recv, IRubyObject filename) {
         JRubyFile file = newFile(filename);
         
         return filename.getRuntime().newBoolean(file.isFile());
     }
     
-    private static JRubyFile newFile(RubyString path) {
-        return JRubyFile.create(path.getRuntime().getCurrentDirectory(), path.toString());
+    private static JRubyFile newFile(IRubyObject path) {
+        return JRubyFile.create(path.getRuntime().getCurrentDirectory(), path.convertToString().toString());
     }
 }

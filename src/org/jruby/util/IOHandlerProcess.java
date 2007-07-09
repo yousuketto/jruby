@@ -30,13 +30,12 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.util;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyIO;
 
 public class IOHandlerProcess extends IOHandlerJavaIO {
@@ -44,20 +43,21 @@ public class IOHandlerProcess extends IOHandlerJavaIO {
     protected OutputStream output = null;
     protected Process process = null;
 
-    public IOHandlerProcess(IRuby runtime, Process process, IOModes modes) throws IOException {
+    public IOHandlerProcess(Ruby runtime, Process process, IOModes modes) throws IOException {
         super(runtime);
         
         if (process == null) {
         	throw new IOException("Null process");
         }
-        
+
         this.process = process;
-        this.input = new BufferedInputStream(process.getInputStream());
+        this.input = process.getInputStream();
         this.output = process.getOutputStream();
         
         isOpen = true;
 
         this.modes = modes;
+        this.isSync = true;
         fileno = RubyIO.getNewFileno();
     }
     
@@ -84,6 +84,7 @@ public class IOHandlerProcess extends IOHandlerJavaIO {
         output.close();
         
         // TODO: to destroy or not destroy the process?
+        process.destroy();
         process = null;
     }
 
@@ -177,27 +178,47 @@ public class IOHandlerProcess extends IOHandlerJavaIO {
         return input.read();
     }
 
+    public ByteList sysread(int number) throws IOException, BadDescriptorException {
+        checkReadable();
+        byte[] buf = new byte[number];
+        int read = 0;
+        int n;
+        while(read < number) {
+            n = input.read(buf,read,number-read);
+            if(n == -1) {
+                if(read == 0) {
+                    throw new java.io.EOFException();
+                } else {
+                    break;
+                }
+            }
+            read += n;
+        }
+        
+        return new ByteList(buf, 0, read, false);
+    }
+
     /**
      * @throws IOException 
      * @throws BadDescriptorException 
      * @see org.jruby.util.IOHandler#syswrite(String buf)
      */
-    public int syswrite(String buf) throws IOException, BadDescriptorException {
+    public int syswrite(ByteList buf) throws IOException, BadDescriptorException {
         getRuntime().secure(4);
         checkWriteable();
         
-        if (buf == null || buf.length() == 0) {
+        if (buf == null || buf.realSize == 0) {
             return 0;
         }
         
-        output.write(buf.getBytes("ISO8859_1"));
+        output.write(buf.bytes, buf.begin, buf.realSize);
 
         // Should syswrite sync?
         if (isSync) {
             sync();
         }
             
-        return buf.length();
+        return buf.realSize;
     }
 
     /**

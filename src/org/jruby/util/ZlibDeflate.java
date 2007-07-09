@@ -34,13 +34,16 @@ import java.io.UnsupportedEncodingException;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
+import org.jruby.RubyString;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class ZlibDeflate {
     private Deflater flater;
-    private StringBuffer collected;
-    private IRuby runtime;
+    private ByteList collected;
+    private Ruby runtime;
+
+    public static final int BASE_SIZE = 100;
 
     public final static int DEF_MEM_LEVEL = 8;
     public final static int MAX_MEM_LEVEL = 9;
@@ -54,26 +57,29 @@ public class ZlibDeflate {
 
     public ZlibDeflate(IRubyObject caller, int level, int win_bits, int memlevel, int strategy) {
         super();
-        flater = new Deflater(level);
+        flater = new Deflater(level,false);
         flater.setStrategy(strategy);
-        collected = new StringBuffer();
+        collected = new ByteList(BASE_SIZE);
         runtime = caller.getRuntime();
     }
 
-    public static IRubyObject s_deflate(IRubyObject caller, String str, int level) 
-    	throws UnsupportedEncodingException, DataFormatException, IOException {
+    public static IRubyObject s_deflate(IRubyObject caller, ByteList str, int level) 
+    	throws DataFormatException, IOException {
         ZlibDeflate zstream = new ZlibDeflate(caller, level, MAX_WBITS, DEF_MEM_LEVEL, Deflater.DEFAULT_STRATEGY);
-        IRubyObject result = zstream.deflate(str, new Long(FINISH));
+        IRubyObject result = zstream.deflate(str, FINISH);
         zstream.close();
-        
         return result;
     }
 
-    public void append(IRubyObject obj) throws IOException, UnsupportedEncodingException {
-        append(obj.convertToString().toString());
+    public Deflater getDeflater() {
+        return flater;
     }
 
-    public void append(String obj) throws IOException, UnsupportedEncodingException {
+    public void append(IRubyObject obj) throws IOException, UnsupportedEncodingException {
+        append(obj.convertToString().getByteList());
+    }
+
+    public void append(ByteList obj) throws IOException {
         collected.append(obj);
     }
 
@@ -83,56 +89,39 @@ public class ZlibDeflate {
     }
 
     public IRubyObject set_dictionary(IRubyObject str) throws UnsupportedEncodingException {
-        flater.setDictionary(str.convertToString().toString().getBytes("ISO8859_1"));
-        
+        flater.setDictionary(str.convertToString().getBytes());
         return str;
     }
 
-    public IRubyObject flush(Long flush) throws IOException {
-        return deflate("", flush);
+    public IRubyObject flush(int flush) throws IOException {
+        return deflate(new ByteList(0), flush);
     }
 
-    public IRubyObject deflate(String str, Long flush_x) throws IOException {
-        int flush = flush_x.intValue();
-        
+    public IRubyObject deflate(ByteList str, int flush) throws IOException {
         if (null == str) {
-            StringBuffer result = new StringBuffer();
-            byte[] outp = new byte[1024];
-            byte[] buf = collected.toString().getBytes("ISO8859_1");
-            collected = new StringBuffer();
-            flater.setInput(buf);
-            flater.finish();
-            int resultLength = -1;
-            while (!flater.finished() && resultLength != 0) {
-                resultLength = flater.deflate(outp);
-                result.append(new String(outp, 0, resultLength,"ISO-8859-1"));
-            }
-            
-            return runtime.newString(result.toString());       
+            return finish();
         } else {
             append(str);
             if (flush == FINISH) {
-                StringBuffer result = new StringBuffer();
-                byte[] outp = new byte[1024];
-                byte[] buf = collected.toString().getBytes("ISO8859_1");
-                collected = new StringBuffer();
-                flater.setInput(buf);
-                flater.finish();
-                int resultLength = -1;
-                while (!flater.finished() && resultLength != 0) {
-                    resultLength = flater.deflate(outp);
-                    result.append(new String(outp, 0, resultLength,"ISO-8859-1"));
-                }
-                
-                return runtime.newString(result.toString());
+                return finish();
             }
-            
-            return runtime.getNil();
+            return runtime.newString("");
         }
     }
     
-    public void finish() {
+    public IRubyObject finish() throws IOException {
+        ByteList result = new ByteList(collected.realSize);
+        byte[] outp = new byte[1024];
+        ByteList buf = collected;
+        collected = new ByteList(BASE_SIZE);
+        flater.setInput(buf.bytes, buf.begin, buf.realSize);
         flater.finish();
+        int resultLength = -1;
+        while (!flater.finished() && resultLength != 0) {
+            resultLength = flater.deflate(outp);
+            result.append(outp, 0, resultLength);
+        }
+        return RubyString.newString(runtime, result);
     }
     
     public void close() {

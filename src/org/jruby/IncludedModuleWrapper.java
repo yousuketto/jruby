@@ -12,7 +12,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2002-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2006 Miguel Covarrubias <mlcovarrubias@gmail.com>
  * 
@@ -47,10 +47,11 @@ import java.util.Map;
 public final class IncludedModuleWrapper extends RubyClass {
     private RubyModule delegate;
 
-    public IncludedModuleWrapper(IRuby runtime, RubyClass superClass, RubyModule delegate) {
-        super(runtime, superClass);
-
+    public IncludedModuleWrapper(Ruby runtime, RubyClass superClass, RubyModule delegate) {
+        super(runtime, superClass, null, false);
+        // FIXME: The null makes me nervous, but it makes sense that an included wrapper would never have an allocator
         this.delegate = delegate;
+        this.metaClass = delegate.metaClass;
     }
 
     /**
@@ -81,10 +82,14 @@ public final class IncludedModuleWrapper extends RubyClass {
     public boolean isIncluded() {
         return true;
     }
-
-    public RubyClass getMetaClass() {
-		return delegate.getMetaClass();
+    
+    public boolean isImmediate() {
+        return true;
     }
+
+//    public RubyClass getMetaClass() {
+//		return delegate.getMetaClass();
+//    }
 
     public void setMetaClass(RubyClass newRubyClass) {
         throw new UnsupportedOperationException("An included class is only a wrapper for a module");

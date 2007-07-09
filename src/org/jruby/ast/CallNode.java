@@ -38,24 +38,34 @@ import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.runtime.MethodIndex;
 
 /**
  * A method or operator call.
  * 
  * @author  jpetersen
  */
-public final class CallNode extends Node implements INameNode {
+public final class CallNode extends Node implements INameNode, IArgumentNode, BlockAcceptingNode {
     static final long serialVersionUID = -1993752395320088525L;
 
     private final Node receiverNode;
     private String name;
-    private final Node argsNode;
+    private Node argsNode;
+    private Node iterNode;
+    public final int index;
 
     public CallNode(ISourcePosition position, Node receiverNode, String name, Node argsNode) {
+        this(position, receiverNode, name, argsNode, null);
+    }
+    
+    public CallNode(ISourcePosition position, Node receiverNode, String name, Node argsNode, 
+            Node iterNode) {
         super(position, NodeTypes.CALLNODE);
         this.receiverNode = receiverNode;
         this.name = name.intern();
-        this.argsNode = argsNode;
+        setArgsNode(argsNode);
+        this.iterNode = iterNode;
+        this.index = MethodIndex.getIndex(this.name);
     }
     
     private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
@@ -72,14 +82,34 @@ public final class CallNode extends Node implements INameNode {
     public Instruction accept(NodeVisitor iVisitor) {
         return iVisitor.visitCallNode(this);
     }
+    
+    public Node getIterNode() {
+        return iterNode;
+    }
+    
+    public void setIterNode(Node iterNode) {
+        this.iterNode = iterNode;
+    }
 
     /**
-     * Gets the argsNode.
-	 * argsNode representing the method's arguments' value for this call.
+     * Gets the argsNode representing the method's arguments' value for this call.
      * @return argsNode
      */
     public Node getArgsNode() {
         return argsNode;
+    }
+
+    /**
+     * Set the argsNode
+     * 
+     * @param argsNode set the arguments for this node.
+     */
+    public void setArgsNode(Node argsNode) {
+        this.argsNode = argsNode;
+        // If we have more than one arg, make sure the array created to contain them is not ObjectSpaced
+        if (argsNode instanceof ArrayNode) {
+            ((ArrayNode)argsNode).setLightweight(true);
+        }
     }
 
     /**
@@ -101,6 +131,10 @@ public final class CallNode extends Node implements INameNode {
     }
     
     public List childNodes() {
-        return Node.createList(receiverNode, argsNode);
+        return Node.createList(receiverNode, argsNode, iterNode);
+    }
+    
+    public String toString() {
+        return "CallNode: " + getName();
     }
 }

@@ -36,7 +36,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 
 /**
  */
@@ -47,15 +47,17 @@ public abstract class IOHandler {
     
     // We use a highly uncommon string to represent the paragraph delimeter. 
     // The 100% solution is not really worth the extra code.
-    public static final String PARAGRAPH_DELIMETER = "PARAGRPH_DELIM_MRK_ER";
+    // CON: I used getBytes here to avoid the exception-handling hassle and because
+    // these bytes should be the same in almost all encodings.
+    public static final ByteList PARAGRAPH_DELIMETER = ByteList.create("PARAGRPH_DELIM_MRK_ER");
     
-    private IRuby runtime;
+    private Ruby runtime;
     protected IOModes modes;
     protected int fileno;
     protected boolean isOpen = false;
     protected boolean isSync = false;
     
-    protected IOHandler(IRuby runtime) {
+    protected IOHandler(Ruby runtime) {
         this.runtime = runtime;
     }
 
@@ -67,7 +69,7 @@ public abstract class IOHandler {
         this.fileno = fileno;
     }
 
-    protected IRuby getRuntime() {
+    protected Ruby getRuntime() {
         return runtime;
     }
     
@@ -137,22 +139,22 @@ public abstract class IOHandler {
         resetByModes(subsetModes);
     }
 
-    public abstract String gets(String separatorString) throws IOException, BadDescriptorException, EOFException;
-    public abstract String getsEntireStream() throws IOException, BadDescriptorException, EOFException;
+    public abstract ByteList gets(ByteList separatorString) throws IOException, BadDescriptorException, EOFException;
+    public abstract ByteList getsEntireStream() throws IOException, BadDescriptorException, EOFException;
 
     // TODO: We overflow on large files...We could increase to long to limit
     // this, but then the impl gets more involved since java io APIs based on
     // int (means we have to chunk up a long into a series of int ops).
 
-    public abstract String read(int number) throws IOException, BadDescriptorException, EOFException;
-    public abstract int write(String string) throws IOException, BadDescriptorException;
+    public abstract ByteList read(int number) throws IOException, BadDescriptorException, EOFException;
+    public abstract int write(ByteList string) throws IOException, BadDescriptorException;
 
     public abstract int getc() throws IOException, BadDescriptorException, EOFException;
     public abstract void ungetc(int c);
     public abstract void putc(int c) throws IOException, BadDescriptorException;
     
-    public abstract String sysread(int number) throws IOException, BadDescriptorException, EOFException;
-    public abstract int syswrite(String buf) throws IOException, BadDescriptorException;
+    public abstract ByteList sysread(int number) throws IOException, BadDescriptorException, EOFException;
+    public abstract int syswrite(ByteList buf) throws IOException, BadDescriptorException;
     public abstract int syswrite(int ch) throws IOException, BadDescriptorException;
     
     public abstract IOHandler cloneIOHandler() throws IOException, PipeException, InvalidValueException;
@@ -202,6 +204,28 @@ public abstract class IOHandler {
      */
     public abstract void seek(long offset, int type) throws IOException, PipeException, InvalidValueException;
     public abstract void truncate(long newLength) throws IOException, PipeException;
+    
+    /**
+     * Implement IO#ready? as per io/wait in MRI.
+     * returns non-nil if input available without blocking, or nil.
+     */
+    public abstract int ready() throws IOException;
+
+    /**
+     * Implement IO#wait as per io/wait in MRI.
+     * waits until input available or timed out and returns self, or nil when EOF reached.
+     *
+     * The default implementation loops while ready returns 0.
+     */
+    public void waitUntilReady() throws IOException, InterruptedException {
+        while (ready() == 0) {
+            Thread.sleep(10);
+        }
+    }
+
+    public boolean hasPendingBuffered() {
+        return false;
+    }
     
     public class PipeException extends Exception {
 		private static final long serialVersionUID = 1L;

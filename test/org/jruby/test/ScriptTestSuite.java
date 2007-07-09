@@ -40,11 +40,9 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import org.jruby.IRuby;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyString;
-import org.jruby.runtime.builtin.IRubyObject;
 
 /**
  * @author Anders
@@ -52,7 +50,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class ScriptTestSuite extends TestSuite {
 
     private static final String TEST_DIR = "test";
-    private static final String TEST_INDEX = "test" + File.separator + "test_index";
+    private static final String TEST_INDEX = "test_index";
 
     public ScriptTestSuite(String name) {
         super(name);
@@ -61,7 +59,14 @@ public class ScriptTestSuite extends TestSuite {
     public static Test suite() throws java.io.IOException {
         TestSuite suite = new TestSuite();
 
-        File testIndex = new File("test/test_index");
+        File testDir;
+        if (System.getProperty("basedir") != null) {
+            testDir = new File(System.getProperty("basedir"), "target/test-classes/" + TEST_DIR);
+        } else {
+            testDir = new File(TEST_DIR);
+        }
+
+        File testIndex = new File(testDir, TEST_INDEX);
 
         if (! testIndex.canRead()) {
             // Since we don't have any other error reporting mechanism, we
@@ -84,63 +89,50 @@ public class ScriptTestSuite extends TestSuite {
             
             // Ensure we have a new interpreter for each test. Previous we were using the
             //  same interpreter which caused problems as soon as one test failed.
-            IRuby runtime = setupInterpreter();
+            Ruby runtime = setupInterpreter();
             
-            suite.addTest(new ScriptTest(runtime, line));
+            suite.addTest(new ScriptTest(runtime, testDir, line));
         }
 
         return suite;
     }
 
-    private static IRuby setupInterpreter() {
-        IRuby runtime = Ruby.getDefaultInstance();
+    private static Ruby setupInterpreter() {
+        Ruby runtime = Ruby.getDefaultInstance();
         
         runtime.getLoadService().init(new ArrayList());
         
         return runtime;
     }
 
-
-    private static class FailingTest extends TestCase {
-        private final String message;
-
-        public FailingTest(String name, String message) {
-            super(name);
-            this.message = message;
-        }
-
-        public void runTest() throws Throwable {
-            fail(message);
-        }
-    }
-
-
     private static class ScriptTest extends TestCase {
-        private final IRuby runtime;
+        private final Ruby runtime;
+        private final File testDir;
         private final String filename;
 
-        public ScriptTest(IRuby runtime, String filename) {
+        public ScriptTest(Ruby runtime, File testDir, String filename) {
             super(filename);
             this.runtime = runtime;
+            this.testDir = testDir;
             this.filename = filename;
         }
 
-		private String scriptName() {
-			return new File(TEST_DIR + File.separator + filename).getPath();
-		}
+        private String scriptName() {
+            return new File(testDir, filename).getPath();
+        }
 
         public void runTest() throws Throwable {
-        	StringBuffer script = new StringBuffer();
-        	
-        	script.append("require 'test/minirunit'").append('\n');
-        	script.append("$silentTests = true").append('\n');
-        	script.append("test_load('").append(scriptName()).append("')").append('\n');
+            StringBuffer script = new StringBuffer();
+            
+            script.append("require 'test/minirunit'").append('\n');
+            script.append("$silentTests = true").append('\n');
+            script.append("test_load('").append(scriptName()).append("')").append('\n');
             script.append("$failed").append('\n');
 
             RubyArray lastFailed = (RubyArray)runtime.evalScript(script.toString());
             
             if (!lastFailed.isEmpty()) {
-				RubyString message = (RubyString) lastFailed.callMethod("to_s");
+                RubyString message = (RubyString) lastFailed.callMethod(lastFailed.getRuntime().getCurrentContext(), "to_s");
                 fail(scriptName() + " failed, complete failure list follows:\n" + message.toString());
             }
 

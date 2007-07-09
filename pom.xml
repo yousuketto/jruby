@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.jruby</groupId>
-  <artifactId>jruby</artifactId>
-  <packaging>jar</packaging>
-  <version>0.9.1-SNAPSHOT</version>
-  <name>JRuby</name>
+  <artifactId>shared</artifactId>
+  <packaging>pom</packaging>
+  <version>1.1-SNAPSHOT</version>
+  <name>JRuby Shared</name>
   <url>http://www.jruby.org/</url>
-  <description>A 1.8.2 compatible Ruby interpreter written in 100% pure Java</description>
+  <description>A 1.8.5 compatible Ruby interpreter written in 100% pure Java</description>
 
   <issueManagement>
     <system>JIRA</system>
@@ -16,9 +16,9 @@
   </issueManagement>
 
   <scm>
-    <connection>scm:svn:http://svn.codehaus.org/jruby/trunk/jruby/</connection>
-    <developerConnection>scm:svn:https://svn.codehaus.org/jruby/trunk/jruby/</developerConnection>
-    <url>http://svn.codehaus.org/jruby/trunk/jruby/</url>
+    <connection>scm:svn:http://svn.codehaus.org/jruby</connection>
+    <developerConnection>scm:svn:https://svn.codehaus.org/jruby</developerConnection>
+    <url>http://svn.codehaus.org/jruby</url>
   </scm>
 
   <licenses>
@@ -42,29 +42,39 @@
     <repository>
       <id>codehaus-jruby-repository</id>
       <name>JRuby Central Repository</name>
-      <url>dav:https://dav.codehaus.org/repository/jruby/</url>
+      <url>dav:https://dav.codehaus.org/repository/jruby</url>
     </repository>
     <snapshotRepository>
       <id>codehaus-jruby-snapshot-repository</id>
       <name>JRuby Central Development Repository</name>
-      <url>dav:https://dav.codehaus.org/snapshots.repository/jruby/</url>
+      <url>dav:https://dav.codehaus.org/snapshots.repository/jruby</url>
     </snapshotRepository>
     <site>
       <id>codehaus-jruby-site</id>
       <name>JRuby Maven site</name>
-      <url>dav:https://dav.codehaus.org/jruby/info/</url>
+      <url>dav:https://dav.codehaus.org/jruby/info</url>
     </site>
   </distributionManagement>
   <developers>
     <developer>
       <id>headius</id>
       <name>Charles Nutter</name>
-      <email>headius@headius.com</email>
+      <email>charles.o.nutter@sun.com</email>
     </developer>
     <developer>
       <id>enebo</id>
       <name>Thomas Enebo</name>
       <email>enebo@acm.org</email>
+    </developer>
+    <developer>
+      <id>olabini</id>
+      <name>Ola Bini</name>
+      <email>ola.bini@ki.se</email>
+    </developer>
+    <developer>
+      <id>nsieger</id>
+      <name>Nick Sieger</name>
+      <email>nicksieger@gmail.com</email>
     </developer>
   </developers>
 
@@ -79,6 +89,7 @@
       <groupId>bsf</groupId>
       <artifactId>bsf</artifactId>
       <version>2.3.0</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>ant</groupId>
@@ -86,116 +97,153 @@
       <version>1.5</version>
       <scope>provided</scope>
     </dependency>
-    <dependency>
-      <groupId>jvyaml</groupId>
-      <artifactId>jvyaml</artifactId>
-      <version>1.0</version>
-      <scope>system</scope>
-      <systemPath>${basedir}/lib/jvyaml.jar</systemPath>
-    </dependency>
-    <dependency>
-      <groupId>asm</groupId>
-      <artifactId>asm</artifactId>
-      <version>2.2.2</version>
-      <scope>system</scope>
-      <systemPath>${basedir}/lib/asm-2.2.2.jar</systemPath>
-    </dependency>                                                                                                                                                          
   </dependencies>
 
+  <modules>
+    <!-- <module>maven/jruby-jdk14</module> -->
+    <module>maven/jruby</module>
+    <module>maven/jruby-complete</module>
+    <module>maven/jruby-rake-plugin</module>
+  </modules>
+
   <build>
+    <defaultGoal>install</defaultGoal>
     <extensions>
       <extension>
         <groupId>org.apache.maven.wagon</groupId>
         <artifactId>wagon-webdav</artifactId>
-        <version>1.0-beta-1</version>
       </extension>
     </extensions>
-    <sourceDirectory>src</sourceDirectory>
-    <testSourceDirectory>test</testSourceDirectory>
-    <outputDirectory>build/classes</outputDirectory>
-    <testOutputDirectory>build/test-classes</testOutputDirectory>
-    <directory>build</directory>
-    <resources>
-      <resource>
-        <directory>src</directory>
-        <includes>
-          <include>**/*.rb</include>
-          <include>**/*.properties</include>
-        </includes>
-      </resource>
-    </resources>
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>1.4</source>
-          <target>1.4</target>
-        </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>process-classes</phase>
-            <configuration>
-              <tasks>
-                <unjar src="${basedir}/lib/plaincharset.jar" dest="${project.build.outputDirectory}"/>
-                <unjar src="${basedir}/lib/jvyaml.jar" dest="${project.build.outputDirectory}"/>
-                <delete file="${project.build.outputDirectory}/META-INF/MANIFEST.MF"/>
-                <taskdef name="jruby-serialize" classname="org.jruby.util.ant.JRubySerialize">
-                  <classpath path="${project.build.outputDirectory}"/>
-                </taskdef>
-                <jruby-serialize destdir="${project.build.outputDirectory}">
-                  <fileset dir="${project.build.sourceDirectory}">
-                    <include name="**/*.rb"/>
-                  </fileset>
-                </jruby-serialize>
-              </tasks>
-            </configuration>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
           <archive>
             <manifest>
-              <mainClass>org.jruby.Main</mainClass>
-              <packageName>org.jruby</packageName>
+              <mainClass>${jruby.main.class}</mainClass>
+              <packageName>${jruby.package}</packageName>
             </manifest>
           </archive>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <!-- surefire not working yet -->
-          <skip>true</skip>
-          <includes>
-            <include>org/jruby/test/MainTestSuite.java</include>
-          </includes>
-          <systemProperties>
-            <property>
-              <name>jruby.base</name>
-              <value>${basedir}</value>
-            </property>
-            <property>
-              <name>jruby.home</name>
-              <value>${basedir}</value>
-            </property>
-            <property>
-              <name>jruby.lib</name>
-              <value>${basedir}/lib</value>
-            </property>
-          </systemProperties>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>jruby</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <build>
+        <resources>
+          <resource>
+            <directory>${project.basedir}/../../src</directory>
+            <includes>
+              <include>**/*.rb</include>
+            </includes>
+          </resource>
+        </resources>
+        <testResources>
+          <testResource>
+            <directory>${project.basedir}/../..</directory>
+            <includes>
+              <include>build.xml</include>
+              <include>test/**/*.rb</include>
+              <include>test/**/*.txt</include>
+              <include>test/test_index</include>
+              <include>test/test_unit_index</include>
+              <include>test/RubyInitTest.jar</include>
+              <include>test/requireTarget.jar</include>
+            </includes>
+          </testResource>
+          <testResource>
+            <directory>${project.basedir}/../../test</directory>
+            <includes>
+              <include>org/jruby/**/*.rb</include>
+            </includes>
+          </testResource>
+        </testResources>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <source>${javac.version}</source>
+              <target>${javac.version}</target>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>filter-jruby-properties</id>
+                <phase>process-resources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <tasks>
+                    <tstamp><format property="build.date" pattern="yyyy-MM-dd"/></tstamp>
+                    <copy todir="${project.build.outputDirectory}" overwrite="true" failonerror="false">
+                      <fileset dir="${project.build.sourceDirectory}">
+                        <include name="**/*.properties"/>
+                      </fileset>
+                      <filterset>
+                        <filter token="os.arch" value="${os.arch}"/>
+                        <filter token="java.specification.version" value="${java.specification.version}"/>
+                        <filter token="javac.version" value="${javac.version}"/>
+                        <filter token="build.date" value="${build.date}"/>
+                      </filterset>
+                    </copy>
+                  </tasks>
+                </configuration>
+              </execution>
+            </executions>
+            <dependencies>
+              <dependency>
+                <groupId>ant</groupId>
+                <artifactId>ant-junit</artifactId>
+                <version>1.6.5</version>
+              </dependency>
+              <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>3.8.1</version>
+              </dependency>
+            </dependencies>
+          </plugin>
+        </plugins>
+      </build>
+      <properties>
+        <jruby.package>org.jruby</jruby.package>
+        <jruby.main.class>org.jruby.Main</jruby.main.class>
+        <javac.version>${java.specification.version}</javac.version>
+        <os.arch>${os.arch}</os.arch>
+        <java.specification.version>${java.specification.version}</java.specification.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>jruby-release</id>
+      <activation>
+        <property>
+          <name>performRelease</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <properties>
+        <javac.version>1.4</javac.version>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <source>1.4</source>
+              <target>1.4</target>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

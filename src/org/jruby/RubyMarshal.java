@@ -13,7 +13,7 @@
  *
  * Copyright (C) 2002 Benoit Cerrina <b.cerrina@wanadoo.fr>
  * Copyright (C) 2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
- * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
+ * Copyright (C) 2002-2007 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2003 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004-2005 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
@@ -39,10 +39,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.Constants;
+import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
+
+import org.jruby.util.ByteList;
+import org.jruby.util.IOInputStream;
+import org.jruby.util.IOOutputStream;
 
 /**
  * Marshal module
@@ -51,31 +58,35 @@ import org.jruby.runtime.marshal.UnmarshalStream;
  */
 public class RubyMarshal {
 
-    public static RubyModule createMarshalModule(IRuby runtime) {
+    public static RubyModule createMarshalModule(Ruby runtime) {
         RubyModule module = runtime.defineModule("Marshal");
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyMarshal.class);
 
-        module.defineSingletonMethod("dump", callbackFactory.getOptSingletonMethod("dump"));
-        module.defineSingletonMethod("load", callbackFactory.getOptSingletonMethod("load"));
-        module.defineSingletonMethod("restore", callbackFactory.getOptSingletonMethod("load"));
+        module.getSingletonClass().defineMethod("dump", callbackFactory.getOptSingletonMethod("dump"));
+        module.getSingletonClass().defineMethod("load", callbackFactory.getOptSingletonMethod("load"));
+        module.getSingletonClass().defineMethod("restore", callbackFactory.getOptSingletonMethod("load"));
+        module.defineConstant("MAJOR_VERSION", runtime.newFixnum(Constants.MARSHAL_MAJOR));
+        module.defineConstant("MINOR_VERSION", runtime.newFixnum(Constants.MARSHAL_MINOR));
 
         return module;
     }
 
-    public static IRubyObject dump(IRubyObject recv, IRubyObject[] args) {
+    public static IRubyObject dump(IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
         if (args.length < 1) {
             throw recv.getRuntime().newArgumentError("wrong # of arguments(at least 1)");
         }
         IRubyObject objectToDump = args[0];
 
-        RubyIO io = null;
+        IRubyObject io = null;
         int depthLimit = -1;
 
         if (args.length >= 2) {
-            if (args[1] instanceof RubyIO) {
-                io = (RubyIO) args[1];
+            if (args[1].respondsTo("write")) {
+                io = args[1];
             } else if (args[1] instanceof RubyFixnum) {
                 depthLimit = (int) ((RubyFixnum) args[1]).getLongValue();
+            } else {
+                throw recv.getRuntime().newTypeError("Instance of IO needed");
             }
             if (args.length == 3) {
                 depthLimit = (int) ((RubyFixnum) args[2]).getLongValue();
@@ -84,12 +95,13 @@ public class RubyMarshal {
 
         try {
             if (io != null) {
-                dumpToStream(objectToDump, io.getOutStream(), depthLimit);
+                dumpToStream(objectToDump, outputStream(io), depthLimit);
                 return io;
             }
 			ByteArrayOutputStream stringOutput = new ByteArrayOutputStream();
 			dumpToStream(objectToDump, stringOutput, depthLimit);
-			return RubyString.newString(recv.getRuntime(), stringOutput.toByteArray());
+
+            return RubyString.newString(recv.getRuntime(), new ByteList(stringOutput.toByteArray(),false));
 
         } catch (IOException ioe) {
             throw recv.getRuntime().newIOErrorFromException(ioe);
@@ -97,7 +109,21 @@ public class RubyMarshal {
 
     }
 
-    public static IRubyObject load(IRubyObject recv, IRubyObject[] args) {
+    private static OutputStream outputStream(IRubyObject out) {
+        setBinmodeIfPossible(out);
+        if (out instanceof RubyIO) {
+            return ((RubyIO) out).getOutStream();
+        }
+        return new IOOutputStream(out);
+    }
+
+    private static void setBinmodeIfPossible(IRubyObject io) {
+        if (io.respondsTo("binmode")) {
+            io.callMethod(io.getRuntime().getCurrentContext(), "binmode");
+        }
+    }
+
+    public static IRubyObject load(IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
         try {
             if (args.length < 1) {
                 throw recv.getRuntime().newArgumentError("wrong number of arguments (0 for 1)");
@@ -118,24 +144,33 @@ public class RubyMarshal {
             }
 
             InputStream rawInput;
-            if (in instanceof RubyIO) {
-                rawInput = ((RubyIO) in).getInStream();
-            } else if (in.respondsTo("to_str")) {
-                RubyString inString = (RubyString) in.callMethod("to_str");
-                rawInput = new ByteArrayInputStream(inString.toByteArray());
+            if (in != null && in.respondsTo("read")) {
+                rawInput = inputStream(in);
+            } else if (in != null && in.respondsTo("to_str")) {
+                RubyString inString = (RubyString) in.callMethod(recv.getRuntime().getCurrentContext(), MethodIndex.TO_STR, "to_str", IRubyObject.NULL_ARRAY);
+                ByteList bytes = inString.getByteList();
+                rawInput = new ByteArrayInputStream(bytes.unsafeBytes(), bytes.begin(), bytes.length());
             } else {
                 throw recv.getRuntime().newTypeError("instance of IO needed");
             }
             
-            UnmarshalStream input = new UnmarshalStream(recv.getRuntime(), rawInput);
+            UnmarshalStream input = new UnmarshalStream(recv.getRuntime(), rawInput, proc);
 
-            return input.unmarshalObject(proc);
+            return input.unmarshalObject();
 
         } catch (EOFException ee) {
             throw recv.getRuntime().newEOFError();
         } catch (IOException ioe) {
             throw recv.getRuntime().newIOErrorFromException(ioe);
         }
+    }
+
+    private static InputStream inputStream(IRubyObject in) {
+        setBinmodeIfPossible(in);
+        if (in instanceof RubyIO) {
+            return ((RubyIO) in).getInStream();
+        }
+        return new IOInputStream(in);
     }
 
     private static void dumpToStream(IRubyObject object, OutputStream rawOutput, int depthLimit)

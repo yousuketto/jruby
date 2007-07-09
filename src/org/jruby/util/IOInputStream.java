@@ -31,6 +31,7 @@ import java.io.InputStream;
 import java.io.IOException;
 
 import org.jruby.RubyFixnum;
+import org.jruby.RubyString;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -45,7 +46,6 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class IOInputStream extends InputStream {
     private IRubyObject io;
     private final IRubyObject numOne;
-    //private final IRubyObject packArg;
 
     /**
      * Creates a new InputStream with the object provided.
@@ -58,11 +58,10 @@ public class IOInputStream extends InputStream {
         }
         this.io = io;
         this.numOne = RubyFixnum.one(this.io.getRuntime());
-        //this.packArg = io.getRuntime().newString("C");
     }
     
     public int read() throws IOException {
-        IRubyObject readValue = io.callMethod("read", numOne);
+        IRubyObject readValue = io.callMethod(io.getRuntime().getCurrentContext(), "read", numOne);
         int returnValue = -1;
         if (!readValue.isNil()) {
             returnValue = readValue.toString().charAt(0);
@@ -71,23 +70,23 @@ public class IOInputStream extends InputStream {
     }
 
     public int read(byte[] b) throws IOException {
-        IRubyObject readValue = io.callMethod("read", this.io.getRuntime().newFixnum(b.length));
+        IRubyObject readValue = io.callMethod(io.getRuntime().getCurrentContext(), "read", this.io.getRuntime().newFixnum(b.length));
         int returnValue = -1;
         if (!readValue.isNil()) {
-            final String str = readValue.toString();
-            System.arraycopy(str.getBytes("ISO8859_1"),0,b,0,str.length());
-            returnValue = str.length();
+            ByteList str = ((RubyString)readValue).getByteList();
+            System.arraycopy(str.bytes, str.begin, b, 0, str.realSize);
+            returnValue = str.realSize;
         }
         return returnValue;
     }
 
     public int read(byte[] b, int off, int len) throws IOException {
-        IRubyObject readValue = io.callMethod("read", io.getRuntime().newFixnum(len));
+        IRubyObject readValue = io.callMethod(io.getRuntime().getCurrentContext(), "read", io.getRuntime().newFixnum(len));
         int returnValue = -1;
         if (!readValue.isNil()) {
-            String str = readValue.toString();
-            System.arraycopy(str.getBytes("ISO8859_1"),0,b,off,str.length());
-            returnValue = str.length();
+            ByteList str = ((RubyString)readValue).getByteList();
+            System.arraycopy(str.bytes, str.begin, b, off, str.realSize);
+            returnValue = str.realSize;
         }
         return returnValue;
      }

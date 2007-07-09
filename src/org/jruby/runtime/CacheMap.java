@@ -27,13 +27,14 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.WeakHashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
+import org.jruby.Ruby;
 
 import org.jruby.RubyModule;
+import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.util.WeakIdentityHashMap;
 
 /**
  * This class represents mappings between methods that have been cached and the classes which
@@ -51,43 +52,54 @@ import org.jruby.RubyModule;
  * call this is responsible for synchronization.
  */
 public class CacheMap {
-	Map mappings = new HashMap();
-
-	/**
-	 * Add another class to the list of classes which are caching the method.
-	 * 
-	 * @param method which is cached
-	 * @param module which is caching method
-	 */
-	public void add(ICallable method, RubyModule module) {
-		List classList = (List) mappings.get(method);
-		
-		if (classList == null) {
-			classList = new ArrayList();
-			mappings.put(method, classList);
-		}
-		
-		classList.add(module);
-	}
-	
-	/**
-	 * Remove all method caches associated with the provided method.  This signature
-	 * relies on having the methods valid name passed with it since the caching classes
-	 * store the cache by name.
-	 * 
-	 * @param name of the method to remove
-	 * @param method to remove all caches of
-	 */
-	public void remove(String name, ICallable method) {
-		List classList = (List) mappings.remove(method);
-		
-		// Removed method has never been used so it has not been cached
-		if (classList == null) {
-			return;
-		}
-		
-		for(Iterator iter = classList.iterator(); iter.hasNext();) {
-			((RubyModule) iter.next()).removeCachedMethod(name);
-		}
-	}
+	private final Map mappings = new WeakHashMap();
+    private final Ruby runtime;
+    
+    public CacheMap(Ruby runtime) {
+        this.runtime = runtime;
+    }
+    
+    /**
+     * Add another class to the list of classes which are caching the method.
+     *
+     * @param method which is cached
+     * @param module which is caching method
+     */
+    public void add(DynamicMethod method, RubyModule module) {
+        Map classList = (Map) mappings.get(method);
+        
+        if (classList == null) {
+            classList = new WeakIdentityHashMap();
+            mappings.put(method, classList);
+        }
+        
+        classList.put(module,null);
+    }
+    
+    /**
+     * Remove all method caches associated with the provided method.  This signature
+     * relies on having the methods valid name passed with it since the caching classes
+     * store the cache by name.
+     *
+     * @param name of the method to remove
+     * @param method to remove all caches of
+     */
+    public void remove(String name, DynamicMethod method) {
+        Map classList = (Map) mappings.remove(method);
+        
+        // Removed method has never been used so it has not been cached
+        if (classList == null) {
+            return;
+        }
+        for(Iterator iter = classList.keySet().iterator(); iter.hasNext();) {
+            RubyModule module = (RubyModule) iter.next();
+            if (module != null) {
+                module.removeCachedMethod(name);
+                
+                if (module.index != 0) {
+                    module.dispatcher.clearIndex(MethodIndex.getIndex(name));
+                }
+            }
+        }
+    }
 }

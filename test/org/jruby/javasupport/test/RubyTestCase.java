@@ -38,7 +38,6 @@ import java.net.URL;
 
 import junit.framework.TestCase;
 
-import org.jruby.IRuby;
 import org.jruby.Ruby;
 import org.jruby.RubyKernel;
 import org.jruby.javasupport.JavaUtil;
@@ -52,7 +51,7 @@ public class RubyTestCase extends TestCase {
         super(name);
     }
 
-    protected IRuby createRuby(URL url) throws IOException {
+    protected Ruby createRuby(URL url) throws IOException {
         if (url == null) {
             throw new NullPointerException("url was null");
         }
@@ -69,15 +68,15 @@ public class RubyTestCase extends TestCase {
         out.close();
 
         String filePath = f.getAbsolutePath();
-        IRuby runtime = Ruby.getDefaultInstance();
+        Ruby runtime = Ruby.getDefaultInstance();
         initRuby(runtime);
-        RubyKernel.require(runtime.getTopSelf(), runtime.newString(filePath));
+        RubyKernel.require(runtime.getTopSelf(), runtime.newString(filePath), null);
         f.delete();
         return runtime;
     }
 
     // Is there something built into JRuby to do this?
-    protected void initRuby(IRuby runtime) {
+    protected void initRuby(Ruby runtime) {
         IRubyObject empty =
             JavaUtil.convertJavaToRuby(
                 runtime,

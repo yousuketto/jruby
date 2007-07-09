@@ -30,8 +30,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
-import java.util.List;
-
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.evaluator.Instruction;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -40,11 +38,11 @@ import org.jruby.lexer.yacc.ISourcePosition;
  *
  * @author  jpetersen
  */
-public class PostExeNode extends Node {
+public class PostExeNode extends IterNode {
     static final long serialVersionUID = -2851659895226590014L;
 
-    public PostExeNode(ISourcePosition position) {
-        super(position, NodeTypes.POSTEXENODE);
+    public PostExeNode(ISourcePosition position, Node body) {
+        super(position, null, null, body, NodeTypes.POSTEXENODE);
     }
 
     /**
@@ -53,9 +51,5 @@ public class PostExeNode extends Node {
      **/
     public Instruction accept(NodeVisitor iVisitor) {
         return iVisitor.visitPostExeNode(this);
-    }
-    
-    public List childNodes() {
-        return EMPTY_LIST;
     }
 }

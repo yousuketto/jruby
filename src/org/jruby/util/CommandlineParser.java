@@ -35,11 +35,11 @@ package org.jruby.util;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,6 +52,7 @@ public class CommandlineParser {
 
     private ArrayList loadPaths = new ArrayList();
     private StringBuffer inlineScript = new StringBuffer();
+    private boolean hasInlineScript = false;
     private String scriptFileName = null;
     private ArrayList requiredLibraries = new ArrayList();
     private boolean benchmarking = false;
@@ -60,10 +61,17 @@ public class CommandlineParser {
     private boolean processLineEnds = false;
     private boolean split = false;
     private boolean verbose = false;
+    private boolean debug = false;
     private boolean showVersion = false;
+    private boolean endOfArguments = false;
     private String[] scriptArguments = null;
     private boolean shouldRunInterpreter = true;
+
     private boolean objectSpaceEnabled = true;
+    private boolean compilerEnabled = false;
+    private boolean yarv = false;
+    private boolean yarvCompile = false;
+    private KCode kcode = KCode.NONE;
 
     public int argumentIndex = 0;
     public int characterIndex = 0;
@@ -75,23 +83,27 @@ public class CommandlineParser {
     }
 
     private void processArguments() {
+
         while (argumentIndex < arguments.length && isInterpreterArgument(arguments[argumentIndex])) {
             processArgument();
             argumentIndex++;
         }
-        if (! hasInlineScript()) {
+
+        if (!hasInlineScript) {
             if (argumentIndex < arguments.length) {
                 setScriptFileName(arguments[argumentIndex]); //consume the file name
                 argumentIndex++;
             }
         }
+
+
         // Remaining arguments are for the script itself
         scriptArguments = new String[arguments.length - argumentIndex];
         System.arraycopy(arguments, argumentIndex, getScriptArguments(), 0, getScriptArguments().length);
     }
 
-    private static boolean isInterpreterArgument(String argument) {
-        return argument.charAt(0) == '-';
+    private boolean isInterpreterArgument(String argument) {
+        return argument.charAt(0) == '-' && !endOfArguments;
     }
 
     private void processArgument() {
@@ -103,7 +115,11 @@ public class CommandlineParser {
                     shouldRunInterpreter = false;
                     break;
                 case 'I' :
-                    loadPaths.add(grabValue(" -I must be followed by a directory name to add to lib path"));
+                    String s = grabValue(" -I must be followed by a directory name to add to lib path");
+                    String[] ls = s.split(java.io.File.pathSeparator);
+                    for(int i=0;i<ls.length;i++) {
+                        loadPaths.add(ls[i]);
+                    }
                     break FOR;
                 case 'r' :
                     requiredLibraries.add(grabValue("-r must be followed by a package to require"));
@@ -111,6 +127,7 @@ public class CommandlineParser {
                 case 'e' :
                     inlineScript.append(grabValue(" -e must be followed by an expression to evaluate"));
                     inlineScript.append('\n');
+                    hasInlineScript = true;
                     break FOR;
                 case 'b' :
                     benchmarking = true;
@@ -122,11 +139,24 @@ public class CommandlineParser {
                 case 'O' :
                     objectSpaceEnabled = false;
                     break;
+                case 'C' :
+                    compilerEnabled = true;
+                    break;
+                case 'y' :
+                    yarv = true;
+                    break;
+                case 'Y' :
+                    yarvCompile = true;
+                    break;
                 case 'n' :
                     assumeLoop = true;
                     break;
                 case 'a' :
                     split = true;
+                    break;
+                case 'd' :
+                    debug = true;
+                    verbose = true;
                     break;
                 case 'l' :
                     processLineEnds = true;
@@ -138,21 +168,52 @@ public class CommandlineParser {
                 case 'w' :
                     verbose = true;
                     break;
+                case 'K':
+                    // FIXME: No argument seems to work for -K in MRI plus this should not
+                    // siphon off additional args 'jruby -K ~/scripts/foo'.  Also better error
+                    // processing.
+                    String eArg = grabValue("provide a value for -K");
+                    kcode = KCode.create(null, eArg);
+                    break;
+                case 'S':
+                    runBinScript();
+                    break FOR;
                 case '-' :
                     if (argument.equals("--version")) {
                         setShowVersion(true);
                         break FOR;
+                    } else if(argument.equals("--debug")) {
+                        debug = true;
+                        verbose = true;
+                        break;
+                    } else if (argument.equals("--help")) {
+                        main.printUsage();
+                        shouldRunInterpreter = false;
+                        break;
+                    } else if (argument.equals("--command") || argument.equals("--bin")) {
+                        characterIndex = argument.length();
+                        runBinScript();
+                        break;
                     } else {
                         if (argument.equals("--")) {
                             // ruby interpreter compatibilty 
                             // Usage: ruby [switches] [--] [programfile] [arguments])
-                            break FOR;
-                        }                    	
+                            endOfArguments = true;
+                            break;
+                        }
                     }
                 default :
                     throw new MainExitException(1, "unknown option " + argument.charAt(characterIndex));
             }
         }
+    }
+
+    private void runBinScript() {
+        requiredLibraries.add("jruby/commands");
+        inlineScript.append("JRuby::Commands." + grabValue("provide a bin script to execute"));
+        inlineScript.append("\n");
+        hasInlineScript = true;
+        endOfArguments = true;
     }
 
     private String grabValue(String errorMessage) {
@@ -171,12 +232,12 @@ public class CommandlineParser {
 		throw mee;
     }
 
-    public boolean hasInlineScript() {
-        return inlineScript.length() > 0;
-    }
-
     public String inlineScript() {
-        return inlineScript.toString();
+        try {
+            return new String(inlineScript.toString().getBytes("UTF-8"), "ISO-8859-1");
+        } catch (UnsupportedEncodingException e) {
+            return inlineScript.toString();
+        }
     }
 
     public List requiredLibraries() {
@@ -190,20 +251,31 @@ public class CommandlineParser {
     public boolean shouldRunInterpreter() {
         return isShouldRunInterpreter();
     }
-
+    
     private boolean isSourceFromStdin() {
         return getScriptFileName() == null;
+    }
+    
+    public boolean isInlineScript() {
+        return hasInlineScript;
     }
 
     public Reader getScriptSource() {
         try {
-            if (hasInlineScript()) {
+            // KCode.NONE is used because KCODE does not affect parse in Ruby 1.8
+            // if Ruby 2.0 encoding pragmas are implemented, this will need to change
+            if (hasInlineScript) {
+                if (scriptFileName != null) {
+                    File file = new File(getScriptFileName());
+                    return new BufferedReader(new InputStreamReader(new FileInputStream(file), KCode.NONE.decoder()));
+                }
+                
                 return new StringReader(inlineScript());
             } else if (isSourceFromStdin()) {
-                return new InputStreamReader(System.in, "ISO8859_1");
+                return new InputStreamReader(System.in, KCode.NONE.decoder());
             } else {
                 File file = new File(getScriptFileName());
-                return new BufferedReader(new InputStreamReader(new FileInputStream(file), "ISO8859_1"));
+                return new BufferedReader(new InputStreamReader(new FileInputStream(file), KCode.NONE.decoder()));
             }
         } catch (IOException e) {
             throw new MainExitException(1, "Error opening script file: " + e.getMessage());
@@ -211,8 +283,12 @@ public class CommandlineParser {
     }
 
     public String displayedFileName() {
-        if (hasInlineScript()) {
-            return "-e";
+        if (hasInlineScript) {
+            if (scriptFileName != null) {
+                return scriptFileName;
+            } else {
+                return "-e";
+            }
         } else if (isSourceFromStdin()) {
             return "-";
         } else {
@@ -252,6 +328,10 @@ public class CommandlineParser {
         return verbose;
     }
 
+    public boolean isDebug() {
+        return debug;
+    }
+
     public boolean isShowVersion() {
         return showVersion;
     }
@@ -271,5 +351,21 @@ public class CommandlineParser {
     
     public boolean isObjectSpaceEnabled() {
         return objectSpaceEnabled;
+    }
+    
+    public boolean isCompilerEnabled() {
+        return compilerEnabled;
+    }
+
+    public boolean isYARVEnabled() {
+        return yarv;
+    }
+
+    public boolean isYARVCompileEnabled() {
+        return yarvCompile;
+    }
+    
+    public KCode getKCode() {
+        return kcode;
     }
 }

@@ -34,7 +34,9 @@ import org.jruby.ast.AliasNode;
 import org.jruby.ast.AndNode;
 import org.jruby.ast.ArgsCatNode;
 import org.jruby.ast.ArgsNode;
+import org.jruby.ast.ArgsPushNode;
 import org.jruby.ast.ArrayNode;
+import org.jruby.ast.AttrAssignNode;
 import org.jruby.ast.BackRefNode;
 import org.jruby.ast.BeginNode;
 import org.jruby.ast.BignumNode;
@@ -103,9 +105,9 @@ import org.jruby.ast.RescueBodyNode;
 import org.jruby.ast.RescueNode;
 import org.jruby.ast.RetryNode;
 import org.jruby.ast.ReturnNode;
+import org.jruby.ast.RootNode;
 import org.jruby.ast.SClassNode;
 import org.jruby.ast.SValueNode;
-import org.jruby.ast.ScopeNode;
 import org.jruby.ast.SelfNode;
 import org.jruby.ast.SplatNode;
 import org.jruby.ast.StrNode;
@@ -130,7 +132,7 @@ import org.jruby.evaluator.Instruction;
  * @author  jpetersen
  */
 public abstract class AbstractVisitor implements NodeVisitor {
-    
+
     /**
      * This method is called by default for each visited Node.
      */
@@ -419,12 +421,12 @@ public abstract class AbstractVisitor implements NodeVisitor {
     public Instruction visitReturnNode(ReturnNode iVisited) {
         return visitNode(iVisited);
     }
-
-    public Instruction visitSClassNode(SClassNode iVisited) {
+    
+    public Instruction visitRootNode(RootNode iVisited) {
         return visitNode(iVisited);
     }
 
-    public Instruction visitScopeNode(ScopeNode iVisited) {
+    public Instruction visitSClassNode(SClassNode iVisited) {
         return visitNode(iVisited);
     }
 
@@ -513,6 +515,14 @@ public abstract class AbstractVisitor implements NodeVisitor {
     }
 
     public Instruction visitSymbolNode(SymbolNode iVisited) {
+        return visitNode(iVisited);
+    }
+    
+    public Instruction visitArgsPushNode(ArgsPushNode iVisited) {
+        return visitNode(iVisited);
+    }
+
+    public Instruction visitAttrAssignNode(AttrAssignNode iVisited) {
         return visitNode(iVisited);
     }
 }

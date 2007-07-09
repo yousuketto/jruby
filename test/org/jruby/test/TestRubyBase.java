@@ -36,14 +36,14 @@ import java.io.StringReader;
 
 import junit.framework.TestCase;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyIO;
 
 /**
  * @author Benoit
  */
 public class TestRubyBase extends TestCase {
-    protected IRuby runtime;
+    protected Ruby runtime;
     private PrintStream out;
 
     public TestRubyBase() {
@@ -66,7 +66,7 @@ public class TestRubyBase extends TestCase {
         runtime.getGlobalVariables().set("$>", lStream);
         runtime.getGlobalVariables().set("$stderr", lStream);
         
-        runtime.loadScript("test", new StringReader(script), false);
+        runtime.loadScript("test", new StringReader(script));
         StringBuffer sb = new StringBuffer(new String(result.toByteArray()));
         for (int idx = sb.indexOf("\n"); idx != -1; idx = sb.indexOf("\n")) {
             sb.deleteCharAt(idx);

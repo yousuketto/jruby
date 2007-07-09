@@ -30,7 +30,9 @@ package org.jruby;
 import java.io.PrintStream;
 
 import org.jruby.javasupport.JavaObject;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
 
@@ -38,16 +40,18 @@ public class NativeException extends RubyException {
 
     private final Throwable cause;
     public static final String CLASS_NAME = "NativeException";
-	private final IRuby runtime;
+	private final Ruby runtime;
 
-    public NativeException(IRuby runtime, RubyClass rubyClass, Throwable cause) {
+    public NativeException(Ruby runtime, RubyClass rubyClass, Throwable cause) {
         super(runtime, rubyClass, cause.getClass().getName()+": "+cause.getMessage());
 		this.runtime = runtime;
         this.cause = cause;
     }
     
-    public static RubyClass createClass(IRuby runtime, RubyClass baseClass) {
-    	RubyClass exceptionClass = runtime.defineClass(CLASS_NAME, baseClass);
+    public static RubyClass createClass(Ruby runtime, RubyClass baseClass) {
+        // FIXME: If NativeException is expected to be used from Ruby code, it should provide
+        // a real allocator to be used. Otherwise Class.new will fail, as will marshalling. JRUBY-415
+    	RubyClass exceptionClass = runtime.defineClass(CLASS_NAME, baseClass, ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
     	
 		CallbackFactory callbackFactory = runtime.callbackFactory(NativeException.class);
 		exceptionClass.defineMethod("cause", 
@@ -56,23 +60,25 @@ public class NativeException extends RubyException {
 		return exceptionClass;
     }
     
-    public IRubyObject cause() {
-        return JavaObject.wrap(getRuntime(), cause);
+    public IRubyObject cause(Block unusedBlock) {
+        return getRuntime().getModule("JavaUtilities").callMethod(getRuntime().getCurrentContext(),
+            "wrap",
+            JavaObject.wrap(getRuntime(), cause));
     }
     
     public IRubyObject backtrace() {
         IRubyObject rubyTrace = super.backtrace();
         if (rubyTrace.isNil())
             return rubyTrace;
-        RubyArray array = (RubyArray) rubyTrace;
+        RubyArray array = (RubyArray) rubyTrace.dup();
         StackTraceElement[] stackTrace = cause.getStackTrace();
         for (int i=stackTrace.length-1; i>=0; i--) {
             StackTraceElement element = stackTrace[i];
-            String line = element.toString();
+            String line = element.getFileName() + ":" + element.getLineNumber() + ":in `" + element.getClassName() + "." + element.getMethodName() + "'";
             RubyString string = runtime.newString(line);
             array.unshift(string);
         }
-        return rubyTrace;
+        return array;
     }
     
     public void printBacktrace(PrintStream errorStream) {

@@ -1,4 +1,4 @@
-# format.rb: Written by Tadayoshi Funaba 1999-2005
+# format.rb: Written by Tadayoshi Funaba 1999-2006
 # $Id$
 
 require 'rational'
@@ -51,8 +51,8 @@ class Date
   }
 
   def self.__strptime(str, fmt, elem)
-    fmt.scan(/%[EO]?.|./o) do |c|
-      cc = c.sub(/\A%[EO]?(.)\Z/o, '%\\1')
+    fmt.scan(/%[EO]?.|./mo) do |c|
+      cc = c.sub(/\A%[EO]?(.)\z/mo, '%\\1')
       case cc
       when /\A\s/o
 	str.sub!(/\A[\s\v]+/o, '')
@@ -148,7 +148,7 @@ class Date
 	return unless str.sub!(/\A(\d+)/o, '')
 	val = $1.to_i
 	return unless (0..53) === val
-	elem[if c == '%U' then :wnum0 else :wnum1 end] = val
+	elem[if c[-1,1] == 'U' then :wnum0 else :wnum1 end] = val
       when '%u'
 	return unless str.sub!(/\A(\d+)/o, '')
 	val = $1.to_i
@@ -213,6 +213,8 @@ class Date
 	  warn("warning: %3 is deprecated; use '%F'")
 	end
 	return unless __strptime(str, '%F', elem)
+      when /\A%(.)/m
+	return unless str.sub!(Regexp.new('\\A' + Regexp.quote($1)), '')
       else
 	return unless str.sub!(Regexp.new('\\A' + Regexp.quote(c)), '')
       end
@@ -490,8 +492,8 @@ class Date
 
   def strftime(fmt='%F')
     o = ''
-    fmt.scan(/%[EO]?.|./o) do |c|
-      cc = c.sub(/^%[EO]?(.)$/o, '%\\1')
+    fmt.scan(/%[EO]?.|./mo) do |c|
+      cc = c.sub(/\A%[EO]?(.)\z/mo, '%\\1')
       case cc
       when '%A'; o << DAYNAMES[wday]
       when '%a'; o << ABBR_DAYNAMES[wday]
@@ -531,7 +533,7 @@ class Date
       when '%t'; o << "\t"					# P2,ID
       when '%U', '%W'
 	a = self.class.civil_to_jd(year, 1, 1, ns?) + 6
-	k = if c == '%U' then 0 else 1 end
+	k = if c[-1,1] == 'U' then 0 else 1 end
 	w = (jd - (a - ((a - k) + 1) % 7) + 7) / 7
 	o << '%02d' % w
       when '%u'; o <<   '%d' % cwday				# P2,ID
@@ -571,7 +573,10 @@ class Date
 	  warn("warning: %3 is deprecated; use '%F'")
 	end
 	o << strftime('%F')
-      else;      o << c
+      when /\A%(.)/m
+	o << $1
+      else
+	o << c
       end
     end
     o

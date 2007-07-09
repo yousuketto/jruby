@@ -20,6 +20,7 @@
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 David Corbin <dcorbin@users.sourceforge.net>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
+ * Copyright (C) 2006 Kresten Krab Thorup <krab@gnu.org>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -40,51 +41,49 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
+import org.jruby.javasupport.proxy.InternalJavaProxy;
+import org.jruby.javasupport.proxy.JavaProxyClass;
+import org.jruby.javasupport.proxy.JavaProxyMethod;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class JavaMethod extends JavaCallable {
     private final Method method;
+    private final Class[] parameterTypes;
 
-    public static RubyClass createJavaMethodClass(IRuby runtime, RubyModule javaModule) {
+    public static RubyClass createJavaMethodClass(Ruby runtime, RubyModule javaModule) {
+        // TODO: NOT_ALLOCATABLE_ALLOCATOR is probably ok here, since we don't intend for people to monkey with
+        // this type and it can't be marshalled. Confirm. JRUBY-415
         RubyClass result = 
-            javaModule.defineClassUnder("JavaMethod", runtime.getObject());
+            javaModule.defineClassUnder("JavaMethod", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(JavaMethod.class);
 
         JavaAccessibleObject.registerRubyMethods(runtime, result);
         
-        result.defineMethod("name", 
-                callbackFactory.getMethod("name"));
-        result.defineMethod("arity", 
-                callbackFactory.getMethod("arity"));
-        result.defineMethod("public?", 
-                callbackFactory.getMethod("public_p"));
-        result.defineMethod("final?", 
-                callbackFactory.getMethod("final_p"));
-        result.defineMethod("static?", 
-                callbackFactory.getMethod("static_p"));
-        result.defineMethod("invoke", 
-                callbackFactory.getOptMethod("invoke"));
-        result.defineMethod("invoke_static", 
-                callbackFactory.getOptMethod("invoke_static"));
-        result.defineMethod("argument_types", 
-                callbackFactory.getMethod("argument_types"));
-        result.defineMethod("inspect", 
-                callbackFactory.getMethod("inspect"));
-        result.defineMethod("return_type", 
-                callbackFactory.getMethod("return_type"));
+        result.defineFastMethod("name", callbackFactory.getFastMethod("name"));
+        result.defineFastMethod("arity", callbackFactory.getFastMethod("arity"));
+        result.defineFastMethod("public?", callbackFactory.getFastMethod("public_p"));
+        result.defineFastMethod("final?", callbackFactory.getFastMethod("final_p"));
+        result.defineFastMethod("static?", callbackFactory.getFastMethod("static_p"));
+        result.defineFastMethod("invoke", callbackFactory.getFastOptMethod("invoke"));
+        result.defineFastMethod("invoke_static", callbackFactory.getFastOptMethod("invoke_static"));
+        result.defineFastMethod("argument_types", callbackFactory.getFastMethod("argument_types"));
+        result.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
+        result.defineFastMethod("return_type", callbackFactory.getFastMethod("return_type"));
 
         return result;
     }
 
-    public JavaMethod(IRuby runtime, Method method) {
+    public JavaMethod(Ruby runtime, Method method) {
         super(runtime, (RubyClass) runtime.getModule("Java").getClass("JavaMethod"));
         this.method = method;
+        this.parameterTypes = method.getParameterTypes();
 
         // Special classes like Collections.EMPTY_LIST are inner classes that are private but 
         // implement public interfaces.  Their methods are all public methods for the public 
@@ -96,25 +95,27 @@ public class JavaMethod extends JavaCallable {
         }
     }
 
-    public static JavaMethod create(IRuby runtime, Method method) {
+    public static JavaMethod create(Ruby runtime, Method method) {
         return new JavaMethod(runtime, method);
     }
 
-    public static JavaMethod create(IRuby runtime, Class javaClass, String methodName, Class[] argumentTypes) {
+    public static JavaMethod create(Ruby runtime, Class javaClass, String methodName, Class[] argumentTypes) {
         try {
             Method method = javaClass.getMethod(methodName, argumentTypes);
             return create(runtime, method);
         } catch (NoSuchMethodException e) {
-            throw runtime.newNameError("undefined method '" + methodName + "' for class '" + javaClass.getName() + "'");
+            throw runtime.newNameError("undefined method '" + methodName + "' for class '" + javaClass.getName() + "'",
+                    methodName);
         }
     }
 
-    public static JavaMethod createDeclared(IRuby runtime, Class javaClass, String methodName, Class[] argumentTypes) {
+    public static JavaMethod createDeclared(Ruby runtime, Class javaClass, String methodName, Class[] argumentTypes) {
         try {
             Method method = javaClass.getDeclaredMethod(methodName, argumentTypes);
             return create(runtime, method);
         } catch (NoSuchMethodException e) {
-            throw runtime.newNameError("undefined method '" + methodName + "' for class '" + javaClass.getName() + "'");
+            throw runtime.newNameError("undefined method '" + methodName + "' for class '" + javaClass.getName() + "'",
+                    methodName);
         }
     }
 
@@ -123,7 +124,7 @@ public class JavaMethod extends JavaCallable {
     }
 
     protected int getArity() {
-        return method.getParameterTypes().length;
+        return parameterTypes.length;
     }
 
     public RubyBoolean public_p() {
@@ -145,15 +146,30 @@ public class JavaMethod extends JavaCallable {
         }
         Object javaInvokee = ((JavaObject) invokee).getValue();
         Object[] arguments = new Object[args.length - 1];
-        System.arraycopy(args, 1, arguments, 0, arguments.length);
-        convertArguments(arguments);
+        convertArguments(arguments, args, 1);
 
         if (! method.getDeclaringClass().isInstance(javaInvokee)) {
             throw getRuntime().newTypeError("invokee not instance of method's class (" +
                                               "got" + javaInvokee.getClass().getName() + " wanted " +
                                               method.getDeclaringClass().getName() + ")");
         }
-        return invokeWithExceptionHandling(javaInvokee, arguments);
+        
+        //
+        // this test really means, that this is a ruby-defined subclass of a java class
+        //
+        if (javaInvokee instanceof InternalJavaProxy &&
+                // don't bother to check if final method, it won't
+                // be there (not generated, can't be!)
+                !Modifier.isFinal(method.getModifiers())) {
+            JavaProxyClass jpc = ((InternalJavaProxy) javaInvokee)
+                    .___getProxyClass();
+            JavaProxyMethod jpm;
+            if ((jpm = jpc.getMethod(method.getName(), parameterTypes)) != null &&
+                    jpm.hasSuperImplementation()) {
+                return invokeWithExceptionHandling(jpm.getSuperMethod(), javaInvokee, arguments);
+            }
+        }
+        return invokeWithExceptionHandling(method, javaInvokee, arguments);
     }
 
     public IRubyObject invoke_static(IRubyObject[] args) {
@@ -162,8 +178,8 @@ public class JavaMethod extends JavaCallable {
         }
         Object[] arguments = new Object[args.length];
         System.arraycopy(args, 0, arguments, 0, arguments.length);
-        convertArguments(arguments);
-        return invokeWithExceptionHandling(null, arguments);
+        convertArguments(arguments, args, 0);
+        return invokeWithExceptionHandling(method, null, arguments);
     }
 
     public IRubyObject return_type() {
@@ -175,12 +191,14 @@ public class JavaMethod extends JavaCallable {
         return JavaClass.get(getRuntime(), klass);
     }
 
-    private IRubyObject invokeWithExceptionHandling(Object javaInvokee, Object[] arguments) {
+    private IRubyObject invokeWithExceptionHandling(Method method, Object javaInvokee, Object[] arguments) {
         try {
             Object result = method.invoke(javaInvokee, arguments);
             return JavaObject.wrap(getRuntime(), result);
         } catch (IllegalArgumentException iae) {
-            throw getRuntime().newTypeError("expected " + argument_types().inspect());
+            throw getRuntime().newTypeError("expected " + argument_types().inspect() + "; got: "
+                        + dumpArgTypes(arguments)
+                        + "; error: " + iae.getMessage());
         } catch (IllegalAccessException iae) {
             throw getRuntime().newTypeError("illegal access on '" + method.getName() + "': " + iae.getMessage());
         } catch (InvocationTargetException ite) {
@@ -190,15 +208,31 @@ public class JavaMethod extends JavaCallable {
         }
     }
 
-    private void convertArguments(Object[] arguments) {
+    private String dumpArgTypes(Object[] arguments) {
+        StringBuffer str = new StringBuffer("[");
+        for (int i = 0; i < arguments.length; i++) {
+            if (i > 0) {
+                str.append(",");
+            }
+            if (arguments[i] == null) {
+                str.append("null");
+            } else {
+                str.append(arguments[i].getClass().getName());
+            }
+        }
+        str.append("]");
+        return str.toString();
+    }
+
+    private void convertArguments(Object[] arguments, Object[] args, int from) {
         Class[] parameterTypes = parameterTypes();
         for (int i = 0; i < arguments.length; i++) {
-            arguments[i] = JavaUtil.convertArgument(arguments[i], parameterTypes[i]);
+            arguments[i] = JavaUtil.convertArgument(args[i+from], parameterTypes[i]);
         }
     }
 
     protected Class[] parameterTypes() {
-        return method.getParameterTypes();
+        return parameterTypes;
     }
 
     protected String nameOnInspection() {

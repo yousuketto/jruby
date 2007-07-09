@@ -17,7 +17,7 @@
  * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2006 Ola Bini <ola.bini@ki.se>
- * 
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -32,22 +32,22 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime.builtin;
 
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.jruby.MetaClass;
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
 import org.jruby.RubyFloat;
+import org.jruby.RubyHash;
 import org.jruby.RubyInteger;
 import org.jruby.RubyModule;
+import org.jruby.RubyFixnum;
+import org.jruby.RubyProc;
 import org.jruby.RubyString;
-import org.jruby.ast.Node;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
-import org.jruby.runtime.callback.Callback;
-import org.jruby.runtime.marshal.MarshalStream;
+import org.jruby.runtime.ThreadContext;
 
 /** Object is the parent class of all classes in Ruby. Its methods are
  * therefore available to all objects unless explicitly overridden.
@@ -55,7 +55,38 @@ import org.jruby.runtime.marshal.MarshalStream;
  * @author  jpetersen
  */
 public interface IRubyObject {
+    /**
+     *
+     */
     public static final IRubyObject[] NULL_ARRAY = new IRubyObject[0];
+    
+    /**
+     * Return the ClassIndex value for the native type this object was
+     * constructed from. Particularly useful for determining marshalling
+     * format. All instances of subclasses of Hash, for example
+     * are of Java type RubyHash, and so should utilize RubyHash marshalling
+     * logic in addition to user-defined class marshalling logic.
+     *
+     * @return the ClassIndex of the native type this object was constructed from
+     */
+    int getNativeTypeIndex();
+    
+    /**
+     * Gets a copy of the instance variables for this object, if any exist.
+     * Returns null if this object has no instance variables.
+     * "safe" in that it doesn't cause the instance var map to be created.
+     *
+     * @return A snapshot of the instance vars, or null if none.
+     */
+    Map safeGetInstanceVariables();
+    
+    /**
+     * Returns true if the object has any instance variables, false otherwise.
+     * "safe" in that it doesn't cause the instance var map to be created.
+     *
+     * @return true if the object has instance variables, false otherwise.
+     */
+    boolean safeHasInstanceVariables();
     
     /**
      * RubyMethod getInstanceVar.
@@ -63,7 +94,7 @@ public interface IRubyObject {
      * @return RubyObject
      */
     IRubyObject getInstanceVariable(String string);
-
+    
     /**
      * RubyMethod setInstanceVar.
      * @param string
@@ -72,244 +103,318 @@ public interface IRubyObject {
      */
     IRubyObject setInstanceVariable(String string, IRubyObject rubyObject);
     
+    /**
+     *
+     * @return
+     */
     Map getInstanceVariables();
-    Map getInstanceVariablesSnapshot();
-
-    IRubyObject callMethod(RubyModule context, String name, IRubyObject[] args, CallType callType);
-    
-    IRubyObject callMethod(String name, IRubyObject[] args, CallType callType);
     
     /**
-     * RubyMethod funcall.
-     * @param string
-     * @return RubyObject
+     *
+     * 
+     * @param instanceVariables 
      */
-    IRubyObject callMethod(String string);
+    void setInstanceVariables(Map instanceVariables);
+    
+    /**
+     *
+     * @return
+     */
+    Map getInstanceVariablesSnapshot();
+    
+    public IRubyObject callSuper(ThreadContext context, IRubyObject[] args, Block block);
 
+    public IRubyObject callMethod(ThreadContext context, String name);
+    public IRubyObject callMethod(ThreadContext context, String name, Block block);
+    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject arg);
+    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args);
+    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, Block block);
+    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, CallType callType);
+    public IRubyObject callMethod(ThreadContext context, String name, IRubyObject[] args, CallType callType, Block block);
+    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name);
+    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject arg);
+    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject[] args);
+    public IRubyObject callMethod(ThreadContext context, int methodIndex, String name, IRubyObject[] args, CallType callType);
+    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, String name, IRubyObject[] args, CallType callType, Block block);
+    public IRubyObject callMethod(ThreadContext context, RubyModule rubyclass, int methodIndex, String name, IRubyObject[] args, CallType callType, Block block);
+    public IRubyObject compilerCallMethodWithIndex(ThreadContext context, int methodIndex, String name, IRubyObject[] args, IRubyObject self, CallType callType, Block block);
+    public IRubyObject compilerCallMethod(ThreadContext context, String name,
+            IRubyObject[] args, IRubyObject self, CallType callType, Block block);
+    
     /**
      * RubyMethod isNil.
      * @return boolean
      */
     boolean isNil();
-
+    
+    /**
+     *
+     * @return
+     */
     boolean isTrue();
-
+    
     /**
      * RubyMethod isTaint.
      * @return boolean
      */
     boolean isTaint();
-
+    
+    /**
+     * RubyMethod setTaint.
+     * @param b
+     */
+    void setTaint(boolean b);
+    
     /**
      * RubyMethod isFrozen.
      * @return boolean
      */
     boolean isFrozen();
-
+    
     /**
-     * RubyMethod funcall.
-     * @param string
-     * @param arg
-     * @return RubyObject
+     * RubyMethod setFrozen.
+     * @param b
      */
-    IRubyObject callMethod(String string, IRubyObject arg);
-
+    void setFrozen(boolean b);
+    
     /**
-     * RubyMethod getRubyClass.
+     *
+     * @return
      */
-    RubyClass getMetaClass();
-
-    void setMetaClass(RubyClass metaClass);
-
-    /**
-     * RubyMethod getSingletonClass.
-     * @return RubyClass
-     */
-    MetaClass getSingletonClass();
-
-    /**
-     * RubyMethod getType.
-     * @return RubyClass
-     */
-    RubyClass getType();
-
+    boolean isImmediate();
+    
     /**
      * RubyMethod isKindOf.
      * @param rubyClass
      * @return boolean
      */
     boolean isKindOf(RubyModule rubyClass);
-
+    
+    /**
+     * Infect this object using the taint of another object
+     * @param obj
+     * @return
+     */
+    IRubyObject infectBy(IRubyObject obj);
+    
+    /**
+     * RubyMethod getRubyClass.
+     * @return
+     */
+    RubyClass getMetaClass();
+    
+    /**
+     *
+     * @param metaClass
+     */
+    void setMetaClass(RubyClass metaClass);
+    
+    /**
+     * RubyMethod getSingletonClass.
+     * @return RubyClass
+     */
+    RubyClass getSingletonClass();
+    
+    /**
+     * RubyMethod getType.
+     * @return RubyClass
+     */
+    RubyClass getType();
+    
     /**
      * RubyMethod respondsTo.
      * @param string
      * @return boolean
      */
     boolean respondsTo(String string);
-
+    
     /**
      * RubyMethod getRuntime.
+     * @return
      */
-    IRuby getRuntime();
-
+    Ruby getRuntime();
+    
     /**
      * RubyMethod getJavaClass.
      * @return Class
      */
     Class getJavaClass();
-
-    /**
-     * RubyMethod callMethod.
-     * @param method
-     * @param rubyArgs
-     * @return IRubyObject
-     */
-    IRubyObject callMethod(String method, IRubyObject[] rubyArgs);
-
-    /**
-     * RubyMethod eval.
-     * @param iNode
-     * @return IRubyObject
-     */
-    IRubyObject eval(Node iNode);
-
+    
     /**
      * Evaluate the given string under the specified binding object. If the binding is not a Proc or Binding object
      * (RubyProc or RubyBinding) throw an appropriate type error.
+     * @param context TODO
      * @param evalString The string containing the text to be evaluated
      * @param binding The binding object under which to perform the evaluation
      * @param file The filename to use when reporting errors during the evaluation
+     * @param lineNumber is the line number to pretend we are starting from
      * @return An IRubyObject result from the evaluation
      */
-    IRubyObject evalWithBinding(IRubyObject evalString, IRubyObject binding, String file);
-
+    IRubyObject evalWithBinding(ThreadContext context, IRubyObject evalString, IRubyObject binding, String file, int lineNumber);
+    
     /**
      * Evaluate the given string.
+     * @param context TODO
      * @param evalString The string containing the text to be evaluated
-     * @param binding The binding object under which to perform the evaluation
      * @param file The filename to use when reporting errors during the evaluation
      * @return An IRubyObject result from the evaluation
      */
-    IRubyObject evalSimple(IRubyObject evalString, String file);
-
-    /**
-     * RubyMethod extendObject.
-     * @param rubyModule
-     */
-    void extendObject(RubyModule rubyModule);
-
+    IRubyObject evalSimple(ThreadContext context, IRubyObject evalString, String file);
+    
     /**
      * Convert the object into a symbol name if possible.
-     * 
+     *
      * @return String the symbol name
      */
     String asSymbol();
-
+    
+    /** rb_obj_as_string
+     * @return
+     */
+    RubyString asString();
+    
     /**
      * Methods which perform to_xxx if the object has such a method
+     * @return
      */
     RubyArray convertToArray();
+    /**
+     *
+     * @return
+     */
+    RubyHash convertToHash();    
+    /**
+    *
+    * @return
+    */    
     RubyFloat convertToFloat();
+    /**
+     *
+     * @return
+     */
     RubyInteger convertToInteger();
+    /**
+     *
+     * @return
+     */
     RubyString convertToString();
-
+    
     /**
      * Converts this object to type 'targetType' using 'convertMethod' method (MRI: convert_type).
-     * 
+     *
      * @param targetType is the type we are trying to convert to
      * @param convertMethod is the method to be called to try and convert to targeType
      * @param raiseOnError will throw an Error if conversion does not work
      * @return the converted value
      */
-    IRubyObject convertToType(String targetType, String convertMethod, boolean raiseOnError);
-
+    IRubyObject convertToType(RubyClass targetType, int convertMethodIndex, String convertMethod, boolean raiseOnError);
+    
     /**
      * Higher level conversion utility similiar to convertToType but it can throw an
      * additional TypeError during conversion (MRI: rb_check_convert_type).
-     * 
+     *
      * @param targetType is the type we are trying to convert to
      * @param convertMethod is the method to be called to try and convert to targeType
      * @return the converted value
      */
-    IRubyObject convertToTypeWithCheck(String targetType, String convertMethod);
-
-
+    IRubyObject convertToTypeWithCheck(RubyClass targetType, int convertMethodIndex, String convertMethod);
+   
     /**
-     * RubyMethod setTaint.
-     * @param b
+     * 
+     * @param targetType 
+     * @param convertMethod 
+     * @param raiseOnMissingMethod 
+     * @param raiseOnWrongTypeResult 
+     * @param allowNilThrough 
+     * @return 
      */
-    void setTaint(boolean b);
-
+    public IRubyObject convertToType(RubyClass targetType, int convertMethodIndex, String convertMethod, boolean raiseOnMissingMethod, boolean raiseOnWrongTypeResult, boolean allowNilThrough);
+    
     /**
-     * RubyMethod checkSafeString.
+     *
+     * @return
      */
-    void checkSafeString();
-
+    IRubyObject anyToString();
+    
     /**
-     * RubyMethod marshalTo.
-     * @param marshalStream
+     *
+     * @return
      */
-    void marshalTo(MarshalStream marshalStream) throws IOException;
-
+    IRubyObject checkStringType();
+    
     /**
-     * RubyMethod convertType.
-     * @param type
-     * @param string
-     * @param string1
+     *
+     * @return
      */
-    IRubyObject convertType(Class type, String string, String string1);
+    IRubyObject checkArrayType();
 
     /**
      * RubyMethod dup.
+     * @return
      */
     IRubyObject dup();
-
-    /**
-     * RubyMethod setupClone.
-     * @param original
-     */
-    void initCopy(IRubyObject original);
-
-    /**
-     * RubyMethod setFrozen.
-     * @param b
-     */
-    void setFrozen(boolean b);
-
+    
     /**
      * RubyMethod inspect.
      * @return String
      */
     IRubyObject inspect();
-
-    /**
-     * Make sure the arguments fit the range specified by minimum and maximum.  On
-     * a failure, The Ruby runtime will generate an ArgumentError.
-     * 
-     * @param arguments to check
-     * @param minimum number of args
-     * @param maximum number of args (-1 for any number of args)
-     * @return the number of arguments in args
-     */
-    int checkArgumentCount(IRubyObject[] arguments, int minimum, int maximum);
-
+    
     /**
      * RubyMethod rbClone.
      * @return IRubyObject
      */
-    IRubyObject rbClone();
-
-
-    public void callInit(IRubyObject[] args);
-
+    IRubyObject rbClone(Block unusedBlock);
+    
+    
     /**
-     * RubyMethod defineSingletonMethod.
-     * @param name
-     * @param callback
+     *
+     * @return
      */
-    void defineSingletonMethod(String name, Callback callback);
+    boolean isSingleton();
+    
+    /**
+     *
+     * @return
+     */
+    Iterator instanceVariableNames();
+    
+    /**
+     * Our version of Data_Wrap_Struct.
+     *
+     * This method will just set a private pointer to the object provided. This pointer is transient
+     * and will not be accessible from Ruby.
+     *
+     * @param obj the object to wrap
+     */
+    void dataWrapStruct(Object obj);
+    
+    /**
+     * Our version of Data_Get_Struct.
+     *
+     * Returns a wrapped data value if there is one, otherwise returns null.
+     *
+     * @return the object wrapped.
+     */
+    Object dataGetStruct();
+    
+    /**
+     *
+     * @return
+     */
+    RubyFixnum id();
+    
+    
+    public IRubyObject equal(IRubyObject other); 
 
-    boolean singletonMethodsAllowed();
+    IRubyObject equalInternal(final ThreadContext context, final IRubyObject other);
 
-	Iterator instanceVariableNames();
+
+    public boolean eql(IRubyObject other);
+
+    public boolean eqlInternal(final ThreadContext context, final IRubyObject other);
+
+    public void addFinalizer(RubyProc finalizer);
+
+    public void removeFinalizers();
 }

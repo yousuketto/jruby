@@ -69,11 +69,18 @@ public class JRubyFile extends File {
     }
 
     public String getAbsolutePath() {
-        return super.getAbsolutePath().replace(File.separatorChar, '/');
+        return new File(super.getPath()).getAbsolutePath().replace(File.separatorChar, '/'); 
     }
 
     public String getCanonicalPath() throws IOException {
-        return super.getCanonicalPath().replace(File.separatorChar, '/');
+        String canonicalPath = super.getCanonicalPath().replace(File.separatorChar, '/');
+        
+        // Java 1.4 canonicalPath does not strip off '.'
+        if (canonicalPath.endsWith("/.")) {
+            canonicalPath = canonicalPath.substring(0, canonicalPath.length() - 1);
+        }
+        
+        return canonicalPath;
     }
 
     public String getPath() {

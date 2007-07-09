@@ -33,13 +33,16 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.javasupport;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.RubyString;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
+import org.jruby.runtime.ObjectMarshal;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -50,16 +53,16 @@ public class JavaObject extends RubyObject {
     private static Object NULL_LOCK = new Object();
     private final Object value;
 
-    protected JavaObject(IRuby runtime, RubyClass rubyClass, Object value) {
+    protected JavaObject(Ruby runtime, RubyClass rubyClass, Object value) {
         super(runtime, rubyClass);
         this.value = value;
     }
 
-    protected JavaObject(IRuby runtime, Object value) {
-        this(runtime, runtime.getModule("Java").getClass("JavaObject"), value);
+    protected JavaObject(Ruby runtime, Object value) {
+        this(runtime, runtime.getJavaSupport().getJavaObjectClass(), value);
     }
 
-    public static JavaObject wrap(IRuby runtime, Object value) {
+    public static JavaObject wrap(Ruby runtime, Object value) {
         Object lock = value == null ? NULL_LOCK : value;
         
         synchronized (lock) {
@@ -88,41 +91,37 @@ public class JavaObject extends RubyObject {
         return value;
     }
 
-    public static RubyClass createJavaObjectClass(IRuby runtime, RubyModule javaModule) {
-    	RubyClass result = javaModule.defineClassUnder("JavaObject", runtime.getObject());
+    public static RubyClass createJavaObjectClass(Ruby runtime, RubyModule javaModule) {
+        // FIXME: Ideally JavaObject instances should be marshallable, which means that
+        // the JavaObject metaclass should have an appropriate allocator. JRUBY-414
+    	RubyClass result = javaModule.defineClassUnder("JavaObject", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
 
     	registerRubyMethods(runtime, result);
 
         result.getMetaClass().undefineMethod("new");
+        result.getMetaClass().undefineMethod("allocate");
+        
+        result.setMarshal(ObjectMarshal.NOT_MARSHALABLE_MARSHAL);
 
         return result;
     }
 
-	protected static void registerRubyMethods(IRuby runtime, RubyClass result) {
+	protected static void registerRubyMethods(Ruby runtime, RubyClass result) {
 		CallbackFactory callbackFactory = runtime.callbackFactory(JavaObject.class);
 
-        result.defineMethod("to_s", 
-            callbackFactory.getMethod("to_s"));
-        result.defineMethod("==", 
-            callbackFactory.getMethod("equal", IRubyObject.class));
-        result.defineMethod("eql?", 
-            callbackFactory.getMethod("equal", IRubyObject.class));
-        result.defineMethod("equal?", 
-            callbackFactory.getMethod("same", IRubyObject.class));
-        result.defineMethod("hash", 
-            callbackFactory.getMethod("hash"));
-        result.defineMethod("java_type", 
-            callbackFactory.getMethod("java_type"));
-        result.defineMethod("java_class", 
-            callbackFactory.getMethod("java_class"));
-        result.defineMethod("java_proxy?", 
-            callbackFactory.getMethod("is_java_proxy"));
-        result.defineMethod("length", 
-            callbackFactory.getMethod("length"));
-        result.defineMethod("[]", 
-            callbackFactory.getMethod("aref", IRubyObject.class));
-        result.defineMethod("[]=", 
-            callbackFactory.getMethod("aset", IRubyObject.class, IRubyObject.class));
+        result.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
+        result.defineFastMethod("==", callbackFactory.getFastMethod("equal", IRubyObject.class));
+        result.defineFastMethod("eql?", callbackFactory.getFastMethod("equal", IRubyObject.class));
+        result.defineFastMethod("equal?", callbackFactory.getFastMethod("same", IRubyObject.class));
+        result.defineFastMethod("hash", callbackFactory.getFastMethod("hash"));
+        result.defineFastMethod("java_type", callbackFactory.getFastMethod("java_type"));
+        result.defineFastMethod("java_class", callbackFactory.getFastMethod("java_class"));
+        result.defineFastMethod("java_proxy?", callbackFactory.getFastMethod("is_java_proxy"));
+        result.defineMethod("synchronized", callbackFactory.getMethod("ruby_synchronized"));
+        result.defineFastMethod("length", callbackFactory.getFastMethod("length"));
+        result.defineFastMethod("[]", callbackFactory.getFastMethod("aref", IRubyObject.class));
+        result.defineFastMethod("[]=", callbackFactory.getFastMethod("aset", IRubyObject.class, IRubyObject.class));
+        result.defineFastMethod("fill", callbackFactory.getFastMethod("afill", IRubyObject.class, IRubyObject.class, IRubyObject.class));
 	}
 
 	public RubyFixnum hash() {
@@ -130,8 +129,9 @@ public class JavaObject extends RubyObject {
     }
 
     public IRubyObject to_s() {
-        return getRuntime().newString(
-           value == null ? "null" : value.toString());
+        String s = value == null ? "" : value.toString();
+
+        return s == null ? getRuntime().getNil() : RubyString.newUnicodeString(getRuntime(), s);
     }
 
     public IRubyObject equal(IRubyObject other) {
@@ -186,7 +186,18 @@ public class JavaObject extends RubyObject {
         throw getRuntime().newTypeError("not a java array");
     }
     
+    public IRubyObject afill (IRubyObject beginIndex, IRubyObject endIndex, IRubyObject someValue) {
+        throw getRuntime().newTypeError("not a java array");
+    }
+    
     public IRubyObject is_java_proxy() {
         return getRuntime().getTrue();
+    }
+
+    public IRubyObject ruby_synchronized(Block block) {
+        Object lock = getValue();
+        synchronized (lock != null ? lock : NULL_LOCK) {
+            return block.yield(getRuntime().getCurrentContext(), null);
+        }
     }
 }

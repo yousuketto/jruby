@@ -17,6 +17,7 @@
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2004 David Corbin <dcorbin@users.sourceforge.net>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
+ * Copyright (C) 2007 William N Dortch <bill.dortch@gmail.com>
  * 
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
@@ -36,45 +37,41 @@ import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.RubyString;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class JavaField extends JavaAccessibleObject {
     private Field field;
 
-    public static RubyClass createJavaFieldClass(IRuby runtime, RubyModule javaModule) {
-        RubyClass result = javaModule.defineClassUnder("JavaField", runtime.getObject());
+    public static RubyClass createJavaFieldClass(Ruby runtime, RubyModule javaModule) {
+        // TODO: NOT_ALLOCATABLE_ALLOCATOR is probably ok here, since we don't intend for people to monkey with
+        // this type and it can't be marshalled. Confirm. JRUBY-415
+        RubyClass result = javaModule.defineClassUnder("JavaField", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(JavaField.class);
 
         JavaAccessibleObject.registerRubyMethods(runtime, result);
-        result.defineMethod("value_type", 
-            callbackFactory.getMethod("value_type"));
-        result.defineMethod("public?", 
-            callbackFactory.getMethod("public_p"));
-        result.defineMethod("static?", 
-            callbackFactory.getMethod("static_p"));
-        result.defineMethod("value", 
-            callbackFactory.getMethod("value", IRubyObject.class));
-        result.defineMethod("set_value", 
-            callbackFactory.getMethod("set_value", IRubyObject.class, IRubyObject.class));
-        result.defineMethod("final?", 
-            callbackFactory.getMethod("final_p"));
-        result.defineMethod("static_value", 
-            callbackFactory.getMethod("static_value"));
-        result.defineMethod("name", 
-            callbackFactory.getMethod("name"));
-        result.defineMethod("==", callbackFactory.getMethod("equal", IRubyObject.class));
+        result.defineFastMethod("value_type", callbackFactory.getFastMethod("value_type"));
+        result.defineFastMethod("public?", callbackFactory.getFastMethod("public_p"));
+        result.defineFastMethod("static?", callbackFactory.getFastMethod("static_p"));
+        result.defineFastMethod("value", callbackFactory.getFastMethod("value", IRubyObject.class));
+        result.defineFastMethod("set_value", callbackFactory.getFastMethod("set_value", IRubyObject.class, IRubyObject.class));
+        result.defineFastMethod("set_static_value", callbackFactory.getFastMethod("set_static_value", IRubyObject.class));
+        result.defineFastMethod("final?", callbackFactory.getFastMethod("final_p"));
+        result.defineFastMethod("static_value", callbackFactory.getFastMethod("static_value"));
+        result.defineFastMethod("name", callbackFactory.getFastMethod("name"));
+        result.defineFastMethod("==", callbackFactory.getFastMethod("equal", IRubyObject.class));
         result.defineAlias("===", "==");
 
         return result;
     }
 
-    public JavaField(IRuby runtime, Field field) {
+    public JavaField(Ruby runtime, Field field) {
         super(runtime, (RubyClass) runtime.getModule("Java").getClass("JavaField"));
         this.field = field;
     }
@@ -112,7 +109,7 @@ public class JavaField extends JavaAccessibleObject {
     }
 
     public JavaObject set_value(IRubyObject object, IRubyObject value) {
-         if (! (object instanceof JavaObject)) {
+        if (! (object instanceof JavaObject)) {
             throw getRuntime().newTypeError("not a java object: " + object);
         }
         if (! (value instanceof JavaObject)) {
@@ -140,18 +137,49 @@ public class JavaField extends JavaAccessibleObject {
     }
 
     public JavaObject static_value() {
-        try {
-	    // TODO: Only setAccessible to account for pattern found by
-	    // accessing constants included from a non-public interface.
-	    // (aka java.util.zip.ZipConstants being implemented by many
-	    // classes)
-	    field.setAccessible(true);
-            return JavaObject.wrap(getRuntime(), field.get(null));
-        } catch (IllegalAccessException iae) {
-	    throw getRuntime().newTypeError("illegal static value access: " + iae.getMessage());
+        
+        if (Ruby.isSecurityRestricted())
+            return null;
+        else {
+            try {
+                // TODO: Only setAccessible to account for pattern found by
+                // accessing constants included from a non-public interface.
+                // (aka java.util.zip.ZipConstants being implemented by many
+                // classes)
+                field.setAccessible(true);
+                return JavaObject.wrap(getRuntime(), field.get(null));
+            } catch (IllegalAccessException iae) {
+                throw getRuntime().newTypeError("illegal static value access: " + iae.getMessage());
+            }
         }
     }
 
+    public JavaObject set_static_value(IRubyObject value) {
+        if (! (value instanceof JavaObject)) {
+            throw getRuntime().newTypeError("not a java object:" + value);
+        }
+        try {
+            Object convertedValue = JavaUtil.convertArgument(((JavaObject) value).getValue(),
+                                                             field.getType());
+            // TODO: Only setAccessible to account for pattern found by
+            // accessing constants included from a non-public interface.
+            // (aka java.util.zip.ZipConstants being implemented by many
+            // classes)
+            // TODO: not sure we need this at all, since we only expose
+            // public fields.
+            //field.setAccessible(true);
+            field.set(null, convertedValue);
+        } catch (IllegalAccessException iae) {
+            throw getRuntime().newTypeError(
+                                "illegal access on setting static variable: " + iae.getMessage());
+        } catch (IllegalArgumentException iae) {
+            throw getRuntime().newTypeError(
+                                "wrong type for " + field.getType().getName() + ": " +
+                                ((JavaObject) value).getValue().getClass().getName());
+        }
+        return (JavaObject) value;
+    }
+    
     public RubyString name() {
         return getRuntime().newString(field.getName());
     }

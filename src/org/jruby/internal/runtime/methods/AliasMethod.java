@@ -30,52 +30,45 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime.methods;
 
-import org.jruby.IRuby;
 import org.jruby.RubyModule;
-import org.jruby.runtime.ICallable;
+import org.jruby.runtime.Arity;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
  *
  * @author  jpetersen
  */
-public class AliasMethod extends AbstractMethod {
-    private ICallable oldMethod;
+public class AliasMethod extends DynamicMethod {
+    private DynamicMethod oldMethod;
     private String oldName;
 
     /*
      * This code used to try and optimize the case of when oldMethod is an aliasMethod.
      * This seems a little overkill.
      */
-    public AliasMethod(ICallable oldMethod, String oldName) {
-        super(oldMethod.getImplementationClass(), oldMethod.getVisibility());
+
+    public AliasMethod(RubyModule implementationClass, DynamicMethod oldMethod, String oldName) {
+        super(implementationClass, oldMethod.getVisibility());
 
         this.oldName = oldName;
         this.oldMethod = oldMethod;
     }
     
-    public String getOriginalName() {
-    	return oldName;
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, boolean noSuper, Block block) {
+        return oldMethod.call(context, self, clazz, oldName, args, noSuper, block);
     }
 
-    public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-    	// FIXME: using implementationClass may not be right, since the alias may be found in an included module
-        oldMethod.preMethod(runtime, implementationClass, recv, name, args, noSuper);
+    public DynamicMethod dup() {
+        return new AliasMethod(implementationClass, oldMethod, oldName);
     }
 
-    public void postMethod(IRuby runtime) {
-        oldMethod.postMethod(runtime);
-    }
-
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-        return oldMethod.internalCall(runtime, receiver, lastClass, oldName, args, noSuper);
-    }
-
-    public ICallable dup() {
-        return new AliasMethod(oldMethod, oldName);
+    public Arity getArity(){
+        return oldMethod.getArity();
     }
     
-    public boolean needsImplementer() {
-        return oldMethod.needsImplementer();
+    public DynamicMethod getRealMethod() {
+        return oldMethod.getRealMethod();
     }
 }

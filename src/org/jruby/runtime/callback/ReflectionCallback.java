@@ -36,8 +36,10 @@ import java.lang.reflect.Method;
 
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.exceptions.MainExitException;
 import org.jruby.exceptions.ThreadKill;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -51,24 +53,26 @@ public class ReflectionCallback implements Callback {
     private boolean isRestArgs;
     private Arity arity;
     private boolean isStaticMethod;
+    private boolean fast;
     
     public ReflectionCallback(Class type, String methodName, Class[] argumentTypes,
-            boolean isRestArgs, boolean isStaticMethod, Arity arity) {
+            boolean isRestArgs, boolean isStaticMethod, Arity arity, boolean fast) {
         this.type = type;
     	this.methodName = methodName;
     	this.argumentTypes = argumentTypes;
         this.isRestArgs = isRestArgs;
         this.isStaticMethod = isStaticMethod;
     	this.arity = arity;
+        this.fast = fast;
     	
         assert type != null;
         assert methodName != null;
         assert arity != null;
         
-        loadMethod();
+        loadMethod(fast);
     }
     
-    private void loadMethod() {
+    private void loadMethod(boolean fast) {
     	Class[] args;
     	
         if (isStaticMethod) {
@@ -77,7 +81,15 @@ public class ReflectionCallback implements Callback {
             types[0] = IRubyObject.class;
             args = types;
         } else {
-        	args = argumentTypes;
+            args = argumentTypes;
+        }
+        
+        // ENEBO: Perhaps slow but simple for now
+        if (!fast) {
+            Class[] types = new Class[args.length + 1];
+            System.arraycopy(args, 0, types, 0, args.length);
+            types[args.length] = Block.class;
+            args = types;
         }
         
         try {
@@ -120,7 +132,7 @@ public class ReflectionCallback implements Callback {
 	/**
      * Calls a wrapped Ruby method for the specified receiver with the specified arguments.
      */
-    public IRubyObject execute(IRubyObject recv, IRubyObject[] oargs) {
+    public IRubyObject execute(IRubyObject recv, IRubyObject[] oargs, Block block) {
         arity.checkArity(recv.getRuntime(), oargs);
 
         Object[] methodArgs = oargs;
@@ -131,10 +143,16 @@ public class ReflectionCallback implements Callback {
         try {
         	IRubyObject receiver = recv;
             if (isStaticMethod) {
-                Object[] args = new Object[methodArgs.length + 1];
+                Object[] args = new Object[methodArgs.length + (fast ? 1 : 2)];
                 System.arraycopy(methodArgs, 0, args, 1, methodArgs.length);
                 args[0] = recv;
+                if (!fast) args[methodArgs.length + 1] = block;
                 receiver = null;
+                methodArgs = args;
+            } else {
+                Object[] args = new Object[methodArgs.length + (fast ? 0 : 1)];
+                System.arraycopy(methodArgs, 0, args, 0, methodArgs.length);
+                if (!fast) args[methodArgs.length] = block;
                 methodArgs = args;
             }
             return (IRubyObject) method.invoke(receiver, methodArgs);
@@ -147,6 +165,9 @@ public class ReflectionCallback implements Callback {
             	// allow it to bubble up
             	throw (ThreadKill) e.getTargetException();
             } else if (e.getTargetException() instanceof Exception) {
+                if(e.getTargetException() instanceof MainExitException) {
+                    throw (RuntimeException)e.getTargetException();
+                }
                 recv.getRuntime().getJavaSupport().handleNativeException(e.getTargetException());
                 return recv.getRuntime().getNil();
             } else {

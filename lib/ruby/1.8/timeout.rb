@@ -51,7 +51,9 @@ module Timeout
       x = Thread.current
       y = Thread.start {
         sleep sec
-        x.raise exception, "execution expired" if x.alive?
+        if x.alive?
+        x.raise exception, "execution expired"
+        end
       }
       yield sec
       #    return true

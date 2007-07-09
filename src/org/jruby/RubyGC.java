@@ -42,12 +42,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author Anders
  */
 public class RubyGC {
-    public static RubyModule createGCModule(IRuby runtime) {
+    public static RubyModule createGCModule(Ruby runtime) {
         RubyModule result = runtime.defineModule("GC");
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyGC.class);
         
-        result.defineSingletonMethod("start", callbackFactory.getSingletonMethod("start"));
-        result.defineSingletonMethod("garbage_collect", callbackFactory.getSingletonMethod("start"));
+        result.defineFastModuleFunction("start", callbackFactory.getFastSingletonMethod("start"));
+        result.defineFastModuleFunction("garbage_collect", callbackFactory.getFastSingletonMethod("start"));
         
         return result;        
     }

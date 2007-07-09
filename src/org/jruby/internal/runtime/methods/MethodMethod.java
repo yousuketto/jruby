@@ -29,10 +29,10 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime.methods;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyModule;
 import org.jruby.RubyUnboundMethod;
-import org.jruby.runtime.ICallable;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -41,7 +41,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * 
  * @author jpetersen
  */
-public class MethodMethod extends AbstractMethod {
+public class MethodMethod extends DynamicMethod {
     private RubyUnboundMethod method;
 
     /**
@@ -52,27 +52,21 @@ public class MethodMethod extends AbstractMethod {
         super(implementationClass, visibility);
         this.method = method;
     }
-    
-    public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-        ThreadContext context = runtime.getCurrentContext();
-        
-        context.preMethodCall(implementationClass, lastClass, recv, name, args, noSuper);
-    }
-    
-    public void postMethod(IRuby runtime) {
-        ThreadContext context = runtime.getCurrentContext();
-        
-        context.postMethodCall();
-    }
 
     /**
-     * @see org.jruby.runtime.ICallable#call(IRuby, IRubyObject, String, IRubyObject[], boolean)
+     * @see org.jruby.runtime.ICallable#call(Ruby, IRubyObject, String, IRubyObject[], boolean)
      */
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-        return method.bind(receiver).call(args);
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule klazz, String name, IRubyObject[] args, boolean noSuper, Block block) {
+        context.preMethodCall(implementationClass, klazz, self, name, args, 0, block, noSuper, this);
+        
+        try {
+            return method.bind(self, block).call(args, block);
+        } finally {
+        context.postMethodCall();
+        }
     }
     
-    public ICallable dup() {
+    public DynamicMethod dup() {
         return new MethodMethod(getImplementationClass(), method, getVisibility());
     }
 }

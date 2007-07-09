@@ -28,8 +28,10 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
-import org.jruby.runtime.ICallable;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
@@ -39,7 +41,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author jpetersen
  */
 public class RubyUnboundMethod extends RubyMethod {
-    protected RubyUnboundMethod(IRuby runtime) {
+    protected RubyUnboundMethod(Ruby runtime) {
         super(runtime, runtime.getClass("UnboundMethod"));
     }
 
@@ -48,7 +50,7 @@ public class RubyUnboundMethod extends RubyMethod {
         String methodName,
         RubyModule originModule,
         String originName,
-        ICallable method) {
+        DynamicMethod method) {
         RubyUnboundMethod newMethod = new RubyUnboundMethod(implementationModule.getRuntime());
 
         newMethod.implementationModule = implementationModule;
@@ -60,13 +62,14 @@ public class RubyUnboundMethod extends RubyMethod {
         return newMethod;
     }
 
-    public static RubyClass defineUnboundMethodClass(IRuby runtime) {
+    public static RubyClass defineUnboundMethodClass(Ruby runtime) {
+        // TODO: NOT_ALLOCATABLE_ALLOCATOR is probably ok here. Confirm. JRUBY-415
         RubyClass newClass = 
-        	runtime.defineClass("UnboundMethod", runtime.getClass("Method"));
+        	runtime.defineClass("UnboundMethod", runtime.getClass("Method"), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
 
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyUnboundMethod.class);
         newClass.defineMethod("[]", callbackFactory.getOptMethod("call"));
-        newClass.defineMethod("bind", callbackFactory.getMethod("bind", IRubyObject.class));
+        newClass.defineMethod("bind", callbackFactory.getMethod("bind", RubyKernel.IRUBY_OBJECT));
         newClass.defineMethod("call", callbackFactory.getOptMethod("call"));
         newClass.defineMethod("to_proc", callbackFactory.getMethod("to_proc"));
         newClass.defineMethod("unbind", callbackFactory.getMethod("unbind"));
@@ -77,18 +80,18 @@ public class RubyUnboundMethod extends RubyMethod {
     /**
      * @see org.jruby.RubyMethod#call(IRubyObject[])
      */
-    public IRubyObject call(IRubyObject[] args) {
+    public IRubyObject call(IRubyObject[] args, Block block) {
         throw getRuntime().newTypeError("you cannot call unbound method; bind first");
     }
 
     /**
      * @see org.jruby.RubyMethod#unbind()
      */
-    public RubyUnboundMethod unbind() {
+    public RubyUnboundMethod unbind(Block block) {
         return this;
     }
 
-    public RubyMethod bind(IRubyObject aReceiver) {
+    public RubyMethod bind(IRubyObject aReceiver, Block block) {
         RubyClass receiverClass = aReceiver.getMetaClass();
         
         if (!aReceiver.isKindOf(originModule)) {

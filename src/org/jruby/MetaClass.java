@@ -12,7 +12,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2002-2004 Jan Arne Petersen <jpetersen@uni-bonn.de>
- * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2004-2006 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * 
  * Alternatively, the contents of this file may be used under the terms of
@@ -29,13 +29,17 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.collections.SinglyLinkedList;
 
 public class MetaClass extends RubyClass {
 
-    public MetaClass(IRuby runtime, RubyClass superClass, SinglyLinkedList parentCRef) {
-        super(runtime, runtime.getClass("Class"), superClass, parentCRef, null);
+    public MetaClass(Ruby runtime, RubyClass superClass, ObjectAllocator allocator, SinglyLinkedList parentCRef) {
+        super(runtime, runtime.getClass("Class"), superClass, allocator, parentCRef, null, false);
+        
+        this.index = ClassIndex.CLASS;
     }
  
     public boolean isSingleton() {
@@ -46,24 +50,16 @@ public class MetaClass extends RubyClass {
         throw getRuntime().newTypeError("can't make subclass of virtual class");
     }
 
-    public void attachToObject(IRubyObject object) {
-        setInstanceVariable("__attached__", object);
-    }
-    
-	public String getName() {
-		return "#<Class:" + getInstanceVariable("__attached__").toString() + ">";
-	}
-	
-	/**
-	 * If an object uses an anonymous class 'class << obj', then this grabs the original 
-	 * metaclass and not the one that get injected as a result of 'class << obj'.
-	 */
-	public RubyClass getRealClass() {
+    /**
+     * If an object uses an anonymous class 'class << obj', then this grabs the original 
+     * metaclass and not the one that get injected as a result of 'class << obj'.
+     */
+    public RubyClass getRealClass() {
         return getSuperClass().getRealClass();
     }
     
     public void methodAdded(RubySymbol symbol) {
-        getAttachedObject().callMethod("singleton_method_added", symbol);
+        getAttachedObject().callMethod(getRuntime().getCurrentContext(), "singleton_method_added", symbol);
     }
 
     public IRubyObject getAttachedObject() {

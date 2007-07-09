@@ -295,3 +295,102 @@ module Foo
 end
 
 test_equal("Foo::Bar",Foo::Bar.name)
+
+Fred = Module.new do
+  def meth1
+     "hello" 
+  end
+end
+
+a = "my string"
+a.extend(Fred)
+test_equal("hello", a.meth1)
+
+# Chain of includes deals with method cache flush
+module MT_A
+  def foo
+  end
+end
+module MT_B
+  include MT_A
+  alias :foo_x :foo
+end
+class MT_C
+  include MT_B
+end
+
+# Make sure that the self-object inside a block to new instance of Module evals correctly.
+
+x = Module.new do
+  def self.foo
+    "1"
+  end
+end
+
+test_ok x.methods.include?("foo")
+
+# Make sure that the self object will fire correctly with super, when using define_method
+Aaaa = Class.new(Dir) { 
+  define_method(:initialize) do |*args| 
+    super(*args) 
+  end 
+}
+
+test_no_exception { Aaaa.new("/") }
+
+class Froom < Module; end
+test_equal Froom, Froom.new.class
+
+# Dup/Clon'ing of modules
+module M
+    def self.initialize_copy original
+       raise Exception.new
+    end
+    
+    def self.meth;end
+end
+
+test_no_exception do
+    M.dup
+end
+
+test_exception do
+    M.clone
+end
+
+
+module M2
+    def self.meth;end
+end
+
+test_no_exception do
+    M2.clone.instance_eval{meth}
+    M2.dup.instance_eval{meth}
+end
+
+test_ok(9.class.include?(Precision))
+test_ok(9.class.include?(Kernel))
+test_equal(false, Precision.include?(Precision))
+
+class ModuleForTestingIfMethodsAreDefined
+  def a_public_method; end
+  protected
+  def a_protected_method; end
+  private
+  def a_private_method; end
+end
+test_ok(ModuleForTestingIfMethodsAreDefined.method_defined?(:a_public_method))
+test_ok(ModuleForTestingIfMethodsAreDefined.method_defined?(:a_protected_method))
+test_ok(! ModuleForTestingIfMethodsAreDefined.method_defined?(:a_private_method))
+
+test_ok(ModuleForTestingIfMethodsAreDefined.public_method_defined?(:a_public_method))
+test_ok(! ModuleForTestingIfMethodsAreDefined.public_method_defined?(:a_protected_method))
+test_ok(! ModuleForTestingIfMethodsAreDefined.public_method_defined?(:a_private_method))
+
+test_ok(! ModuleForTestingIfMethodsAreDefined.protected_method_defined?(:a_public_method))
+test_ok(ModuleForTestingIfMethodsAreDefined.protected_method_defined?(:a_protected_method))
+test_ok(! ModuleForTestingIfMethodsAreDefined.protected_method_defined?(:a_private_method))
+
+test_ok(! ModuleForTestingIfMethodsAreDefined.private_method_defined?(:a_public_method))
+test_ok(! ModuleForTestingIfMethodsAreDefined.private_method_defined?(:a_protected_method))
+test_ok(ModuleForTestingIfMethodsAreDefined.private_method_defined?(:a_private_method))

@@ -32,11 +32,11 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 
 public class IOHandlerNull extends IOHandler {
     
-    public IOHandlerNull(IRuby runtime, IOModes modes) {
+    public IOHandlerNull(Ruby runtime, IOModes modes) {
         super(runtime);
         
         this.modes = modes;
@@ -47,22 +47,22 @@ public class IOHandlerNull extends IOHandler {
         return null;
     }
 
-    public String gets(String separatorString) throws IOException, BadDescriptorException, 
+    public ByteList gets(ByteList separatorString) throws IOException, BadDescriptorException, 
         EOFException {
         throw new EOFException();
     }
 
-    public String getsEntireStream() throws IOException,
+    public ByteList getsEntireStream() throws IOException,
             BadDescriptorException, EOFException {
         throw new EOFException();
     }
 
-    public String read(int number) throws IOException, BadDescriptorException,
+    public ByteList read(int number) throws IOException, BadDescriptorException,
             EOFException {
         throw new EOFException();
     }
 
-    public int write(String string) throws IOException, BadDescriptorException {
+    public int write(ByteList string) throws IOException, BadDescriptorException {
         return string.length();
     }
 
@@ -76,11 +76,11 @@ public class IOHandlerNull extends IOHandler {
     public void putc(int c) throws IOException, BadDescriptorException {
     }
 
-    public String sysread(int number) throws IOException, BadDescriptorException, EOFException {
+    public ByteList sysread(int number) throws IOException, BadDescriptorException, EOFException {
         throw new EOFException();
     }
 
-    public int syswrite(String buf) throws IOException, BadDescriptorException {
+    public int syswrite(ByteList buf) throws IOException, BadDescriptorException {
         return buf.length();
     }
 
@@ -124,5 +124,9 @@ public class IOHandlerNull extends IOHandler {
     }
 
     public void truncate(long newLength) throws IOException, PipeException {
+    }
+    
+    public int ready() {
+        return 0;
     }
 }

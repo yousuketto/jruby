@@ -11,8 +11,8 @@
  * implied. See the License for the specific language governing
  * rights and limitations under the License.
  *
- * Copyright (C) 2004 Charles O Nutter <headius@headius.com>
- * 
+ * Copyright (C) 2007 Charles O Nutter <headius@headius.com>
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -28,55 +28,60 @@
 package org.jruby.internal.runtime;
 
 import org.jruby.RubyThread;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.builtin.IRubyObject;
 
 /**
  * @author cnutter
  */
-public class NativeThread {
-	private Thread nativeThread;
-	public RubyThread rubyThread;
-	
-	public NativeThread(RubyThread rubyThread, IRubyObject[] args) {
-		this.rubyThread = rubyThread;
-		
-		nativeThread = new RubyNativeThread(rubyThread, args);
-	}
-	
-	public NativeThread(RubyThread rubyThread, Thread nativeThread) {
-		this.rubyThread = rubyThread;
-		this.nativeThread = nativeThread;
-	}
-
-	public void start() {
-		nativeThread.start();
-	}
-
-	public void interrupt() {
-		nativeThread.interrupt();
-	}
-
-	public boolean isAlive() {
-		return nativeThread.isAlive();
-	}
-
-	public void join() throws InterruptedException {
-		nativeThread.join();
-	}
-
-	public int getPriority() {
-		return nativeThread.getPriority();
-	}
-
-	public void setPriority(int priority) {
-		nativeThread.setPriority(priority);
-	}
-	
-	public boolean isCurrent() {
-		return Thread.currentThread() == nativeThread;
-	}
-	
-	public boolean isInterrupted() {
-		return nativeThread.isInterrupted();
-	}
+public class NativeThread implements ThreadLike {
+    private Thread nativeThread;
+    public RubyThread rubyThread;
+    
+    public NativeThread(RubyThread rubyThread, IRubyObject[] args, Block block) {
+        this.rubyThread = rubyThread;
+        
+        nativeThread = new RubyNativeThread(rubyThread, args, block);
+    }
+    
+    public NativeThread(RubyThread rubyThread, Thread nativeThread) {
+        this.rubyThread = rubyThread;
+        this.nativeThread = nativeThread;
+    }
+    
+    public void start() {
+        nativeThread.start();
+    }
+    
+    public void interrupt() {
+        nativeThread.interrupt();
+    }
+    
+    public boolean isAlive() {
+        return nativeThread.isAlive();
+    }
+    
+    public void join() throws InterruptedException {
+        nativeThread.join();
+    }
+    
+    public void join(long timeoutMillis) throws InterruptedException {
+        nativeThread.join(timeoutMillis);
+    }
+    
+    public int getPriority() {
+        return nativeThread.getPriority();
+    }
+    
+    public void setPriority(int priority) {
+        nativeThread.setPriority(priority);
+    }
+    
+    public boolean isCurrent() {
+        return Thread.currentThread() == nativeThread;
+    }
+    
+    public boolean isInterrupted() {
+        return nativeThread.isInterrupted();
+    }
 }

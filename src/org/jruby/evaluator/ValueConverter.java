@@ -28,7 +28,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.evaluator;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -37,9 +37,9 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author jpetersen
  */
 public final class ValueConverter {
-    private IRuby runtime;
+    private Ruby runtime;
 
-    public ValueConverter(IRuby runtime) {
+    public ValueConverter(Ruby runtime) {
         this.runtime = runtime;
     }
 
@@ -64,7 +64,7 @@ public final class ValueConverter {
             case 0:
                 return useUndefined ? null : runtime.getNil();
             case 1:
-                return ((RubyArray)value).entry(0);
+                return ((RubyArray)value).eltInternal(0);
             default:
                 return value;
         }
@@ -88,8 +88,8 @@ public final class ValueConverter {
             case 0:
                 return runtime.getNil();
             case 1:
-                if (!(((RubyArray)value).entry(0) instanceof RubyArray)) {
-                    return ((RubyArray)value).entry(0);
+                if (!(((RubyArray)value).eltInternal(0) instanceof RubyArray)) {
+                    return ((RubyArray)value).eltInternal(0);
                 }
             default:
                 return value;
@@ -103,7 +103,7 @@ public final class ValueConverter {
             return (RubyArray)value;
         }
         if (value.respondsTo("to_ary")) {
-            return (RubyArray)value.convertType(RubyArray.class, "Array", "to_ary");
+            return (RubyArray)value.convertToArray();
         }
         return runtime.newArray(value);
     }

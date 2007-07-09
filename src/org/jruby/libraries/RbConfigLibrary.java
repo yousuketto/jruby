@@ -14,7 +14,8 @@
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
  * Copyright (C) 2005 Charles O Nutter
- * 
+ * Copyright (C) 2006 Nick Sieger
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -29,7 +30,12 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.libraries;
 
-import org.jruby.IRuby;
+import java.io.IOException;
+import java.net.URL;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.jruby.Ruby;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.runtime.Constants;
@@ -42,7 +48,7 @@ public class RbConfigLibrary implements Library {
      * unit tests. The tests use <code>bindir</code>, <code>RUBY_INSTALL_NAME</code> and
      * <code>EXEEXT</code>.
      */
-    public void load(IRuby runtime) {
+    public void load(Ruby runtime) {
         RubyModule configModule = runtime.defineModule("Config");
         RubyHash configHash = RubyHash.newHash(runtime);
         configModule.defineConstant("CONFIG", configHash);
@@ -52,43 +58,91 @@ public class RbConfigLibrary implements Library {
         setConfig(configHash, "MINOR", versionParts[1]);
         setConfig(configHash, "TEENY", versionParts[2]);
         setConfig(configHash, "ruby_version", versionParts[0] + '.' + versionParts[1]);
+        setConfig(configHash, "arch", System.getProperty("os.arch") + "-java" + System.getProperty("java.specification.version"));
 
-        setConfig(configHash, "bindir", new NormalizedFile(System.getProperty("jruby.home"), "bin").getAbsolutePath());
-        setConfig(configHash, "RUBY_INSTALL_NAME", System.getProperty("jruby.script").replace('\\', '/'));
-        setConfig(configHash, "ruby_install_name", System.getProperty("jruby.script").replace('\\', '/'));
-        setConfig(configHash, "SHELL", System.getProperty("jruby.shell").replace('\\', '/'));
-        setConfig(configHash, "prefix", new NormalizedFile(System.getProperty("jruby.home")).getAbsolutePath());
+        String normalizedHome = new NormalizedFile(runtime.getJRubyHome()).getAbsolutePath();
+        setConfig(configHash, "bindir", new NormalizedFile(normalizedHome, "bin").getAbsolutePath());
+        setConfig(configHash, "RUBY_INSTALL_NAME", jruby_script());
+        setConfig(configHash, "ruby_install_name", jruby_script());
+        setConfig(configHash, "SHELL", jruby_shell());
+        setConfig(configHash, "prefix", normalizedHome);
+        setConfig(configHash, "exec_prefix", normalizedHome);
+
+        setConfig(configHash, "host_os", System.getProperty("os.name"));
+        setConfig(configHash, "host_vendor", System.getProperty("java.vendor"));
+        setConfig(configHash, "host_cpu", System.getProperty("os.arch"));
+        
+        String target_os = System.getProperty("os.name");
+        if (target_os.compareTo("Mac OS X") == 0) {
+            target_os = "darwin";
+        }
+        setConfig(configHash, "target_os", target_os);
+        
+        setConfig(configHash, "target_cpu", System.getProperty("os.arch"));
+        
+        String jrubyJarFile = "jruby.jar";
+        URL jrubyPropertiesUrl = Ruby.class.getClassLoader().getResource("jruby.properties");
+        if (jrubyPropertiesUrl != null) {
+            Pattern jarFile = Pattern.compile("jar:file:.*?([a-zA-Z0-9.\\-]+\\.jar)!/jruby.properties");
+            Matcher jarMatcher = jarFile.matcher(jrubyPropertiesUrl.toString());
+            jarMatcher.find();
+            if (jarMatcher.matches()) {
+                jrubyJarFile = jarMatcher.group(1);
+            }
+        }
+        setConfig(configHash, "LIBRUBY", jrubyJarFile);
+        setConfig(configHash, "LIBRUBY_SO", jrubyJarFile);
+        
+        setConfig(configHash, "build", Constants.BUILD);
+        setConfig(configHash, "target", Constants.TARGET);
         
         String libdir = System.getProperty("jruby.lib");
         if (libdir == null) {
-        	libdir = new NormalizedFile(System.getProperty("jruby.home"), "lib").getAbsolutePath();
+            libdir = new NormalizedFile(normalizedHome, "lib").getAbsolutePath();
         } else {
-            libdir = new NormalizedFile(libdir).getAbsolutePath();
+            try {
+            // Our shell scripts pass in non-canonicalized paths, but even if we didn't
+            // anyone who did would become unhappy because Ruby apps expect no relative
+            // operators in the pathname (rubygems, for example).
+                libdir = new NormalizedFile(libdir).getCanonicalPath();
+            } catch (IOException e) {
+                libdir = new NormalizedFile(libdir).getAbsolutePath();
+            }
         }
-        
+
         setConfig(configHash, "libdir", libdir);
-        setConfig(configHash, "rubylibdir", 	new NormalizedFile(libdir, "ruby/1.8").getAbsolutePath());
-        setConfig(configHash, "sitedir", 		new NormalizedFile(libdir, "ruby/site_ruby").getAbsolutePath());
-        setConfig(configHash, "sitelibdir", 	new NormalizedFile(libdir, "ruby/site_ruby/1.8").getAbsolutePath());
-        setConfig(configHash, "sitearchdir", 	new NormalizedFile(libdir, "ruby/site_ruby/1.8/java").getAbsolutePath());
+        setConfig(configHash, "rubylibdir",     new NormalizedFile(libdir, "ruby/1.8").getAbsolutePath());
+        setConfig(configHash, "sitedir",        new NormalizedFile(libdir, "ruby/site_ruby").getAbsolutePath());
+        setConfig(configHash, "sitelibdir",     new NormalizedFile(libdir, "ruby/site_ruby/1.8").getAbsolutePath());
+        setConfig(configHash, "sitearchdir",    new NormalizedFile(libdir, "ruby/site_ruby/1.8/java").getAbsolutePath());
+        setConfig(configHash, "archdir",    new NormalizedFile(libdir, "ruby/site_ruby/1.8/java").getAbsolutePath());
         setConfig(configHash, "configure_args", "");
-        setConfig(configHash, "datadir", new NormalizedFile(System.getProperty("jruby.home"), "share").getAbsolutePath());
-        setConfig(configHash, "mandir", new NormalizedFile(System.getProperty("jruby.home"), "man").getAbsolutePath());
-        setConfig(configHash, "sysconfdir", new NormalizedFile(System.getProperty("jruby.home"), "etc").getAbsolutePath());
-        
+        setConfig(configHash, "datadir", new NormalizedFile(normalizedHome, "share").getAbsolutePath());
+        setConfig(configHash, "mandir", new NormalizedFile(normalizedHome, "man").getAbsolutePath());
+        setConfig(configHash, "sysconfdir", new NormalizedFile(normalizedHome, "etc").getAbsolutePath());
+        setConfig(configHash, "DLEXT", "jar");
+
         if (isWindows()) {
-        	setConfig(configHash, "EXEEXT", ".exe");
+            setConfig(configHash, "EXEEXT", ".exe");
         } else {
-        	setConfig(configHash, "EXEEXT", "");
+            setConfig(configHash, "EXEEXT", "");
         }
     }
 
     private static void setConfig(RubyHash configHash, String key, String value) {
-        IRuby runtime = configHash.getRuntime();
+        Ruby runtime = configHash.getRuntime();
         configHash.aset(runtime.newString(key), runtime.newString(value));
     }
-    
+
     private static boolean isWindows() {
-    	return System.getProperty("os.name", "").startsWith("Windows");
+        return System.getProperty("os.name", "").startsWith("Windows");
+    }
+
+    private String jruby_script() {
+        return System.getProperty("jruby.script", isWindows() ? "jruby.bat" : "jruby").replace('\\', '/');
+    }
+
+    private String jruby_shell() {
+        return System.getProperty("jruby.shell", isWindows() ? "cmd.exe" : "/bin/sh").replace('\\', '/');
     }
 }

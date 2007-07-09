@@ -31,6 +31,7 @@
 package org.jruby;
 
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.Block;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.callback.Callback;
 
@@ -47,14 +48,14 @@ public final class TopSelfFactory {
         super();
     }
     
-    public static IRubyObject createTopSelf(final IRuby runtime) {
+    public static IRubyObject createTopSelf(final Ruby runtime) {
         IRubyObject topSelf = new RubyObject(runtime, runtime.getObject());
         
-        topSelf.defineSingletonMethod("to_s", new Callback() {
+        topSelf.getSingletonClass().defineMethod("to_s", new Callback() {
             /**
              * @see org.jruby.runtime.callback.Callback#execute(IRubyObject, IRubyObject[])
              */
-            public IRubyObject execute(IRubyObject recv, IRubyObject[] args) {
+            public IRubyObject execute(IRubyObject recv, IRubyObject[] args, Block block) {
                 return runtime.newString("main");
             }
 
@@ -66,11 +67,13 @@ public final class TopSelfFactory {
             }
         });
         
-        topSelf.defineSingletonMethod("include", new Callback() {
+        // The following three methods must be defined fast, since they expect to modify the current frame
+        // (i.e. they expect no frame will be allocated for them). JRUBY-1185.
+        topSelf.getSingletonClass().defineFastPrivateMethod("include", new Callback() {
             /**
              * @see org.jruby.runtime.callback.Callback#execute(IRubyObject, IRubyObject[])
              */
-            public IRubyObject execute(IRubyObject recv, IRubyObject[] args) {
+            public IRubyObject execute(IRubyObject recv, IRubyObject[] args, Block block) {
                 runtime.secure(4);
                 return runtime.getObject().include(args);
             }
@@ -83,11 +86,11 @@ public final class TopSelfFactory {
             }
         });
         
-        topSelf.defineSingletonMethod("public", new Callback() {
+        topSelf.getSingletonClass().defineFastPrivateMethod("public", new Callback() {
             /**
              * @see org.jruby.runtime.callback.Callback#execute(IRubyObject, IRubyObject[])
              */
-            public IRubyObject execute(IRubyObject recv, IRubyObject[] args) {
+            public IRubyObject execute(IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
                 return runtime.getObject().rbPublic(args);
             }
 
@@ -99,11 +102,11 @@ public final class TopSelfFactory {
             }
         });
         
-        topSelf.defineSingletonMethod("private", new Callback() {
+        topSelf.getSingletonClass().defineFastPrivateMethod("private", new Callback() {
             /**
              * @see org.jruby.runtime.callback.Callback#execute(IRubyObject, IRubyObject[])
              */
-            public IRubyObject execute(IRubyObject recv, IRubyObject[] args) {
+            public IRubyObject execute(IRubyObject recv, IRubyObject[] args, Block unusedBlock) {
                 return runtime.getObject().rbPrivate(args);
             }
 

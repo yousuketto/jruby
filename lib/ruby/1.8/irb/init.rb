@@ -1,13 +1,13 @@
 #
 #   irb/init.rb - irb initialize module
-#   	$Release Version: 0.9.5$
-#   	$Revision$
-#   	$Date$
-#   	by Keiju ISHITSUKA(keiju@ruby-lang.org)
+#       $Release Version: 0.9.5$
+#       $Revision$
+#       $Date$
+#       by Keiju ISHITSUKA(keiju@ruby-lang.org)
 #
 # --
 #
-#   
+#
 #
 
 module IRB
@@ -119,6 +119,10 @@ module IRB
 
   def IRB.init_error
     @CONF[:LC_MESSAGES].load("irb/error.rb")
+  rescue LoadError
+    # ignore; when running from within an archive (JRuby's "complete" jar) this won't load
+  rescue
+    # happens with applet TODO: probably should make this more robust
   end
 
   FEATURE_IOPT_CHANGE_VERSION = "1.9.0"
@@ -233,7 +237,7 @@ module IRB
   # enumerate possible rc-file base name generators
   def IRB.rc_file_generators
     if irbrc = ENV["IRBRC"]
-      yield proc{|rc| irbrc}
+      yield proc{|rc|  rc == "rc" ? irbrc : irbrc+rc}
     end
     if home = ENV["HOME"]
       yield proc{|rc| home+"/.irb#{rc}"} 

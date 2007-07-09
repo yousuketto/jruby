@@ -33,120 +33,235 @@
 package org.jruby.internal.runtime.methods;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyArray;
+import org.jruby.RubyBinding;
 import org.jruby.RubyModule;
+import org.jruby.RubyProc;
 import org.jruby.ast.ArgsNode;
 import org.jruby.ast.ListNode;
 import org.jruby.ast.Node;
-import org.jruby.ast.ScopeNode;
+import org.jruby.ast.executable.Script;
+import org.jruby.compiler.ArrayCallback;
+import org.jruby.compiler.ClosureCallback;
+import org.jruby.compiler.Compiler;
+import org.jruby.compiler.NodeCompilerFactory;
+import org.jruby.compiler.impl.StandardASMCompiler;
 import org.jruby.evaluator.AssignmentVisitor;
 import org.jruby.evaluator.EvaluationState;
 import org.jruby.exceptions.JumpException;
+import org.jruby.javasupport.util.CompilerHelpers;
 import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
-import org.jruby.runtime.ICallable;
-import org.jruby.runtime.Scope;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.EventHook;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.util.CodegenUtils;
+import org.jruby.util.JRubyClassLoader;
 import org.jruby.util.collections.SinglyLinkedList;
 
 /**
  *
  */
-public final class DefaultMethod extends AbstractMethod {
-    private ScopeNode body;
+public final class DefaultMethod extends DynamicMethod {
+    
+    private StaticScope staticScope;
+    private Node body;
     private ArgsNode argsNode;
     private SinglyLinkedList cref;
+    private int callCount = 0;
+    private Script jitCompiledScript;
+    private int expectedArgsCount;
+    private int restArg;
+    private boolean hasOptArgs;
+    private boolean needsImplementer;
 
-    public DefaultMethod(RubyModule implementationClass, ScopeNode body, ArgsNode argsNode, 
-        Visibility visibility, SinglyLinkedList cref) {
+    public DefaultMethod(RubyModule implementationClass, StaticScope staticScope, Node body, 
+            ArgsNode argsNode, Visibility visibility, SinglyLinkedList cref) {
         super(implementationClass, visibility);
         this.body = body;
+        this.staticScope = staticScope;
         this.argsNode = argsNode;
-		this.cref = cref;
-		
-		assert body != null;
-		assert argsNode != null;
-    }
-    
-    public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-        ThreadContext context = runtime.getCurrentContext();
+        this.cref = cref;
+        this.expectedArgsCount = argsNode.getArgsCount();
+        this.restArg = argsNode.getRestArg();
+        this.hasOptArgs = argsNode.getOptArgs() != null;
+
+        assert argsNode != null;
         
-        context.preDefMethodInternalCall(lastClass, recv, name, args, noSuper, cref);
-    }
-    
-    public void postMethod(IRuby runtime) {
-        ThreadContext context = runtime.getCurrentContext();
-        
-        context.postDefMethodInternalCall();
+        if (implementationClass != null) {
+            needsImplementer = !implementationClass.isClass();
+        }
     }
 
     /**
-     * @see AbstractCallable#call(IRuby, IRubyObject, String, IRubyObject[], boolean)
+     * @see AbstractCallable#call(Ruby, IRubyObject, String, IRubyObject[], boolean)
      */
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-    	assert args != null;
-
-        ThreadContext context = runtime.getCurrentContext();
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, boolean noSuper, Block block) {
+        assert args != null;
         
-        Scope scope = context.getFrameScope();
-        if (body.getLocalNames() != null) {
-            scope.resetLocalVariables(body.getLocalNames());
+        RubyModule implementer = null;
+        if (needsImplementer) {
+            // modules are included with a shim class; we must find that shim to handle super() appropriately
+            implementer = clazz.findImplementer(getImplementationClass());
+        } else {
+            // classes are directly in the hierarchy, so no special logic is necessary for implementer
+            implementer = getImplementationClass();
         }
         
-        if (argsNode.getBlockArgNode() != null && context.isBlockGiven()) {
-            scope.setValue(argsNode.getBlockArgNode().getCount(), runtime.newProc());
-        }
-
+        context.preDefMethodInternalCall(implementer, name, self, args, getArity().required(), block, noSuper, cref, staticScope, this);
+        
         try {
-            prepareArguments(context, runtime, scope, receiver, args);
-            
-            getArity().checkArity(runtime, args);
+            Ruby runtime = context.getRuntime();
 
-            traceCall(runtime, receiver, name);
+            if (runtime.getInstanceConfig().isJitEnabled()) {
+                runJIT(runtime, context, name);
+            }
 
-            return receiver.eval(body.getBodyNode());
-        } catch (JumpException je) {
-        	if (je.getJumpType() == JumpException.JumpType.ReturnJump) {
-	            if (je.getPrimaryData() == this) {
-	                return (IRubyObject)je.getSecondaryData();
-	            }
-        	}
-       		throw je;
+            try {
+                if (jitCompiledScript != null && !runtime.hasEventHooks()) {
+                    return jitCompiledScript.run(context, self, args, block);
+                } else {
+                    if (argsNode.getBlockArgNode() != null) {
+                        CompilerHelpers.processBlockArgument(runtime, context, block, argsNode.getBlockArgNode().getCount());
+                    }
+
+                    getArity().checkArity(runtime, args);
+
+                    prepareArguments(context, runtime, args);
+
+                    if (runtime.hasEventHooks()) {
+                        traceCall(context, runtime, name);
+                    }
+
+                    return EvaluationState.eval(runtime, context, body, self, block);
+                }
+            } catch (JumpException.ReturnJump rj) {
+                    if (rj.getTarget() == this) {
+                    return (IRubyObject) rj.getValue();
+                }
+                throw rj;
+            } catch (JumpException.RedoJump rj) {
+                throw runtime.newLocalJumpError("redo", runtime.getNil(), "unexpected redo");
+            } finally {
+                if (runtime.hasEventHooks()) {
+                    traceReturn(context, runtime, name);
+                }
+            }
         } finally {
-            traceReturn(runtime, receiver, name);
+            context.postDefMethodInternalCall();
         }
     }
 
-    private void prepareArguments(ThreadContext context, IRuby runtime, Scope scope, IRubyObject receiver, IRubyObject[] args) {
-        int expectedArgsCount = argsNode.getArgsCount();
+    private void runJIT(Ruby runtime, ThreadContext context, String name) {
+        if (callCount >= 0) {
+            String className = null;
+            if (runtime.getInstanceConfig().isJitLogging()) {
+                className = getImplementationClass().getBaseName();
+                if (className == null) {
+                    className = "<anon class>";
+                }
+            }
+            
+            try {
+                callCount++;
 
-        int restArg = argsNode.getRestArg();
-        boolean hasOptArgs = argsNode.getOptArgs() != null;
+                if (callCount >= runtime.getInstanceConfig().getJitThreshold()) {
+                    NodeCompilerFactory.confirmNodeIsSafe(argsNode);
+                    // FIXME: Total duplication from DefnNodeCompiler...need to refactor this
+                    final ArrayCallback evalOptionalValue = new ArrayCallback() {
+                        public void nextValue(Compiler context, Object object, int index) {
+                            ListNode optArgs = (ListNode)object;
+                            
+                            Node node = optArgs.get(index);
 
+                            NodeCompilerFactory.getCompiler(node).compile(node, context);
+                        }
+                    };
+                    
+                    ClosureCallback args = new ClosureCallback() {
+                        public void compile(Compiler context) {
+                            Arity arity = argsNode.getArity();
+                            
+                            context.lineNumber(argsNode.getPosition());
+                            int required = expectedArgsCount;
+                            
+                            if (argsNode.getBlockArgNode() != null) {
+                                context.processBlockArgument(argsNode.getBlockArgNode().getCount());
+                            }
+                            
+                            if (hasOptArgs) {
+                                if (restArg > -1) {
+                                    int opt = argsNode.getOptArgs().size();
+                                    context.processRequiredArgs(arity, required, opt, restArg);
+                                    
+                                    ListNode optArgs = argsNode.getOptArgs();
+                                    context.assignOptionalArgs(optArgs, required, opt, evalOptionalValue);
+                                    
+                                    context.processRestArg(required + opt, restArg);
+                                } else {
+                                    int opt = argsNode.getOptArgs().size();
+                                    context.processRequiredArgs(arity, required, opt, restArg);
+                                    
+                                    ListNode optArgs = argsNode.getOptArgs();
+                                    context.assignOptionalArgs(optArgs, required, opt, evalOptionalValue);
+                                }
+                            } else {
+                                if (restArg > -1) {
+                                    context.processRequiredArgs(arity, required, 0, restArg);
+                                    
+                                    context.processRestArg(required, restArg);
+                                } else {
+                                    context.processRequiredArgs(arity, required, 0, restArg);
+                                }
+                            }
+                        }
+                    };
+                    
+                    String cleanName = CodegenUtils.cg.cleanJavaIdentifier(name);
+                    // FIXME: not handling empty bodies correctly...
+                    StandardASMCompiler compiler = new StandardASMCompiler(cleanName + hashCode() + "_" + context.hashCode(), body.getPosition().getFile());
+                    compiler.startScript();
+                    Object methodToken = compiler.beginMethod("__file__", args);
+                    NodeCompilerFactory.getCompiler(body).compile(body, compiler);
+                    compiler.endMethod(methodToken);
+                    compiler.endScript();
+                    Class sourceClass = compiler.loadClass(new JRubyClassLoader(runtime.getJRubyClassLoader()));
+                    jitCompiledScript = (Script)sourceClass.newInstance();
+                    
+                    if (runtime.getInstanceConfig().isJitLogging()) System.err.println("compiled: " + className + "." + name);
+                    callCount = -1;
+                }
+            } catch (Exception e) {
+                if (runtime.getInstanceConfig().isJitLoggingVerbose()) System.err.println("could not compile: " + className + "." + name + " because of: \"" + e.getMessage() + '"');
+                callCount = -1;
+             }
+        }
+    }
+
+    private void prepareArguments(ThreadContext context, Ruby runtime, IRubyObject[] args) {
         if (expectedArgsCount > args.length) {
             throw runtime.newArgumentError("Wrong # of arguments(" + args.length + " for " + expectedArgsCount + ")");
         }
 
-        if (scope.hasLocalVariables() && expectedArgsCount > 0) {
-            for (int i = 0; i < expectedArgsCount; i++) {
-                scope.setValue(i + 2, args[i]);
-            }
+        // Bind 'normal' parameter values to the local scope for this method.
+        if (expectedArgsCount > 0) {
+            context.getCurrentScope().setArgValues(args, expectedArgsCount);
         }
 
         // optArgs and restArgs require more work, so isolate them and ArrayList creation here
         if (hasOptArgs || restArg != -1) {
-            args = prepareOptOrRestArgs(context, runtime, scope, args, expectedArgsCount, restArg, hasOptArgs);
+            args = prepareOptOrRestArgs(context, runtime, args);
         }
         
         context.setFrameArgs(args);
     }
 
-    private IRubyObject[] prepareOptOrRestArgs(ThreadContext context, IRuby runtime, Scope scope, IRubyObject[] args, int expectedArgsCount, int restArg, boolean hasOptArgs) {
+    private IRubyObject[] prepareOptOrRestArgs(ThreadContext context, Ruby runtime, IRubyObject[] args) {
+        int localExpectedArgsCount = expectedArgsCount;
         if (restArg == -1 && hasOptArgs) {
             int opt = expectedArgsCount + argsNode.getOptArgs().size();
 
@@ -167,44 +282,46 @@ public final class DefaultMethod extends AbstractMethod {
             allArgs.add(args[i]);
         }
         
-        if (scope.hasLocalVariables()) {
-            if (hasOptArgs) {
-                ListNode optArgs = argsNode.getOptArgs();
+        if (hasOptArgs) {
+            ListNode optArgs = argsNode.getOptArgs();
    
-                Iterator iter = optArgs.iterator();
-                for (int i = expectedArgsCount; i < args.length && iter.hasNext(); i++) {
-                    //new AssignmentVisitor(new EvaluationState(runtime, receiver)).assign((Node)iter.next(), args[i], true);
-   //                  in-frame EvalState should already have receiver set as self, continue to use it
-                    AssignmentVisitor.assign(context, context.getFrameSelf(), (Node)iter.next(), args[i], true);
-                    expectedArgsCount++;
-                }
+            int j = 0;
+            for (int i = expectedArgsCount; i < args.length && j < optArgs.size(); i++, j++) {
+                // in-frame EvalState should already have receiver set as self, continue to use it
+                AssignmentVisitor.assign(runtime, context, context.getFrameSelf(), optArgs.get(j), args[i], Block.NULL_BLOCK, true);
+                localExpectedArgsCount++;
+            }
    
-                // assign the default values, adding to the end of allArgs
-                while (iter.hasNext()) {
-                    //new EvaluationState(runtime, receiver).begin((Node)iter.next());
-                    //EvaluateVisitor.getInstance().eval(receiver.getRuntime(), receiver, (Node)iter.next());
-                    // in-frame EvalState should already have receiver set as self, continue to use it
-                    allArgs.add(EvaluationState.eval(context, ((Node)iter.next()), context.getFrameSelf()));
-                }
+            // assign the default values, adding to the end of allArgs
+            while (j < optArgs.size()) {
+                // in-frame EvalState should already have receiver set as self, continue to use it
+                allArgs.add(EvaluationState.eval(runtime, context, optArgs.get(j++), context.getFrameSelf(), Block.NULL_BLOCK));
             }
         }
         
         // build an array from *rest type args, also adding to allArgs
         
+        // ENEBO: Does this next comment still need to be done since I killed hasLocalVars:
         // move this out of the scope.hasLocalVariables() condition to deal
         // with anonymous restargs (* versus *rest)
+        
+        
         // none present ==> -1
         // named restarg ==> >=0
         // anonymous restarg ==> -2
         if (restArg != -1) {
-            RubyArray array = runtime.newArray(args.length - expectedArgsCount);
-            for (int i = expectedArgsCount; i < args.length; i++) {
-                array.append(args[i]);
+            for (int i = localExpectedArgsCount; i < args.length; i++) {
                 allArgs.add(args[i]);
             }
+
             // only set in scope if named
             if (restArg >= 0) {
-                scope.setValue(restArg, array);
+                RubyArray array = runtime.newArray(args.length - localExpectedArgsCount);
+                for (int i = localExpectedArgsCount; i < args.length; i++) {
+                    array.append(args[i]);
+                }
+
+                context.getCurrentScope().setValue(restArg, array, 0);
             }
         }
         
@@ -212,31 +329,22 @@ public final class DefaultMethod extends AbstractMethod {
         return args;
     }
 
-    private void traceReturn(IRuby runtime, IRubyObject receiver, String name) {
-        if (runtime.getTraceFunction() == null) {
-            return;
-        }
-
-        ISourcePosition position = runtime.getCurrentContext().getPreviousFramePosition();
-        runtime.callTraceFunction("return", position, receiver, name, getImplementationClass()); // XXX
+    private void traceReturn(ThreadContext context, Ruby runtime, String name) {
+        ISourcePosition position = context.getPreviousFramePosition();
+        runtime.callEventHooks(context, EventHook.RUBY_EVENT_RETURN, position.getFile(), position.getStartLine(), name, getImplementationClass());
     }
-
-    private void traceCall(IRuby runtime, IRubyObject receiver, String name) {
-        if (runtime.getTraceFunction() == null) {
-            return;
-        }
-
-		ISourcePosition position = body.getBodyNode() != null ? 
-            body.getBodyNode().getPosition() : body.getPosition();  
-
-		runtime.callTraceFunction("call", position, receiver, name, getImplementationClass()); // XXX
+    
+    private void traceCall(ThreadContext context, Ruby runtime, String name) {
+        ISourcePosition position = body != null ? body.getPosition() : context.getPosition();
+        
+        runtime.callEventHooks(context, EventHook.RUBY_EVENT_CALL, position.getFile(), position.getStartLine(), name, getImplementationClass());
     }
 
     public Arity getArity() {
         return argsNode.getArity();
     }
     
-    public ICallable dup() {
-        return new DefaultMethod(getImplementationClass(), body, argsNode, getVisibility(), cref);
-    }	
+    public DynamicMethod dup() {
+        return new DefaultMethod(getImplementationClass(), staticScope, body, argsNode, getVisibility(), cref);
+    }
 }

@@ -28,9 +28,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.internal.runtime.methods;
 
-import org.jruby.IRuby;
 import org.jruby.RubyModule;
-import org.jruby.runtime.ICallable;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -38,7 +38,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * 
  * @author jpetersen
  */
-public class UndefinedMethod extends AbstractMethod {
+public class UndefinedMethod extends DynamicMethod {
     private static final UndefinedMethod instance = new UndefinedMethod(Visibility.PUBLIC);
 
     /**
@@ -48,24 +48,10 @@ public class UndefinedMethod extends AbstractMethod {
     private UndefinedMethod(Visibility visibility) {
         super(null, visibility);
     }
-    
-    public void preMethod(IRuby runtime, RubyModule implementationClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-        // do nothing
-    }
-    
-    public void postMethod(IRuby runtime) {
-        // do nothing
-    }
 
-    public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
+    
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule klazz, String name, IRubyObject[] args, boolean noSuper, Block block) {
         throw new UnsupportedOperationException();
-    }
-
-    /**
-     * If UndefinedMethod gets invoked, don't do the usual method scoping/framing. It should never be invoked.
-     */
-    public IRubyObject call(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-        return internalCall(runtime, receiver, lastClass, name, args, noSuper);
     }
 
     public boolean isUndefined() {
@@ -73,7 +59,7 @@ public class UndefinedMethod extends AbstractMethod {
     }
     
     // Dup is not really a dup, but this is a singleton so it hardly matters.
-    public ICallable dup() {
+    public DynamicMethod dup() {
         return instance;
     }
 

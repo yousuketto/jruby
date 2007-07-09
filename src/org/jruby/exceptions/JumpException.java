@@ -14,7 +14,9 @@
  * Copyright (C) 2002 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2002 Jan Arne Petersen <jpetersen@uni-bonn.de>
  * Copyright (C) 2005 Charles O Nutter <headius@headius.com>
- * 
+ * Copyright (C) 2007 Thomas E Enebo <enebo@acm.org>
+ * Copyright (C) 2007 Miguel Covarrubias <mlcovarrubias@gmail.com>
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -30,122 +32,69 @@
 package org.jruby.exceptions;
 
 /**
- * This class should be used for performance reasons if the 
+ * This class should be used for performance reasons if the
  * Exception don't need a stack trace.
- * 
+ *
  * @author jpetersen
  */
 public class JumpException extends RuntimeException {
     private static final long serialVersionUID = -228162532535826617L;
+    
+    public static class FlowControlException extends JumpException {
+        protected Object target;
+        private Object value;
+        // FIXME: Remove inKernelLoop from this and come up with something more general
+        // Hack to detect a break in Kernel#loop
+        private boolean inKernelLoop = false;
 
-    public static final class JumpType {
-        public static final int BREAK = 0;
-        public static final int NEXT = 1;
-        public static final int REDO = 2;
-        public static final int RETRY = 3;
-        public static final int RETURN = 4;
-        public static final int THROW = 5;
-        public static final int RAISE = 6;
-        
-		public static final JumpType BreakJump = new JumpType(BREAK);
-		public static final JumpType NextJump = new JumpType(NEXT);
-		public static final JumpType RedoJump = new JumpType(REDO);
-		public static final JumpType RetryJump = new JumpType(RETRY);
-		public static final JumpType ReturnJump = new JumpType(RETURN);
-		public static final JumpType ThrowJump = new JumpType(THROW);
-		public static final JumpType RaiseJump = new JumpType(RAISE);
-		
-		private final int typeId;
-		private JumpType(int typeId) {
-			this.typeId = typeId;
-		}
-		public int getTypeId() {
-			return typeId;
-		}
-	}
-	
-	private JumpType jumpType;
-	private Object primaryData;
-	private Object secondaryData;
-	private Object tertiaryData;
-
-    /**
-     * Constructor for JumpException.
-     */
-    public JumpException(JumpType jumpType) {
-        super();
-        this.jumpType = jumpType;
+        public FlowControlException() {}
+        public FlowControlException(Object target, Object value) {
+            this.target = target;
+            this.value = value;
+        }
+        public Object getTarget() { return target; }
+        public void setTarget(Object target) { this.target = target; }
+        public Object getValue() { return value; }
+        public void setValue(Object value) { this.value = value; }
+        public void setBreakInKernelLoop(boolean inKernelLoop) { this.inKernelLoop = inKernelLoop; }
+        public boolean isBreakInKernelLoop() { return inKernelLoop; }
     }
-
+    
+    public static class BreakJump extends FlowControlException { public BreakJump(Object t, Object v) { super(t, v); }}
+    public static class NextJump extends FlowControlException { public NextJump(Object t, Object v) { super(t, v); }}
+    public static class RetryJump extends FlowControlException { public RetryJump(Object t, Object v) { super(t, v); }}
+    public static class ThrowJump extends FlowControlException { public ThrowJump(Object t, Object v) { super(t, v); }}
+    public static class RedoJump extends FlowControlException { public RedoJump(Object t, Object v) { super(t, v); }}
+    public static class SpecialJump extends FlowControlException {}
+    public static class ReturnJump extends FlowControlException { public ReturnJump(Object t, Object v) { super(t, v); }}
+    
+    /**
+     * Constructor for flow-control-only JumpExceptions.
+     */
+    public JumpException() {
+    }
+    
     /**
      * Constructor for JumpException.
      * @param msg
      */
-    public JumpException(String msg, JumpType jumpType) {
+    public JumpException(String msg) {
         super(msg);
-        this.jumpType = jumpType;
     }
-
-    public JumpException(String msg, Throwable cause, JumpType jumpType) {
+    
+    public JumpException(String msg, Throwable cause) {
         super(msg, cause);
-        this.jumpType = jumpType;
     }
     
     /** This method don't do anything for performance reasons.
-     * 
+     *
      * @see Throwable#fillInStackTrace()
      */
     public Throwable fillInStackTrace() {
         return this;
-    }    
-
+    }
+    
     protected Throwable originalFillInStackTrace() {
         return super.fillInStackTrace();
     }
-    
-    public JumpType getJumpType() {
-    	return jumpType;
-    }
-    
-	/**
-	 * @return Returns the data.
-	 */
-	public Object getPrimaryData() {
-		return primaryData;
-	}
-	
-	/**
-	 * @param data The data to set.
-	 */
-	public void setPrimaryData(Object data) {
-		this.primaryData = data;
-	}
-	
-	/**
-	 * @return Returns the secondaryData.
-	 */
-	public Object getSecondaryData() {
-		return secondaryData;
-	}
-	
-	/**
-	 * @param secondaryData The secondaryData to set.
-	 */
-	public void setSecondaryData(Object secondaryData) {
-		this.secondaryData = secondaryData;
-	}
-	
-	/**
-	 * @return Returns the tertiaryData.
-	 */
-	public Object getTertiaryData() {
-		return tertiaryData;
-	}
-	
-	/**
-	 * @param tertiaryData The tertiaryData to set.
-	 */
-	public void setTertiaryData(Object tertiaryData) {
-		this.tertiaryData = tertiaryData;
-	}
 }

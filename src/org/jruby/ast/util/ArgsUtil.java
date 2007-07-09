@@ -31,8 +31,10 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast.util;
 
+import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.MethodIndex;
 
 /**
  *
@@ -40,16 +42,45 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 public final class ArgsUtil {
     
-    public static IRubyObject[] arrayify(IRubyObject value) {
+    public static IRubyObject[] convertToJavaArray(IRubyObject value) {
         if (value == null) {
         	return IRubyObject.NULL_ARRAY;
         }
         
         if (value instanceof RubyArray) {
-            return ((RubyArray) value).toJavaArray();
+            return ((RubyArray)value).toJavaArrayMaybeUnsafe();
         }
         
         return new IRubyObject[] { value };
+    }
+
+    /**
+     * This name may be a bit misleading, since this also attempts to coerce
+     * array behavior using to_ary.
+     * 
+     * @param runtime The JRuby runtime
+     * @param value The value to convert
+     * @param coerce Whether to coerce using to_ary or just wrap with an array
+     */
+    public static RubyArray convertToRubyArray(Ruby runtime, IRubyObject value, boolean coerce) {
+        if (value == null) {
+            return RubyArray.newArrayLight(runtime, 0);
+        }
+        
+        if (!coerce) {
+            // don't attempt to coerce to array, just wrap and return
+            return RubyArray.newArrayNoCopyLight(runtime, new IRubyObject[] {value});
+        }
+        
+        IRubyObject newValue = value.convertToType(runtime.getArray(), MethodIndex.TO_ARY, "to_ary", false);
+
+        if (newValue.isNil()) {
+            return RubyArray.newArrayNoCopyLight(runtime, new IRubyObject[] {value});
+        }
+        
+        // empirically it appears that to_ary coersions always return array or nil, so this
+        // should always be an array by now.
+        return (RubyArray)newValue;
     }
     
     /**

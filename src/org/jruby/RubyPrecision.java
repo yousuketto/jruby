@@ -30,6 +30,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -39,11 +40,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 public class RubyPrecision {
     
-    public static RubyModule createPrecisionModule(IRuby runtime) {
+    public static RubyModule createPrecisionModule(Ruby runtime) {
         RubyModule precisionModule = runtime.defineModule("Precision");
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyPrecision.class);
-        precisionModule.defineSingletonMethod("append_features", callbackFactory.getSingletonMethod("append_features", IRubyObject.class));
-        precisionModule.defineMethod("prec", callbackFactory.getSingletonMethod("prec", IRubyObject.class));
+        precisionModule.getSingletonClass().defineMethod("append_features", callbackFactory.getSingletonMethod("append_features", RubyKernel.IRUBY_OBJECT));
+        precisionModule.defineMethod("prec", callbackFactory.getSingletonMethod("prec", RubyKernel.IRUBY_OBJECT));
         precisionModule.defineMethod("prec_i", callbackFactory.getSingletonMethod("prec_i"));
         precisionModule.defineMethod("prec_f", callbackFactory.getSingletonMethod("prec_f"));
         return precisionModule;
@@ -53,24 +54,24 @@ public class RubyPrecision {
         throw receiver.getRuntime().newTypeError("Undefined conversion from " + source.getMetaClass().getName() + " into " + ((RubyClass)receiver).getName());
     }
 
-    public static IRubyObject append_features(IRubyObject receiver, IRubyObject include) {
+    public static IRubyObject append_features(IRubyObject receiver, IRubyObject include, Block block) {
         if (include instanceof RubyModule) {
             ((RubyModule) include).includeModule(receiver);
             CallbackFactory f = receiver.getRuntime().callbackFactory(RubyPrecision.class);
-            include.defineSingletonMethod("induced_from", f.getSingletonMethod("induced_from", IRubyObject.class));
+            include.getSingletonClass().defineMethod("induced_from", f.getSingletonMethod("induced_from", RubyKernel.IRUBY_OBJECT));
         }
         return receiver;
     }
     
-    public static IRubyObject prec(IRubyObject receiver, IRubyObject type) {
-        return type.callMethod("induced_from", receiver);
+    public static IRubyObject prec(IRubyObject receiver, IRubyObject type, Block block) {
+        return type.callMethod(receiver.getRuntime().getCurrentContext(), "induced_from", receiver);
     }
 
-    public static IRubyObject prec_i(IRubyObject receiver) {
-        return receiver.getRuntime().getClass("Integer").callMethod("induced_from", receiver);
+    public static IRubyObject prec_i(IRubyObject receiver, Block block) {
+        return receiver.getRuntime().getClass("Integer").callMethod(receiver.getRuntime().getCurrentContext(), "induced_from", receiver);
     }
 
-    public static IRubyObject prec_f(IRubyObject receiver) {
-        return receiver.getRuntime().getClass("Float").callMethod("induced_from", receiver);
+    public static IRubyObject prec_f(IRubyObject receiver, Block block) {
+        return receiver.getRuntime().getClass("Float").callMethod(receiver.getRuntime().getCurrentContext(), "induced_from", receiver);
     }
 }

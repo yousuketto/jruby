@@ -38,40 +38,41 @@ import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-import org.jruby.IRuby;
+import org.jruby.Ruby;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
 import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class JavaConstructor extends JavaCallable {
-    private Constructor constructor;
+    private final Constructor constructor;
+    private final Class[] parameterTypes;
 
-    public static RubyClass createJavaConstructorClass(IRuby runtime, RubyModule javaModule) {
+    public static RubyClass createJavaConstructorClass(Ruby runtime, RubyModule javaModule) {
+        // TODO: NOT_ALLOCATABLE_ALLOCATOR is probably ok here, since we don't intend for people to monkey with
+        // this type and it can't be marshalled. Confirm. JRUBY-415
         RubyClass result =
-                javaModule.defineClassUnder("JavaConstructor", runtime.getObject());
+                javaModule.defineClassUnder("JavaConstructor", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
         CallbackFactory callbackFactory = runtime.callbackFactory(JavaConstructor.class);
 
         JavaCallable.registerRubyMethods(runtime, result, JavaConstructor.class);
-        result.defineMethod("arity", 
-                callbackFactory.getMethod("arity"));
-        result.defineMethod("inspect", 
-                callbackFactory.getMethod("inspect"));
-        result.defineMethod("argument_types", 
-                callbackFactory.getMethod("argument_types"));
-        result.defineMethod("new_instance", 
-                callbackFactory.getOptMethod("new_instance"));
+        result.defineFastMethod("arity", callbackFactory.getFastMethod("arity"));
+        result.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
+        result.defineFastMethod("argument_types", callbackFactory.getFastMethod("argument_types"));
+        result.defineFastMethod("new_instance", callbackFactory.getFastOptMethod("new_instance"));
         
         return result;
     }
 
-    public JavaConstructor(IRuby runtime, Constructor constructor) {
+    public JavaConstructor(Ruby runtime, Constructor constructor) {
         super(runtime, runtime.getModule("Java").getClass("JavaConstructor"));
         this.constructor = constructor;
+        this.parameterTypes = constructor.getParameterTypes();
     }
 
     public int getArity() {
-        return constructor.getParameterTypes().length;
+        return parameterTypes.length;
     }
 
     public IRubyObject new_instance(IRubyObject[] args) {
@@ -79,7 +80,7 @@ public class JavaConstructor extends JavaCallable {
             throw getRuntime().newArgumentError(args.length, getArity());
         }
         Object[] constructorArguments = new Object[args.length];
-        Class[] types = constructor.getParameterTypes();
+        Class[] types = parameterTypes;
         for (int i = 0; i < args.length; i++) {
             constructorArguments[i] = JavaUtil.convertArgument(args[i], types[i]);
         }
@@ -108,7 +109,7 @@ public class JavaConstructor extends JavaCallable {
     }
 
     protected Class[] parameterTypes() {
-        return constructor.getParameterTypes();
+        return parameterTypes;
     }
 
     protected int getModifiers() {

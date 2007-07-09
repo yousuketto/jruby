@@ -32,7 +32,9 @@
 package org.jruby;
 
 import java.util.Iterator;
+import org.jruby.runtime.Arity;
 
+import org.jruby.runtime.Block;
 import org.jruby.runtime.CallbackFactory;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -42,11 +44,12 @@ public class RubyObjectSpace {
     /** Create the ObjectSpace module and add it to the Ruby runtime.
      * 
      */
-    public static RubyModule createObjectSpaceModule(IRuby runtime) {
+    public static RubyModule createObjectSpaceModule(Ruby runtime) {
         RubyModule objectSpaceModule = runtime.defineModule("ObjectSpace");
         CallbackFactory callbackFactory = runtime.callbackFactory(RubyObjectSpace.class);
         objectSpaceModule.defineModuleFunction("each_object", callbackFactory.getOptSingletonMethod("each_object"));
-        objectSpaceModule.defineModuleFunction("garbage_collect", callbackFactory.getSingletonMethod("garbage_collect"));
+        objectSpaceModule.defineFastModuleFunction("garbage_collect", callbackFactory.getFastSingletonMethod("garbage_collect"));
+        objectSpaceModule.defineFastModuleFunction("_id2ref", callbackFactory.getFastSingletonMethod("id2ref", RubyFixnum.class));
         objectSpaceModule.defineModuleFunction("define_finalizer", 
         		callbackFactory.getOptSingletonMethod("define_finalizer"));
         objectSpaceModule.defineModuleFunction("undefine_finalizer", 
@@ -55,19 +58,49 @@ public class RubyObjectSpace {
         return objectSpaceModule;
     }
 
-    // FIXME: Figure out feasibility of this...
-    public static IRubyObject define_finalizer(IRubyObject recv, IRubyObject[] args) {
-        // Put in to fake tempfile.rb out.
+    public static IRubyObject define_finalizer(IRubyObject recv, IRubyObject[] args, Block block) {
+        Ruby runtime = recv.getRuntime();
+        RubyProc proc = null;
+        if(Arity.checkArgumentCount(runtime, args,1,2) == 2) {
+            if(args[1] instanceof RubyProc) {
+                proc = (RubyProc)args[1];
+            } else {
+                proc = (RubyProc)args[1].convertToType(runtime.getClass("Proc"), 0, "to_proc", true);
+            }
+        } else {
+            proc = runtime.newProc(false, block);
+        }
+        IRubyObject obj = args[0];
+        runtime.getObjectSpace().addFinalizer(obj, proc);
         return recv;
     }
 
-    // FIXME: Figure out feasibility of this...
-    public static IRubyObject undefine_finalizer(IRubyObject recv, IRubyObject[] args) {
-        // Put in to fake other stuff out.
+    public static IRubyObject undefine_finalizer(IRubyObject recv, IRubyObject[] args, Block block) {
+        Arity.checkArgumentCount(recv.getRuntime(), args,1,1);
+        recv.getRuntime().getObjectSpace().removeFinalizers(RubyNumeric.fix2long(args[0].id()));
         return recv;
     }
+
+    public static IRubyObject id2ref(IRubyObject recv, RubyFixnum id) {
+        Ruby runtime = id.getRuntime();
+        long longId = id.getLongValue();
+        if (longId == 0) {
+            return runtime.getFalse();
+        } else if (longId == 2) {
+            return runtime.getTrue();
+        } else if (longId == 4) {
+            return runtime.getNil();
+        } else if (longId % 2 != 0) { // odd
+            return runtime.newFixnum((longId - 1) / 2);
+        } else {
+            IRubyObject object = runtime.getObjectSpace().id2ref(longId);
+            if (object == null)
+                runtime.newRangeError("not an id value");
+            return object;
+        }
+    }
     
-    public static IRubyObject each_object(IRubyObject recv, IRubyObject[] args) {
+    public static IRubyObject each_object(IRubyObject recv, IRubyObject[] args, Block block) {
         RubyModule rubyClass;
         if (args.length == 0) {
             rubyClass = recv.getRuntime().getObject();
@@ -80,7 +113,7 @@ public class RubyObjectSpace {
         ThreadContext context = recv.getRuntime().getCurrentContext();
         while ((obj = (IRubyObject)iter.next()) != null) {
             count++;
-            context.yield(obj);
+            block.yield(context, obj);
         }
         return recv.getRuntime().newFixnum(count);
     }

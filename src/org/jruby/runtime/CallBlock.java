@@ -27,11 +27,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
-import org.jruby.IRuby;
 import org.jruby.RubyModule;
+import org.jruby.exceptions.JumpException;
 import org.jruby.runtime.builtin.IRubyObject;
-
-import org.jruby.internal.runtime.methods.AbstractMethod;
 
 /**
  * A Block implemented using a Java-based BlockCallback implementation
@@ -46,7 +44,13 @@ public class CallBlock extends Block {
     private ThreadContext tc;
 
     public CallBlock(IRubyObject self, RubyModule imClass, Arity arity, BlockCallback callback, ThreadContext ctx) {
-        super(null,new CallMethod(imClass,Visibility.PUBLIC,callback),self,ctx.getCurrentFrame(),ctx.peekCRef(),new Scope(self.getRuntime()),ctx.getRubyClass(),Iter.ITER_PRE,ctx.getCurrentDynamicVars());
+        super(null,
+                self,
+              ctx.getCurrentFrame().duplicate(),
+                ctx.peekCRef(),
+                Visibility.PUBLIC,
+                ctx.getRubyClass(),
+                ctx.getCurrentScope());
         this.arity = arity;
         this.callback = callback;
         this.self = self;
@@ -54,8 +58,54 @@ public class CallBlock extends Block {
         this.tc = ctx;
     }
 
-    public IRubyObject call(IRubyObject[] args, IRubyObject replacementSelf) {
-        return callback.call(args,replacementSelf);
+    public IRubyObject call(ThreadContext context, IRubyObject[] args) {
+        return callback.call(context, args, Block.NULL_BLOCK);
+    }
+    
+    public IRubyObject yield(ThreadContext context, IRubyObject value) {
+        return yield(context, new IRubyObject[] {value}, null, null, false);
+    }
+
+    /**
+     * Yield to this block, usually passed to the current call.
+     * 
+     * @param context represents the current thread-specific data
+     * @param value The value to yield, either a single value or an array of values
+     * @param self The current self
+     * @param klass
+     * @param aValue Should value be arrayified or not?
+     * @return
+     */
+    public IRubyObject yield(ThreadContext context, IRubyObject[] args, IRubyObject self, 
+            RubyModule klass, boolean aValue) {
+        if (klass == null) {
+            self = this.self;
+            frame.setSelf(self);
+        }
+        
+        pre(context, klass);
+
+        try {
+            // This while loop is for restarting the block call in case a 'redo' fires.
+            while (true) {
+                try {
+                    return callback.call(context, args, NULL_BLOCK);
+                } catch (JumpException.RedoJump rj) {
+                    context.pollThreadEvents();
+                    // do nothing, allow loop to redo
+                } catch (JumpException.BreakJump bj) {
+                    if (bj.getTarget() == null) {
+                        bj.setTarget(this);                            
+                    }                        
+                    throw bj;
+                }
+            }
+        } catch (JumpException.NextJump nj) {
+            // A 'next' is like a local return from the block, ending this call or yield.
+            return (IRubyObject)nj.getValue();
+        } finally {
+            post(context);
+        }
     }
 
     public Block cloneBlock() {
@@ -65,29 +115,4 @@ public class CallBlock extends Block {
     public Arity arity() {
         return arity;
     }
-
-    public static class CallMethod extends AbstractMethod {
-        private BlockCallback callback;
-        public CallMethod(RubyModule implementationClass, Visibility visibility, BlockCallback callback) {
-            super(implementationClass, visibility);
-            this.callback = callback;
-        }
-        public void preMethod(IRuby runtime, RubyModule lastClass, IRubyObject recv, String name, IRubyObject[] args, boolean noSuper) {
-            ThreadContext context = runtime.getCurrentContext();
-            context.preMethodCall(implementationClass, lastClass, recv, name, args, noSuper);
-        }
-    
-        public void postMethod(IRuby runtime) {
-            ThreadContext context = runtime.getCurrentContext();
-            context.postMethodCall();
-        }
-
-        public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-            return callback.call(args,receiver);
-        }
-
-        public ICallable dup() {
-            return new CallMethod(getImplementationClass(), getVisibility(),callback);
-        }
-    }    
 }

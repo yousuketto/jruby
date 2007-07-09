@@ -38,11 +38,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
-import org.jruby.internal.runtime.methods.DirectInvocationMethod;
-import org.jruby.runtime.Arity;
-import org.jruby.runtime.Visibility;
+import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 
 /**
@@ -50,33 +49,46 @@ import org.jruby.runtime.marshal.UnmarshalStream;
  * @author  jpetersen
  */
 public class RubySymbol extends RubyObject {
-	// FIXME can't use static; would interfere with other runtimes in the same JVM
-    private static int lastId = 0;
-
     private final String symbol;
     private final int id;
-
-    public static abstract class SymbolMethod extends DirectInvocationMethod {
-        public SymbolMethod(RubyModule implementationClass, Arity arity, Visibility visibility) {
-            super(implementationClass, arity, visibility);
-        }
-        
-        public IRubyObject internalCall(IRuby runtime, IRubyObject receiver, RubyModule lastClass, String name, IRubyObject[] args, boolean noSuper) {
-            RubySymbol s = (RubySymbol)receiver;
-            
-            return invoke(s, args);
-        }
-        
-        public abstract IRubyObject invoke(RubySymbol target, IRubyObject[] args);
-        
-    };
     
-    private RubySymbol(IRuby runtime, String symbol) {
-        super(runtime, runtime.getClass("Symbol"));
+    private RubySymbol(Ruby runtime, String symbol) {
+        super(runtime, runtime.getClass("Symbol"), false);
         this.symbol = symbol;
 
-        lastId++;
-        this.id = lastId;
+        runtime.symbolLastId++;
+        this.id = runtime.symbolLastId;
+    }
+    
+    public static RubyClass createSymbolClass(Ruby runtime) {
+        RubyClass symbolClass = runtime.defineClass("Symbol", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        CallbackFactory callbackFactory = runtime.callbackFactory(RubySymbol.class);   
+        RubyClass symbolMetaClass = symbolClass.getMetaClass();
+        symbolClass.index = ClassIndex.SYMBOL;
+
+        
+        symbolClass.defineFastMethod("==", callbackFactory.getFastMethod("equal", RubyKernel.IRUBY_OBJECT));
+        symbolClass.defineFastMethod("freeze", callbackFactory.getFastMethod("freeze"));
+        symbolClass.defineFastMethod("hash", callbackFactory.getFastMethod("hash"));
+        symbolClass.defineFastMethod("inspect", callbackFactory.getFastMethod("inspect"));
+        symbolClass.defineFastMethod("taint", callbackFactory.getFastMethod("taint"));
+        symbolClass.defineFastMethod("to_i", callbackFactory.getFastMethod("to_i"));
+        symbolClass.defineFastMethod("to_s", callbackFactory.getFastMethod("to_s"));
+        symbolClass.defineFastMethod("to_sym", callbackFactory.getFastMethod("to_sym"));
+        symbolClass.defineAlias("id2name", "to_s");
+        symbolClass.defineAlias("to_int", "to_i");
+
+        symbolMetaClass.defineFastMethod("all_symbols", callbackFactory.getFastSingletonMethod("all_symbols"));
+
+        symbolMetaClass.undefineMethod("new");
+        
+        symbolClass.dispatcher = callbackFactory.createDispatcher(symbolClass);
+        
+        return symbolClass;
+    }
+    
+    public int getNativeTypeIndex() {
+        return ClassIndex.SYMBOL;
     }
 
     /** rb_to_id
@@ -86,16 +98,19 @@ public class RubySymbol extends RubyObject {
     public String asSymbol() {
         return symbol;
     }
+    
+    /** short circuit for Symbol key comparison
+     * 
+     */
+    public final boolean eql(IRubyObject other) {
+        return other == this;
+    }
 
     public boolean isImmediate() {
     	return true;
     }
     
-    public boolean singletonMethodsAllowed() {
-        return false;
-    }
-
-    public static String getSymbol(IRuby runtime, long id) {
+    public static String getSymbol(Ruby runtime, long id) {
         RubySymbol result = runtime.getSymbolTable().lookup(id);
         if (result != null) {
             return result.symbol;
@@ -107,7 +122,7 @@ public class RubySymbol extends RubyObject {
      * 
      */
 
-    public static RubySymbol newSymbol(IRuby runtime, String name) {
+    public static RubySymbol newSymbol(Ruby runtime, String name) {
         RubySymbol result;
         synchronized (RubySymbol.class) {
             // Locked to prevent the creation of multiple instances of
@@ -120,6 +135,12 @@ public class RubySymbol extends RubyObject {
             }
         }
         return result;
+    }
+
+    public IRubyObject equal(IRubyObject other) {
+        // Symbol table ensures only one instance for every name,
+        // so object identity is enough to compare symbols.
+        return RubyBoolean.newBoolean(getRuntime(), this == other);
     }
 
     public RubyFixnum to_i() {
@@ -136,17 +157,19 @@ public class RubySymbol extends RubyObject {
     }
 
     public RubyFixnum hash() {
-        return getRuntime().newFixnum(symbol.hashCode());
+        return getRuntime().newFixnum(hashCode());
+    }
+    
+    public int hashCode() {
+        return id;
+    }
+    
+    public boolean equals(Object other) {
+        return other == this;
     }
     
     public IRubyObject to_sym() {
         return this;
-    }
-
-    // TODO: Should all immediate classes be subclassed so that clone etc...can inherit 
-    // immediate behavior like this.
-    public IRubyObject rbClone() {
-        throw getRuntime().newTypeError("can't clone Symbol");
     }
 
     public IRubyObject freeze() {
@@ -155,11 +178,6 @@ public class RubySymbol extends RubyObject {
 
     public IRubyObject taint() {
         return this;
-    }
-
-    public void marshalTo(MarshalStream output) throws java.io.IOException {
-        output.write(':');
-        output.dumpString(symbol);
     }
     
     private static boolean isIdentStart(char c) {
@@ -283,10 +301,12 @@ public class RubySymbol extends RubyObject {
         return false;
     }
     
- 
+    public static IRubyObject all_symbols(IRubyObject recv) {
+        return recv.getRuntime().newArrayNoCopy(recv.getRuntime().getSymbolTable().all_symbols());
+    }
 
     public static RubySymbol unmarshalFrom(UnmarshalStream input) throws java.io.IOException {
-        RubySymbol result = RubySymbol.newSymbol(input.getRuntime(), input.unmarshalString());
+        RubySymbol result = RubySymbol.newSymbol(input.getRuntime(), RubyString.byteListToString(input.unmarshalString()));
         input.registerLinkTarget(result);
         return result;
     }

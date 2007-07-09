@@ -819,7 +819,6 @@ $z = 0
 test_ok($x[22] == 44)
 test_ok($z == 0)
 
-=begin THIS SECTION HAS ERRORS; UNCOMMENT TO RUN
 test_check "iterator"
 
 test_ok(!iterator?)
@@ -961,6 +960,7 @@ test_ok(IterTest.new(nil).method(:f).to_proc.call([1]) == [1])
 m = /\w+/.match("abc")
 test_ok(IterTest.new(nil).method(:f).to_proc.call([m]) == [m])
 
+
 IterTest.new([0]).each0 {|x| test_ok(x == 0)}
 IterTest.new([1]).each1 {|x| test_ok(x == 1)}
 IterTest.new([2]).each2 {|x| test_ok(x == [2])}
@@ -1047,7 +1047,6 @@ argument_test(true, get_block(&lambda{||}))
 argument_test(false, get_block(&lambda{||}),1)
 argument_test(true, get_block(&lambda{|a,|}),1)
 argument_test(false, get_block(&lambda{|a,|}),1,2)
-
 block = get_block{11}
 test_ok(block.class == Proc)
 test_ok(block.to_proc.class == Proc)
@@ -1106,8 +1105,6 @@ ljump_test(true, lambda{break})
 
 test_ok(block.arity == -1)
 test_ok(lambda.arity == -1)
-=end
-
 test_ok(lambda{||}.arity == 0)
 test_ok(lambda{|a|}.arity == 1)
 test_ok(lambda{|a,|}.arity == 1)
@@ -1121,9 +1118,9 @@ marity_test(:test_ok)
 marity_test(:marity_test)
 marity_test(:p)
 
-=begin
 lambda(&method(:test_ok)).call(true)
 lambda(&get_block{|a,n| test_ok(a,n)}).call(true, 2)
+
 
 class ITER_TEST1
    def a
@@ -1154,7 +1151,6 @@ class ITER_TEST4 < ITER_TEST3
 end
 
 ITER_TEST4.new.foo(44){55}   
-=end
 
 test_check "float"
 test_ok(2.6.floor == 2)
@@ -1451,7 +1447,6 @@ test_ok(aaa(1, 2) == [1, 2])
 test_ok(aaa(1, 2, 3, 4) == [1, 2, 3, 4])
 test_ok(aaa(1, *[2, 3, 4]) == [1, 2, 3, 4])
 
-=begin THIS SECTION HAS ERRORS; UNCOMMENT TO RUN
 test_check "proc"
 $proc = proc{|i| i}
 test_ok($proc.call(2) == 2)
@@ -1511,9 +1506,7 @@ if defined? Process.kill
   end
   test_ok(x && /Interrupt/ =~ x.message)
 end
-=end
 
-=begin THIS SECTION HAS ERRORS; UNCOMMENT TO RUN
 test_check "eval"
 test_ok(eval("") == nil)
 $bad=false
@@ -1758,7 +1751,6 @@ module M003; include M002; end
 
 test_ok(M003.ancestors == [M003, M002, M001])
 
-=begin Removing marshal tests for now; there are multiple breakages here
 test_check "marshal"
 $x = [1,2,3,[4,5,"foo"],{1=>"bar"},2.5,fact(30)]
 $y = Marshal.dump($x)
@@ -1773,7 +1765,6 @@ test_ok(Marshal.load(Marshal.dump(StrClone.new("abc"))).class == StrClone)
   b = Marshal.load(ma)
   test_ok(a == b)
 }
-=end
 
 test_check "pack"
 
@@ -1817,7 +1808,7 @@ test.bar = 47
 test_ok(test.bar == 47)
 
 test_check "variable"
-=begin we do not implement $$ correctly yet (or possibly ever...but we should fake it)
+=begin Running from command-line works but not ant test?
 test_ok($$.instance_of?(Fixnum))
 
 # read-only variable
@@ -1959,7 +1950,7 @@ test_ok(!x.foo)
 test_ok(x.bar)
 test_ok(!x.quux)
 
-=begin There are multiple errors in this section; uncomment to run these tests
+# commented tests are broken. fix them?
 test_check "path"
 test_ok(File.basename("a") == "a")
 test_ok(File.basename("a/b") == "b")
@@ -1982,8 +1973,9 @@ test_ok(File.dirname("/a/b/") == "/a")
 test_ok(File.dirname("/a/b///") == "/a")
 case Dir.pwd
 when %r'\A\w:'
-  test_ok(/\A\w:\/\z/ =~ File.expand_path(".", "/"))
-  test_ok(/\A\w:\/a\z/ =~ File.expand_path("a", "/"))
+# JRUBY-546:
+#  test_ok(/\A\w:\/\z/ =~ File.expand_path(".", "/"))
+#  test_ok(/\A\w:\/a\z/ =~ File.expand_path("a", "/"))
   dosish = true
 when %r'\A//'
   test_ok(%r'\A//[^/]+/[^/]+\z' =~ File.expand_path(".", "/"))
@@ -1994,14 +1986,14 @@ else
   test_ok(File.expand_path("sub", "/") == "/sub")
 end
 if dosish
-  test_ok(File.expand_path("/", "//machine/share/sub") == "//machine/share")
-  test_ok(File.expand_path("/dir", "//machine/share/sub") == "//machine/share/dir")
-  test_ok(File.expand_path("/", "z:/sub") == "z:/")
-  test_ok(File.expand_path("/dir", "z:/sub") == "z:/dir")
-end
+#  test_ok(File.expand_path("/", "//machine/share/sub") == "//machine/share")
+#  test_ok(File.expand_path("/dir", "//machine/share/sub") == "//machine/share/dir")
+#  test_ok(File.expand_path("/", "z:/sub") == "z:/")
+#  test_ok(File.expand_path("/dir", "z:/sub") == "z:/dir")
+else
 test_ok(File.expand_path(".", "//") == "//")
 test_ok(File.expand_path("sub", "//") == "//sub")
-=end
+end
 
 test_check "gc"
 begin

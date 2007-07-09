@@ -16,7 +16,7 @@
  * Copyright (C) 2002-2004 Anders Bengtsson <ndrsbngtssn@yahoo.se>
  * Copyright (C) 2004 Thomas E Enebo <enebo@acm.org>
  * Copyright (C) 2004 Stefan Matthias Aust <sma@3plus4.de>
- * 
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -31,6 +31,10 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import org.jruby.runtime.CallbackFactory;
+import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.ObjectAllocator;
+import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.marshal.MarshalStream;
 
 /**
@@ -38,77 +42,135 @@ import org.jruby.runtime.marshal.MarshalStream;
  * @author  jpetersen
  */
 public class RubyBoolean extends RubyObject {
-	private final IRuby runtime;
-	
-	private final boolean value;
+    private final Ruby runtime;
+    
+    public RubyBoolean(Ruby runtime, boolean value) {
+        super(runtime, (value ? runtime.getClass("TrueClass") : runtime.getClass("FalseClass")), // Don't initialize with class
+                false); // Don't put in object space
 
-	public RubyBoolean(IRuby runtime, boolean value) {
-		super(runtime, null, // Don't initialize with class
-		false); // Don't put in object space
-		this.value = value;
-		this.runtime = runtime;
-	}
-	
-	public IRuby getRuntime() {
-		return runtime;
-	}
-	
-	public boolean isImmediate() {
-		return true;
-	}
-
-	public Class getJavaClass() {
-		return Boolean.TYPE;
-	}
-
-	public RubyClass getMetaClass() {
-		return value
-			? getRuntime().getClass("TrueClass")
-			: getRuntime().getClass("FalseClass");
-	}
-
-	public boolean isTrue() {
-		return value;
-	}
-
-	public boolean isFalse() {
-		return !value;
-	}
-
-	public static RubyClass createFalseClass(IRuby runtime) {
-		RubyClass falseClass = runtime.defineClass("FalseClass", runtime.getObject());
-
-		falseClass.defineMethod("type", runtime.callbackFactory(RubyBoolean.class).getMethod("type"));
-
-		runtime.defineGlobalConstant("FALSE", runtime.getFalse());
-
-		return falseClass;
-	}
-
-	public static RubyClass createTrueClass(IRuby runtime) {
-		RubyClass trueClass = runtime.defineClass("TrueClass", runtime.getObject());
-
-		trueClass.defineMethod("type", runtime.callbackFactory(RubyBoolean.class).getMethod("type"));
-
-		runtime.defineGlobalConstant("TRUE", runtime.getTrue());
-
-		return trueClass;
-	}
-
-	public static RubyBoolean newBoolean(IRuby runtime, boolean value) {
+        if (!value) flags = FALSE_F;
+        
+        this.runtime = runtime;
+    }
+    
+    public int getNativeTypeIndex() {
+        return (flags & FALSE_F) == 0 ? ClassIndex.TRUE : ClassIndex.FALSE;
+    }
+    
+    public Ruby getRuntime() {
+        return runtime;
+    }
+    
+    public boolean isImmediate() {
+        return true;
+    }
+    
+    public Class getJavaClass() {
+        return Boolean.TYPE;
+    }
+    
+//    public RubyClass getMetaClass() {
+//        return isTrue
+//                ? getRuntime().getClass("TrueClass")
+//                : getRuntime().getClass("FalseClass");
+//    }
+    
+    public RubyFixnum id() {
+        return getRuntime().newFixnum((flags & FALSE_F) == 0 ? 2 : 0);
+    }
+    
+    public static RubyClass createFalseClass(Ruby runtime) {
+        RubyClass falseClass = runtime.defineClass("FalseClass", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        falseClass.index = ClassIndex.FALSE;
+        
+        CallbackFactory fact = runtime.callbackFactory(RubyBoolean.class);
+        
+        falseClass.defineFastMethod("type", fact.getFastMethod("type"));
+        falseClass.defineFastMethod("&", fact.getFastMethod("false_and", RubyKernel.IRUBY_OBJECT));
+        falseClass.defineFastMethod("|", fact.getFastMethod("false_or", RubyKernel.IRUBY_OBJECT));
+        falseClass.defineFastMethod("^", fact.getFastMethod("false_xor", RubyKernel.IRUBY_OBJECT));
+        falseClass.defineFastMethod("id", fact.getFastMethod("false_id"));
+        falseClass.defineFastMethod("to_s", fact.getFastMethod("false_to_s"));
+        falseClass.getMetaClass().undefineMethod("new");
+        
+        falseClass.dispatcher = fact.createDispatcher(falseClass);
+        
+        return falseClass;
+    }
+    
+    public static RubyClass createTrueClass(Ruby runtime) {
+        RubyClass trueClass = runtime.defineClass("TrueClass", runtime.getObject(), ObjectAllocator.NOT_ALLOCATABLE_ALLOCATOR);
+        trueClass.index = ClassIndex.TRUE;
+        
+        CallbackFactory fact = runtime.callbackFactory(RubyBoolean.class);
+        
+        trueClass.defineFastMethod("type", fact.getFastMethod("type"));
+        trueClass.defineFastMethod("&", fact.getFastMethod("true_and", RubyKernel.IRUBY_OBJECT));
+        trueClass.defineFastMethod("|", fact.getFastMethod("true_or", RubyKernel.IRUBY_OBJECT));
+        trueClass.defineFastMethod("^", fact.getFastMethod("true_xor", RubyKernel.IRUBY_OBJECT));
+        trueClass.defineFastMethod("id", fact.getFastMethod("true_id"));
+        trueClass.defineFastMethod("to_s", fact.getFastMethod("true_to_s"));
+        trueClass.getMetaClass().undefineMethod("new");
+        
+        trueClass.dispatcher = fact.createDispatcher(trueClass);
+        
+        return trueClass;
+    }
+    
+    public static RubyBoolean newBoolean(Ruby runtime, boolean value) {
         return value ? runtime.getTrue() : runtime.getFalse();
-	}
-
-	/** false_type
-	 *  true_type
-	 *
-	 */
-	public RubyClass type() {
-		return getMetaClass();
-	}
-
-	public void marshalTo(MarshalStream output) throws java.io.IOException {
-		output.write(isTrue() ? 'T' : 'F');
-	}
+    }
+    
+    /** false_type
+     *  true_type
+     *
+     */
+    public RubyClass type() {
+        return getMetaClass();
+    }
+    
+    public IRubyObject false_and(IRubyObject oth) {
+        return this;
+    }
+    
+    public IRubyObject false_or(IRubyObject oth) {
+        return oth.isTrue() ? getRuntime().getTrue() : this;
+    }
+    
+    public IRubyObject false_xor(IRubyObject oth) {
+        return oth.isTrue() ? getRuntime().getTrue() : this;
+    }
+    
+    public IRubyObject false_id() {
+        return RubyFixnum.zero(getRuntime());
+    }
+    
+    public IRubyObject false_to_s() {
+        return getRuntime().newString("false");
+    }
+    
+    public IRubyObject true_and(IRubyObject oth) {
+        return oth.isTrue() ? this : getRuntime().getFalse();
+    }
+    
+    public IRubyObject true_or(IRubyObject oth) {
+        return this;
+    }
+    
+    public IRubyObject true_xor(IRubyObject oth) {
+        return oth.isTrue() ? getRuntime().getFalse() : this;
+    }
+    
+    public IRubyObject true_id() {
+        return getRuntime().newFixnum(2);
+    }
+    
+    public IRubyObject true_to_s() {
+        return getRuntime().newString("true");
+    }
+    
+    public void marshalTo(MarshalStream output) throws java.io.IOException {
+        output.write(isTrue() ? 'T' : 'F');
+    }
 }
 

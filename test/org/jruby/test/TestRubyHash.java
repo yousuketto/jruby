@@ -89,7 +89,7 @@ public class TestRubyHash extends TestRubyBase {
         assertEquals("two", result);
         // identity equality
         result = eval("key = /a/; hash = {key => 'one'}; hash[/a/] = 'two'; puts hash[key]");
-        assertEquals("one", result);
+        assertEquals("two", result);
         result = eval("key = (1..3); hash = {key => 'one'}; hash[(1..3)] = 'two'; puts hash[key]");
         assertEquals("two", result);
     }
@@ -122,8 +122,8 @@ public class TestRubyHash extends TestRubyBase {
     public void testIterating() throws Exception {
         assertEquals("[\"foo\", \"bar\"]", eval("$h.each {|pair| p pair}"));
         assertEquals("{\"foo\"=>\"bar\"}", eval("p $h.each {|pair| }"));
-        assertEquals("[\"foo\", \"bar\"]", eval("$h.each_pair {|pair| p pair}"));
-        assertEquals("{\"foo\"=>\"bar\"}", eval("p $h.each_pair {|pair| }"));
+        assertTrue(eval("$h.each_pair {|pair| p pair}").indexOf("[\"foo\", \"bar\"]") != -1);
+        assertTrue(eval("p $h.each_pair {|pair| }").indexOf("{\"foo\"=>\"bar\"}") != -1);
 
         assertEquals("\"foo\"", eval("$h.each_key {|k| p k}"));
         assertEquals("{\"foo\"=>\"bar\"}", eval("p $h.each_key {|k| }"));
