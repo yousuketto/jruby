@@ -81,7 +81,6 @@ public class InvocationMethodFactory extends MethodFactory implements Opcodes {
         mv.visitVarInsn(ALOAD, 2);
         mv.visitVarInsn(ALOAD, 3);
         mv.visitVarInsn(ALOAD, 4);
-        mv.visitVarInsn(ALOAD, 5);
         mv.visitMethodInsn(INVOKESPECIAL, sup, "<init>", COMPILED_SUPER_SIG);
         mv.visitInsn(RETURN);
         mv.visitMaxs(0,0);

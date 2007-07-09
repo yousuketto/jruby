@@ -39,6 +39,7 @@ public class CompilerHelpers {
             String[] staticScopeNames, CompiledBlockCallback callback) {
         StaticScope staticScope = 
             new BlockStaticScope(context.getCurrentScope().getStaticScope(), staticScopeNames);
+        staticScope.determineModule();
         
         return new CompiledBlock(context, self, Arity.createArity(arity), 
                 new DynamicScope(staticScope, context.getCurrentScope()), callback);
@@ -57,7 +58,8 @@ public class CompilerHelpers {
             runtime.getWarnings().warn("redefining Object#initialize may cause infinite loop");
         }
         
-        StaticScope scope = new LocalStaticScope(null, scopeNames);
+        StaticScope scope = new LocalStaticScope(context.getCurrentScope().getStaticScope(), scopeNames);
+        scope.determineModule();
         
         MethodFactory factory = MethodFactory.createFactory(compiledClass.getClassLoader());
         DynamicMethod method;

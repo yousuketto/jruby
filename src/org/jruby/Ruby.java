@@ -56,6 +56,7 @@ import java.util.Random;
 import java.util.Stack;
 import java.util.WeakHashMap;
 import org.jruby.ast.Node;
+import org.jruby.ast.RootNode;
 import org.jruby.ast.executable.Script;
 import org.jruby.ast.executable.YARVCompiledRunner;
 import org.jruby.common.RubyWarnings;
@@ -88,6 +89,7 @@ import org.jruby.ext.socket.RubySocket;
 import org.jruby.ext.Generator;
 import org.jruby.ext.Readline;
 import org.jruby.parser.Parser;
+import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CacheMap;
 import org.jruby.runtime.CallbackFactory;
@@ -319,7 +321,22 @@ public final class Ruby {
                 }
             
                 // FIXME: Pass something better for args and block here?
-                return script.run(getCurrentContext(), tc.getFrameSelf(), IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
+                try {
+                    DynamicScope scope = new DynamicScope(((RootNode)node).getStaticScope());
+
+                    StaticScope staticScope = scope.getStaticScope();
+
+                    if (staticScope.getModule() == null) {
+                        staticScope.setModule(getObject());
+                    }
+                    
+                    // Each root node has a top-level scope that we need to push
+                    getCurrentContext().preRootNode(scope);
+                    
+                    return script.run(getCurrentContext(), tc.getFrameSelf(), IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
+                } finally {
+                    getCurrentContext().postRootNode();
+                }
             } else {
                 return eval(node);
             }
