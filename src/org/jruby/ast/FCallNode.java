@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 import org.jruby.Ruby;
 import org.jruby.ast.types.INameNode;
@@ -48,9 +51,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a method call with self as an implicit receiver.
  */
 public class FCallNode extends Node implements INameNode, IArgumentNode, BlockAcceptingNode {
+    private static final long serialVersionUID = 0L;
     private Node argsNode;
     protected Node iterNode;
     public CallSite callAdapter;
+
+    public FCallNode() {
+        super();
+    }
 
     @Deprecated
     public FCallNode(ISourcePosition position, String name, Node argsNode) {
@@ -139,5 +147,19 @@ public class FCallNode extends Node implements INameNode, IArgumentNode, BlockAc
         }
             
         return null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(argsNode);
+        out.writeObject(iterNode);
+        out.writeUTF(callAdapter.methodName);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        argsNode = (Node)in.readObject();
+        iterNode = (Node)in.readObject();
+        callAdapter = MethodIndex.getFunctionalCallSite(in.readUTF());
     }
 }

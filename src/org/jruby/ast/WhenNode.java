@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -48,10 +51,15 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a when condition
  */
 public class WhenNode extends Node {
-    protected final Node expressionNodes;
-    protected final Node bodyNode;
-    private final Node nextCase;
-    public final CallSite eqq = MethodIndex.getFunctionalCallSite("===");
+    private static final long serialVersionUID = 0L;
+    protected Node expressionNodes;
+    protected Node bodyNode;
+    private Node nextCase;
+    public final transient CallSite eqq = MethodIndex.getFunctionalCallSite("===");
+
+    public WhenNode() {
+        super();
+    }
 
     public WhenNode(ISourcePosition position, Node expressionNodes, Node bodyNode, Node nextCase) {
         super(position);
@@ -122,5 +130,19 @@ public class WhenNode extends Node {
         }
 
         return null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(expressionNodes);
+        out.writeObject(bodyNode);
+        out.writeObject(nextCase);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        expressionNodes = (Node)in.readObject();
+        bodyNode = (Node)in.readObject();
+        nextCase = (Node)in.readObject();
     }
 }

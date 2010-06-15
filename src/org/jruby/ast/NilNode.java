@@ -47,6 +47,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * represents 'nil'
  */
 public class NilNode extends Node implements INameNode, IEqlNode {
+    private static final long serialVersionUID = 0L;
+    public NilNode() {
+        super();
+    }
+    
     public NilNode(ISourcePosition position) {
         super(position);
     }

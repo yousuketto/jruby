@@ -28,6 +28,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -52,11 +55,16 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Node that represents an assignment of either an array element or attribute.
  */
 public class AttrAssignNode extends Node implements INameNode, IArgumentNode {
-    protected final Node receiverNode;
+    private static final long serialVersionUID = 0L;
+    protected Node receiverNode;
     private String name;
     private Node argsNode;
     public CallSite variableCallAdapter;
     public CallSite normalCallAdapter;
+
+    public AttrAssignNode() {
+        super();
+    }
 
     public AttrAssignNode(ISourcePosition position, Node receiverNode, String name, Node argsNode) {
         super(position);
@@ -274,5 +282,23 @@ public class AttrAssignNode extends Node implements INameNode, IArgumentNode {
         }
 
         return null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(receiverNode);
+        out.writeUTF(name);
+        out.writeObject(argsNode);
+        out.writeUTF(variableCallAdapter.methodName);
+        out.writeUTF(normalCallAdapter.methodName);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        receiverNode = (Node)in.readObject();
+        name = in.readUTF();
+        argsNode = (Node)in.readObject();
+        this.normalCallAdapter = MethodIndex.getCallSite(in.readUTF());
+        this.variableCallAdapter = MethodIndex.getVariableCallSite(in.readUTF());
     }
 }

@@ -43,7 +43,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a method call with self as an implicit receiver.
  */
 public class FCallManyArgsNode extends FCallNode implements INameNode, IArgumentNode, BlockAcceptingNode {
-
+    private static final long serialVersionUID = 0L;
+    public FCallManyArgsNode() {
+        super();
+    }
+    
     public FCallManyArgsNode(ISourcePosition position, String name, Node argsNode) {
         super(position, name, argsNode, null);
     }

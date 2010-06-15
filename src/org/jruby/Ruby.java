@@ -57,7 +57,6 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.WeakHashMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -126,9 +125,12 @@ import com.kenai.constantine.ConstantSet;
 import com.kenai.constantine.platform.Errno;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.util.Arrays;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.ObjectOutputStream;
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.GZIPOutputStream;
 import org.jruby.ast.RootNode;
 import org.jruby.exceptions.Unrescuable;
 import org.jruby.internal.runtime.methods.DynamicMethod;
@@ -2529,8 +2531,30 @@ public final class Ruby {
             }
         }
     }
-    
+
     public void loadFile(String scriptName, InputStream in, boolean wrap) {
+        IRubyObject self = wrap ? TopSelfFactory.createTopSelf(this) : getTopSelf();
+        ThreadContext context = getCurrentContext();
+        String file = context.getFile();
+
+        try {
+            secure(4); /* should alter global state */
+
+            context.setFile(scriptName);
+            context.preNodeEval(objectClass, self, scriptName);
+
+            Node node = parseFile(in, scriptName, null);
+
+            node.interpret(this, context, self, Block.NULL_BLOCK);
+        } catch (JumpException.ReturnJump rj) {
+            return;
+        } finally {
+            context.postNodeEval();
+            context.setFile(file);
+        }
+    }
+    
+    public void loadFile(String scriptName, String filename, InputStream in, boolean wrap) {
         IRubyObject self = wrap ? TopSelfFactory.createTopSelf(this) : getTopSelf();
         ThreadContext context = getCurrentContext();
         String file = context.getFile();
@@ -2541,7 +2565,48 @@ public final class Ruby {
             context.setFile(scriptName);
             context.preNodeEval(objectClass, self, scriptName);
 
-            parseFile(in, scriptName, null).interpret(this, context, self, Block.NULL_BLOCK);
+            Node node = parseFile(in, scriptName, null);
+
+            if (config.getSaveRbjFiles()) {
+                try {
+                    System.out.println("saving: " + filename + "j");
+                    FileOutputStream fos = new FileOutputStream(filename + "j");
+//                    GZIPOutputStream zos = new GZIPOutputStream(fos);
+                    ObjectOutputStream oos = new ObjectOutputStream(fos);
+                    oos.writeObject(node);
+                    oos.close();
+//                    zos.close();
+                    fos.close();
+                } catch (FileNotFoundException fnfe) {
+                    fnfe.printStackTrace();
+                } catch (IOException ioe) {
+                    // ignore
+                    ioe.printStackTrace();
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+                }
+            }
+            node.interpret(this, context, self, Block.NULL_BLOCK);
+        } catch (JumpException.ReturnJump rj) {
+            return;
+        } finally {
+            context.postNodeEval();
+            context.setFile(file);
+        }
+    }
+
+    public void loadFile(String scriptName, Node node, boolean wrap) {
+        IRubyObject self = wrap ? TopSelfFactory.createTopSelf(this) : getTopSelf();
+        ThreadContext context = getCurrentContext();
+        String file = context.getFile();
+
+        try {
+            secure(4); /* should alter global state */
+
+            context.setFile(scriptName);
+            context.preNodeEval(objectClass, self, scriptName);
+
+            node.interpret(this, context, self, Block.NULL_BLOCK);
         } catch (JumpException.ReturnJump rj) {
             return;
         } finally {

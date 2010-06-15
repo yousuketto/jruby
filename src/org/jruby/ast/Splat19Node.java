@@ -38,6 +38,10 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class Splat19Node extends SplatNode {
+    private static final long serialVersionUID = 0L;
+    public Splat19Node() {
+        super();
+    }
 
     public Splat19Node(ISourcePosition position, Node node) {
         super(position, node);

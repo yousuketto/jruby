@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -48,8 +51,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents an instance variable assignment.
  */
 public class InstAsgnNode extends AssignableNode implements INameNode {
+    private static final long serialVersionUID = 0L;
     private String name;
-    private VariableAccessor accessor = VariableAccessor.DUMMY_ACCESSOR;
+    private transient VariableAccessor accessor = VariableAccessor.DUMMY_ACCESSOR;
+
+    public InstAsgnNode() {
+        super();
+    }
 
     /**
      * @param name the name of the instance variable
@@ -111,5 +119,15 @@ public class InstAsgnNode extends AssignableNode implements INameNode {
             accessor = localAccessor;
         }
         return localAccessor;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
     }
 }

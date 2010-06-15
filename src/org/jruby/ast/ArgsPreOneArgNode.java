@@ -37,6 +37,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  *
  */
 public class ArgsPreOneArgNode extends ArgsNode {
+    private static final long serialVersionUID = 0L;
+    public ArgsPreOneArgNode() {
+        super();
+    }
+    
     public ArgsPreOneArgNode(ISourcePosition position, ListNode pre) {
         super(position, pre, null, null, null, null);
     }

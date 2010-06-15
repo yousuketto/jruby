@@ -42,6 +42,9 @@
 
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -65,23 +68,29 @@ import org.jruby.runtime.builtin.IRubyObject;
  * q1...qn = post arguments (only in 1.9)
  */
 public class ArgsNode extends Node {
-    private final ListNode pre;
-    private final int preCount;
-    private final ListNode optArgs;
-    protected final ArgumentNode restArgNode;
-    protected final int restArg;
-    private final BlockArgNode blockArgNode;
+    private static final long serialVersionUID = 0L;
+    private ListNode pre;
+    private int preCount;
+    private ListNode optArgs;
+    protected ArgumentNode restArgNode;
+    protected int restArg;
+    private BlockArgNode blockArgNode;
     protected Arity arity;
-    private final int requiredArgsCount;
-    protected final boolean hasOptArgs;
-    protected final boolean hasMasgnArgs;
+    private int requiredArgsCount;
+    protected boolean hasOptArgs;
+    protected boolean hasMasgnArgs;
     protected int maxArgsCount;
-    protected final boolean isSimple;
+    protected boolean isSimple;
 
     // Only in ruby 1.9 methods
-    private final ListNode post;
-    private final int postCount;
-    private final int postIndex;
+    private ListNode post;
+    private int postCount;
+    private int postIndex;
+
+    public ArgsNode() {
+        super();
+    }
+
     /**
      *
      * @param optionalArguments  Node describing the optional arguments
@@ -442,5 +451,43 @@ public class ArgsNode extends Node {
         if (post != null) return Node.createList(pre, optArgs, restArgNode, post, blockArgNode);
 
         return Node.createList(pre, optArgs, restArgNode, blockArgNode);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(pre);
+        out.writeInt(preCount);
+        out.writeObject(optArgs);
+        out.writeObject(restArgNode);
+        out.writeInt(restArg);
+        out.writeObject(blockArgNode);
+        out.writeObject(arity);
+        out.writeInt(requiredArgsCount);
+        out.writeBoolean(hasOptArgs);
+        out.writeBoolean(hasMasgnArgs);
+        out.writeInt(maxArgsCount);
+        out.writeBoolean(isSimple);
+        out.writeObject(post);
+        out.writeInt(postCount);
+        out.writeInt(postIndex);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        pre = (ListNode)in.readObject();
+        preCount = in.readInt();
+        optArgs = (ListNode)in.readObject();
+        restArgNode = (ArgumentNode)in.readObject();
+        restArg = in.readInt();
+        blockArgNode = (BlockArgNode)in.readObject();
+        arity = (Arity)in.readObject();
+        requiredArgsCount = in.readInt();
+        hasOptArgs = in.readBoolean();
+        hasMasgnArgs = in.readBoolean();
+        maxArgsCount = in.readInt();
+        isSimple = in.readBoolean();
+        post = (ListNode)in.readObject();
+        postCount = in.readInt();
+        postIndex = in.readInt();
     }
 }

@@ -31,15 +31,23 @@ package org.jruby.ast;
 /**
  * Base class for DefnNode and DefsNode 
  */
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.ast.types.INameNode;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.StaticScope;
 
 public abstract class MethodDefNode extends Node implements INameNode {
-	protected final ArgumentNode nameNode;
-	protected final ArgsNode argsNode;
-	protected final StaticScope scope;
-	protected final Node bodyNode;
+    private static final long serialVersionUID = 0L;
+	protected ArgumentNode nameNode;
+	protected ArgsNode argsNode;
+	protected StaticScope scope;
+	protected Node bodyNode;
+
+    public MethodDefNode() {
+        super();
+    }
 
 	public MethodDefNode(ISourcePosition position, ArgumentNode nameNode, ArgsNode argsNode, 
 	        StaticScope scope, Node bodyNode) {
@@ -98,4 +106,20 @@ public abstract class MethodDefNode extends Node implements INameNode {
 	public String getName() {
 	    return nameNode.getName();
 	}
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(nameNode);
+        out.writeObject(argsNode);
+        out.writeObject(scope);
+        out.writeObject(bodyNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        nameNode = (ArgumentNode)in.readObject();
+        argsNode = (ArgsNode)in.readObject();
+        scope = (StaticScope)in.readObject();
+        bodyNode = (Node)in.readObject();
+    }
 }

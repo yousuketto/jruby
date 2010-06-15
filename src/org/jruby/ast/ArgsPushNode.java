@@ -28,6 +28,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -39,8 +42,13 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class ArgsPushNode extends Node {
+    private static final long serialVersionUID = 0L;
     private Node firstNode;
     private Node secondNode;
+
+    public ArgsPushNode() {
+        super();
+    }
     
     public ArgsPushNode(ISourcePosition position, Node firstNode, Node secondNode) {
         super(position);
@@ -77,5 +85,17 @@ public class ArgsPushNode extends Node {
         RubyArray args = (RubyArray) firstNode.interpret(runtime, context, self, aBlock).dup();
         
         return args.append(secondNode.interpret(runtime, context, self, aBlock));        
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(firstNode);
+        out.writeObject(secondNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        firstNode = (Node)in.readObject();
+        secondNode = (Node)in.readObject();
     }
 }

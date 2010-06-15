@@ -28,6 +28,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.ast.types.INameNode;
@@ -39,7 +42,12 @@ import org.jruby.lexer.yacc.ISourcePosition;
  * (evaluation does not need this).
  */
 public class ArgumentNode extends Node implements INameNode {
+    private static final long serialVersionUID = 0L;
     private String identifier;
+
+    public ArgumentNode() {
+        super();
+    }
 
     public ArgumentNode(ISourcePosition position, String identifier) {
         super(position);
@@ -65,5 +73,15 @@ public class ArgumentNode extends Node implements INameNode {
 
     public List<Node> childNodes() {
         return EMPTY_LIST;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(identifier);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        identifier = in.readUTF();
     }
 }

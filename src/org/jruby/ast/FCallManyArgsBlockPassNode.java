@@ -16,6 +16,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * For SplatNode and ArgsCatNode calls.
  */
 public class FCallManyArgsBlockPassNode extends FCallNode {
+    private static final long serialVersionUID = 0L;
+    public FCallManyArgsBlockPassNode() {
+        super();
+    }
+    
     public FCallManyArgsBlockPassNode(ISourcePosition position, String name, Node args, BlockPassNode iter) {
         super(position, name, args, iter);
     }

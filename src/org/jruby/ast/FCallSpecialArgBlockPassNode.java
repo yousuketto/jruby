@@ -18,6 +18,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class FCallSpecialArgBlockPassNode extends FCallNode {
+    private static final long serialVersionUID = 0L;
+    public FCallSpecialArgBlockPassNode() {
+        super();
+    }
+    
     // For 'foo()'.  Args are only significant in maintaining backwards compatible AST structure
     public FCallSpecialArgBlockPassNode(ISourcePosition position, String name, Node args, BlockPassNode iter) {
         super(position, name, args, iter);

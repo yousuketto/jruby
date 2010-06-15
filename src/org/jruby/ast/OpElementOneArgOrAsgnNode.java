@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.Ruby;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Block;
@@ -47,7 +50,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * </pre>
  */
 public class OpElementOneArgOrAsgnNode extends OpElementAsgnNode {
+    private static final long serialVersionUID = 0L;
     private Node arg1;
+
+    public OpElementOneArgOrAsgnNode() {
+        super();
+    }
     
     public OpElementOneArgOrAsgnNode(ISourcePosition position, Node receiverNode, String operatorName, ArrayNode args, Node valueNode) {
         super(position, receiverNode, operatorName, args, valueNode);
@@ -70,5 +78,15 @@ public class OpElementOneArgOrAsgnNode extends OpElementAsgnNode {
         elementAsgnAdapter.call(context, self, receiver, rArg1, firstValue);
         
         return firstValue;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(arg1);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        arg1 = (Node)in.readObject();
     }
 }

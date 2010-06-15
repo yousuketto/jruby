@@ -13,16 +13,18 @@ import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.util.unsafe.UnsafeFactory;
 
 /**
  *
  * @author enebo
  */
 public class Colon2ConstNode extends Colon2Node {
-    private volatile transient IRubyObject cachedValue = null;
-    private volatile int generation = -1;
-    private volatile int hash = -1;
+    private static final long serialVersionUID = 0L;
+    private volatile transient int hash = -1;
+
+    public Colon2ConstNode() {
+        super();
+    }
     
     public Colon2ConstNode(ISourcePosition position, Node leftNode, String name) {
         super(position, leftNode, name);

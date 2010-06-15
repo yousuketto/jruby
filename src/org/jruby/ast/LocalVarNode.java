@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -45,12 +48,17 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Access a local variable 
  */
 public class LocalVarNode extends Node implements INameNode {
+    private static final long serialVersionUID = 0L;
     // The name of the variable
     private String name;
     
     // A scoped location of this variable (high 16 bits is how many scopes down and low 16 bits
     // is what index in the right scope to set the value.
-    private final int location;
+    private int location;
+
+    public LocalVarNode() {
+        super();
+    }
 
     public LocalVarNode(ISourcePosition position, int location, String name) {
         super(position);
@@ -121,5 +129,17 @@ public class LocalVarNode extends Node implements INameNode {
     @Override
     public String definition(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return "local-variable";
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+        out.writeInt(location);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
+        location = in.readInt();
     }
 }

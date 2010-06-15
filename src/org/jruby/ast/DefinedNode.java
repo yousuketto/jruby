@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -45,7 +48,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * a defined statement.
  */
 public class DefinedNode extends Node {
-    private final Node expressionNode;
+    private static final long serialVersionUID = 0L;
+    private Node expressionNode;
+
+    public DefinedNode() {
+        super();
+    }
 
     public DefinedNode(ISourcePosition position, Node expressionNode) {
         super(position);
@@ -88,5 +96,15 @@ public class DefinedNode extends Node {
         } finally {
             context.setWithinDefined(false);
         }
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(expressionNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        expressionNode = (Node)in.readObject();
     }
 }

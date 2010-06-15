@@ -6,7 +6,6 @@
 package org.jruby.ast;
 
 import org.jruby.Ruby;
-import org.jruby.RubyModule;
 import org.jruby.exceptions.JumpException;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -19,6 +18,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * explicit parameters (e.g. Foo::bar()) will be a CallNode.
  */
 public class Colon2MethodNode extends Colon2Node {
+    private static final long serialVersionUID = 0L;
+    public Colon2MethodNode() {
+        super();
+    }
+    
     public Colon2MethodNode(ISourcePosition position, Node leftNode, String name) {
         super(position, leftNode, name);
 

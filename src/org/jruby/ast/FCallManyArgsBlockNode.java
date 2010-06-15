@@ -17,6 +17,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class FCallManyArgsBlockNode extends FCallNode {
+    private static final long serialVersionUID = 0L;
+    public FCallManyArgsBlockNode() {
+        super();
+    }
+    
     public FCallManyArgsBlockNode(ISourcePosition position, String name, Node args, IterNode iter) {
         super(position, name, args, iter);
     }

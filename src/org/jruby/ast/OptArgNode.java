@@ -27,6 +27,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 import org.jruby.Ruby;
 import org.jruby.ast.types.INameNode;
@@ -41,7 +44,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class OptArgNode extends Node implements INameNode {
+    private static final long serialVersionUID = 0L;
     private Node value;
+
+    public OptArgNode() {
+        super();
+    }
 
     public OptArgNode(ISourcePosition position, Node value) {
         super(position);
@@ -83,4 +91,13 @@ public class OptArgNode extends Node implements INameNode {
         return null;
     }
 
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(value);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        value = (Node)in.readObject();
+    }
 }

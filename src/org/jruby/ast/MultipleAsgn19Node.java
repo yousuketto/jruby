@@ -27,6 +27,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,10 +47,15 @@ import org.jruby.runtime.builtin.IRubyObject;
  *
  */
 public class MultipleAsgn19Node extends AssignableNode {
-    private final ListNode pre;
-    private final Node rest;
-    private final ListNode post;
-    private final Arity arity;
+    private static final long serialVersionUID = 0L;
+    private ListNode pre;
+    private Node rest;
+    private ListNode post;
+    private Arity arity;
+
+    public MultipleAsgn19Node() {
+        super();
+    }
 
     public MultipleAsgn19Node(ISourcePosition position, ListNode pre, Node rest, ListNode post) {
         super(position);
@@ -118,5 +126,21 @@ public class MultipleAsgn19Node extends AssignableNode {
         }
 
         return AssignmentVisitor.multiAssign(runtime, context, self, this, (RubyArray) value, checkArity);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(pre);
+        out.writeObject(rest);
+        out.writeObject(post);
+        out.writeObject(arity);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        pre = (ListNode)in.readObject();
+        rest = (Node)in.readObject();
+        post = (ListNode)in.readObject();
+        arity = (Arity)in.readObject();
     }
 }

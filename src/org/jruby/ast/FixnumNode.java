@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 import org.jruby.Ruby;
 import org.jruby.RubyFixnum;
@@ -47,8 +50,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents an integer literal.
  */
 public class FixnumNode extends Node implements ILiteralNode, IEqlNode {
+    private static final long serialVersionUID = 0L;
     private long value;
-    private RubyFixnum fixnum;
+    private transient RubyFixnum fixnum;
+
+    public FixnumNode() {
+        super();
+    }
 
     public FixnumNode(ISourcePosition position, long value) {
         super(position);
@@ -99,5 +107,13 @@ public class FixnumNode extends Node implements ILiteralNode, IEqlNode {
         if (otherValue instanceof RubyFixnum) return value == ((RubyFixnum)otherValue).getLongValue();
 
         return getFixnum(runtime).op_equal(context, otherValue).isTrue();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        out.writeLong(value);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        value = in.readLong();
     }
 }

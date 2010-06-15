@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -46,7 +49,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a float literal.
  */
 public class FloatNode extends Node implements ILiteralNode {
+    private static final long serialVersionUID = 0L;
     private double value;
+
+    public FloatNode() {
+        super();
+    }
     
     public FloatNode(ISourcePosition position, double value) {
         super(position);
@@ -84,5 +92,15 @@ public class FloatNode extends Node implements ILiteralNode {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return RubyFloat.newFloat(runtime, value);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeDouble(value);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        value = in.readDouble();
     }
 }

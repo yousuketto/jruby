@@ -45,6 +45,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a 'redo'
  */
 public class RedoNode extends Node implements NonLocalControlFlowNode {
+    private static final long serialVersionUID = 0L;
+    public RedoNode() {
+        super();
+    }
+    
     public RedoNode(ISourcePosition position) {
         super(position);
     }

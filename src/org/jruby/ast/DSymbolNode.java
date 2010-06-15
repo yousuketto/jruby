@@ -41,6 +41,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Node representing symbol in a form like ':"3jane"'.
  */
 public class DSymbolNode extends ListNode {
+    private static final long serialVersionUID = 0L;
+    public DSymbolNode() {
+        super();
+    }
+    
     /**
      * For mutating from a DStr to a DSym (we just create a new one with same contents).
      * 

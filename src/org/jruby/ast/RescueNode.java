@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -54,9 +57,14 @@ import org.jruby.util.unsafe.UnsafeFactory;
  * Represents a rescue statement
  */
 public class RescueNode extends Node {
-    private final Node bodyNode;
-    private final RescueBodyNode rescueNode;
-    private final Node elseNode;
+    private static final long serialVersionUID = 0L;
+    private Node bodyNode;
+    private RescueBodyNode rescueNode;
+    private Node elseNode;
+    
+    public RescueNode() {
+        super();
+    }
     
     public RescueNode(ISourcePosition position, Node bodyNode, RescueBodyNode rescueNode, Node elseNode) {
         super(position);
@@ -219,5 +227,19 @@ public class RescueNode extends Node {
             exceptions = ASTInterpreter.setupArgs(runtime, context, exceptionNodes, self, aBlock);
         }
         return exceptions;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(bodyNode);
+        out.writeObject(rescueNode);
+        out.writeObject(elseNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        bodyNode = (Node)in.readObject();
+        rescueNode = (RescueBodyNode)in.readObject();
+        elseNode = (Node)in.readObject();
     }
 }

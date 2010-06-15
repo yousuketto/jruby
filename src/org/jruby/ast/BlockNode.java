@@ -44,6 +44,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a block of nodes (read that as list).
  */
 public class BlockNode extends ListNode {
+    private static final long serialVersionUID = 0L;
+    public BlockNode() {
+        super();
+    }
+    
     public BlockNode(ISourcePosition position) {
         super(position);
     }

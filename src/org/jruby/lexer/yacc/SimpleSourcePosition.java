@@ -28,9 +28,18 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.lexer.yacc;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+
 public class SimpleSourcePosition implements ISourcePosition {
-    final String filename;
-    final int line;
+    private static final long serialVersionUID = 0L;
+    String filename;
+    int line;
+
+    public SimpleSourcePosition() {
+        super();
+    }
 
     public SimpleSourcePosition(String filename, int line) {
         this.filename = filename;
@@ -52,5 +61,15 @@ public class SimpleSourcePosition implements ISourcePosition {
     @Override
     public String toString() {
         return getFile() + ":" + getStartLine();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        out.writeUTF(filename);
+        out.writeInt(line);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        filename = in.readUTF();
+        line = in.readInt();
     }
 }

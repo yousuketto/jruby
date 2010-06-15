@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -45,12 +48,29 @@ import org.jruby.runtime.builtin.IRubyObject;
  * An assignment to a dynamic variable (e.g. block scope local variable).
  */
 public class DAsgnNode extends AssignableNode implements INameNode {
+    private static final long serialVersionUID = 0L;
     // The name of the variable
     private String name;
     
     // A scoped location of this variable (high 16 bits is how many scopes down and low 16 bits
     // is what index in the right scope to set the value.
     private int location;
+
+    public DAsgnNode() {
+        super();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+        out.writeInt(location);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
+        location = in.readInt();
+    }
 
     public DAsgnNode(ISourcePosition position, String name, int location, Node valueNode) {
         super(position, valueNode);

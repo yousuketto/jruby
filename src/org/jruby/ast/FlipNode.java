@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -47,12 +50,17 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A Range in a boolean expression (named after a FlipFlop component in electronic?).
  */
 public class FlipNode extends Node {
-    private final Node beginNode;
-    private final Node endNode;
-    private final boolean exclusive;
+    private static final long serialVersionUID = 0L;
+    private Node beginNode;
+    private Node endNode;
+    private boolean exclusive;
     // A scoped location of this variable (high 16 bits is how many scopes down and low 16 bits
     // is what index in the right scope to set the value.
-    private final int location;
+    private int location;
+
+    public FlipNode() {
+        super();
+    }
     
     public FlipNode(ISourcePosition position, Node beginNode, Node endNode, boolean exclusive, int location) {
         super(position);
@@ -175,5 +183,21 @@ public class FlipNode extends Node {
     
     private static RubyBoolean falseIfTrue(Ruby runtime, IRubyObject truish) {
         return truish.isTrue() ? runtime.getFalse() : runtime.getTrue();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(beginNode);
+        out.writeObject(endNode);
+        out.writeBoolean(exclusive);
+        out.writeInt(location);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        beginNode = (Node)in.readObject();
+        endNode = (Node)in.readObject();
+        exclusive = in.readBoolean();
+        location = in.readInt();
     }
 }

@@ -33,6 +33,10 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,11 +53,15 @@ import org.jruby.runtime.builtin.IRubyObject;
 /**
  * Base class for all Nodes in the AST
  */
-public abstract class Node implements ISourcePositionHolder {    
+public abstract class Node implements ISourcePositionHolder, Externalizable {
+    private static final long serialVersionUID = 0L;
     // We define an actual list to get around bug in java integration (1387115)
     static final List<Node> EMPTY_LIST = new ArrayList<Node>();
     
     private ISourcePosition position;
+
+    public Node() {
+    }
 
     public Node(ISourcePosition position) {
         assert position != null;
@@ -143,4 +151,12 @@ public abstract class Node implements ISourcePositionHolder {
      * @return the nodeId
      */
     public abstract NodeType getNodeType();
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        out.writeObject(position);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        position = (ISourcePosition)in.readObject();
+    }
 }

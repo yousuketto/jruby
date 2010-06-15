@@ -38,7 +38,11 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class SValue19Node extends SValueNode {
-
+    private static final long serialVersionUID = 0L;
+    public SValue19Node() {
+        super();
+    }
+    
     public SValue19Node(ISourcePosition position, Node node) {
         super(position, node);
     }

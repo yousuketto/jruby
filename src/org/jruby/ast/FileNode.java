@@ -35,6 +35,11 @@ import org.jruby.util.ByteList;
  * Represents __FILE__ nodes
  */
 public class FileNode extends StrNode {
+    private static final long serialVersionUID = 0L;
+    public FileNode() {
+        super();
+    }
+    
     public FileNode(ISourcePosition position, ByteList value) {
         super(position, value);
     }

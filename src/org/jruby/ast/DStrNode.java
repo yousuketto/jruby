@@ -46,6 +46,11 @@ import org.jruby.util.ByteList;
  * A string which contains some dynamic elements which needs to be evaluated (introduced by #).
  */
 public class DStrNode extends ListNode implements ILiteralNode {
+    private static final long serialVersionUID = 0L;
+    public DStrNode() {
+        super();
+    }
+    
     public DStrNode(ISourcePosition position) {
         super(position);
     }

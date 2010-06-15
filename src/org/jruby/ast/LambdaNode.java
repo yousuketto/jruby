@@ -42,6 +42,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Stubby lambda node (1.9 only)
  */
 public class LambdaNode extends IterNode {
+    private static final long serialVersionUID = 0L;
+    public LambdaNode() {
+        super();
+    }
+    
     public LambdaNode(ISourcePosition position, ArgsNode args, Node body, StaticScope scope) {
         super(position, args, body, scope);
     }

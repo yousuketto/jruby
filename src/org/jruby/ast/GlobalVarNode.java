@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -45,7 +48,22 @@ import org.jruby.runtime.builtin.IRubyObject;
  *	access to a global variable.
  */
 public class GlobalVarNode extends Node implements INameNode {
+    private static final long serialVersionUID = 0L;
     private String name;
+
+    public GlobalVarNode() {
+        super();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
+    }
 
     public GlobalVarNode(ISourcePosition position, String name) {
         super(position);

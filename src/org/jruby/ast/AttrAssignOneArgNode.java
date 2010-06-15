@@ -5,6 +5,9 @@
 
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.Ruby;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Block;
@@ -17,7 +20,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class AttrAssignOneArgNode extends AttrAssignNode {
+    private static final long serialVersionUID = 0L;
     private Node arg1;
+
+    public AttrAssignOneArgNode() {
+        super();
+    }
     
     public AttrAssignOneArgNode(ISourcePosition position, Node receiverNode, String name, ArrayNode argsNode) {
         super(position, receiverNode, name, argsNode);
@@ -54,5 +62,15 @@ public class AttrAssignOneArgNode extends AttrAssignNode {
         callSite.call(context, self, receiver, param1, value);
         
         return runtime.getNil();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(arg1);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        arg1 = (Node)in.readObject();
     }
 }

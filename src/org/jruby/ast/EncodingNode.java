@@ -41,6 +41,11 @@ import org.jruby.util.KCode;
  * Represents __ENCODING__.
  */
 public class EncodingNode extends Node {
+    private static final long serialVersionUID = 0L;
+    public EncodingNode() {
+        super();
+    }
+    
     public EncodingNode(ISourcePosition position) {
         super(position);
     }

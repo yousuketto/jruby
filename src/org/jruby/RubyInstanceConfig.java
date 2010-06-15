@@ -202,6 +202,7 @@ public class RubyInstanceConfig {
     private String inPlaceBackupExtension = null;
     private boolean parserDebug = false;
     private String threadDumpSignal = null;
+    private boolean saveRbjFiles = false;
 
     private int safeLevel = 0;
 
@@ -1171,6 +1172,9 @@ public class RubyInstanceConfig {
                         INLINE_DYNCALL_ENABLED = true;
                         RubyException.TRACE_TYPE = RubyException.RUBY_COMPILED;
                         break FOR;
+                    } else if (argument.equals("--rbj")) {
+                        saveRbjFiles = true;
+                        break FOR;
                     } else if (argument.equals("--1.9")) {
                         setCompatVersion(CompatVersion.RUBY1_9);
                         break FOR;
@@ -1547,5 +1551,13 @@ public class RubyInstanceConfig {
 
     public String getThreadDumpSignal() {
         return threadDumpSignal;
+    }
+
+    public boolean getSaveRbjFiles() {
+        return saveRbjFiles;
+    }
+
+    public void setSaveRbjFiles(boolean saveRbjFiles) {
+        this.saveRbjFiles = saveRbjFiles;
     }
 }

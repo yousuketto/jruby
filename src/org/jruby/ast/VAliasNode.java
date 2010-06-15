@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,8 +47,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents an alias of a global variable.
  */
 public class VAliasNode extends Node {
+    private static final long serialVersionUID = 0L;
     private String oldName;
     private String newName;
+
+    public VAliasNode() {
+        super();
+    }
 
     public VAliasNode(ISourcePosition position, String newName, String oldName) {
         super(position);
@@ -90,5 +98,17 @@ public class VAliasNode extends Node {
         runtime.getGlobalVariables().alias(newName, oldName);
    
         return runtime.getNil();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(oldName);
+        out.writeUTF(newName);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        oldName = in.readUTF();
+        newName = in.readUTF();
     }
 }

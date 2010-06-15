@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -56,10 +59,15 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A method or operator call.
  */
 public class CallNode extends Node implements INameNode, IArgumentNode, BlockAcceptingNode {
-    private final Node receiverNode;
+    private static final long serialVersionUID = 0L;
+    private Node receiverNode;
     private Node argsNode;
     protected Node iterNode;
     public CallSite callAdapter;
+
+    public CallNode() {
+        super();
+    }
 
     @Deprecated
     public CallNode(ISourcePosition position, Node receiverNode, String name, Node argsNode) {
@@ -189,5 +197,21 @@ public class CallNode extends Node implements INameNode, IArgumentNode, BlockAcc
         }
 
         return null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(receiverNode);
+        out.writeObject(argsNode);
+        out.writeObject(iterNode);
+        out.writeUTF(callAdapter.methodName);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        receiverNode = (Node)in.readObject();
+        argsNode = (Node)in.readObject();
+        iterNode = (Node)in.readObject();
+        callAdapter = MethodIndex.getCallSite(in.readUTF());
     }
 }

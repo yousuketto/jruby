@@ -44,6 +44,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a 'retry' statement.
  */
 public class RetryNode extends Node implements NonLocalControlFlowNode {
+    private static final long serialVersionUID = 0L;
+    public RetryNode() {
+        super();
+    }
+    
     public RetryNode(ISourcePosition position) {
         super(position);
     }

@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.Ruby;
 import org.jruby.RubyRegexp;
 import org.jruby.RubyString;
@@ -47,9 +50,26 @@ import org.jruby.runtime.builtin.IRubyObject;
  * is used for a match.
  */
 public class DRegexpNode extends ListNode implements ILiteralNode {
-    private final int options;
-    private final boolean once;
-    private RubyRegexp onceRegexp;
+    private static final long serialVersionUID = 0L;
+    private int options;
+    private boolean once;
+    private transient RubyRegexp onceRegexp;
+
+    public DRegexpNode() {
+        super();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeInt(options);
+        out.writeBoolean(once);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        options = in.readInt();
+        once = in.readBoolean();
+    }
     
     public DRegexpNode(ISourcePosition position) {
         this(position, 0, false);

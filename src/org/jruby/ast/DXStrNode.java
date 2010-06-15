@@ -45,6 +45,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * or maybe the X is due to the %x general quote syntax?
  */
 public class DXStrNode extends ListNode implements ILiteralNode {
+    private static final long serialVersionUID = 0L;
+    public DXStrNode() {
+        super();
+    }
+    
     public DXStrNode(ISourcePosition position, DStrNode node) {
         super(position);
         addAll(node);

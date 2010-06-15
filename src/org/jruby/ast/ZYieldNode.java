@@ -16,6 +16,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class ZYieldNode extends YieldNode {
+    private static final long serialVersionUID = 0L;
+    public ZYieldNode() {
+        super();
+    }
+    
     public ZYieldNode(ISourcePosition position) {
         super(position, null, true);
     }

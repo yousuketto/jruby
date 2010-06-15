@@ -425,6 +425,8 @@ class Gem::Specification
     yield self if block_given?
 
     @@gather.call(self) if @@gather
+    
+    $last_gemspec = self
   end
 
   ##

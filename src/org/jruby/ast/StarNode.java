@@ -47,6 +47,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * AssignmentVisitor.multiAssign checks for this (this is never visited directly)
  */
 public class StarNode extends Node {
+    private static final long serialVersionUID = 0L;
+    public StarNode() {
+        super();
+    }
+    
     /**
      * Constructor for StarNode.
      */

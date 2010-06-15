@@ -28,6 +28,10 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.io.Serializable;
 
 import org.jruby.Ruby;
@@ -53,12 +57,12 @@ import org.jruby.runtime.scope.NoVarsDynamicScope;
  * will point to the previous scope of the enclosing module/class (cref).
  * 
  */
-public abstract class StaticScope implements Serializable {
+public abstract class StaticScope implements Serializable, Externalizable {
     private static final long serialVersionUID = 4843861446986961013L;
     
     // Next immediate scope.  Variable and constant scoping rules make use of this variable
     // in different ways.
-    final protected StaticScope enclosingScope;
+    protected StaticScope enclosingScope;
     
     // Live reference to module
     private transient RubyModule cref = null;
@@ -85,7 +89,47 @@ public abstract class StaticScope implements Serializable {
 
     private boolean isBackrefLastlineScope = false;
     
-    private DynamicScope dummyScope;
+    private transient DynamicScope dummyScope;
+
+    public StaticScope() {
+        super();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        out.writeObject(enclosingScope);
+        out.writeObject(previousCRefScope);
+        out.writeInt(variableNames.length);
+        for (int i = 0; i < variableNames.length; i++) {
+            out.writeUTF(variableNames[i]);
+        }
+        out.writeInt(variableCaptured.length);
+        for (int i = 0; i < variableCaptured.length; i++) {
+            out.writeBoolean(variableCaptured[i]);
+        }
+        out.writeInt(requiredArgs);
+        out.writeInt(optionalArgs);
+        out.writeInt(restArg);
+        out.writeBoolean(isArgumentScope);
+        out.writeBoolean(isBackrefLastlineScope);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        enclosingScope = (StaticScope)in.readObject();
+        previousCRefScope = (StaticScope)in.readObject();
+        variableNames = new String[in.readInt()];
+        for (int i = 0; i < variableNames.length; i++) {
+            variableNames[i] = in.readUTF().intern();
+        }
+        variableCaptured = new boolean[in.readInt()];
+        for (int i = 0; i < variableCaptured.length; i++) {
+            variableCaptured[i] = in.readBoolean();
+        }
+        requiredArgs = in.readInt();
+        optionalArgs = in.readInt();
+        restArg = in.readInt();
+        isArgumentScope = in.readBoolean();
+        isBackrefLastlineScope = in.readBoolean();
+    }
 
     /**
      * Construct a new static scope. The array of strings should all be the

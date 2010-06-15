@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,8 +47,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a && (and) operator.
  */
 public class AndNode extends Node implements BinaryOperatorNode {
-    private final Node firstNode;
-    private final Node secondNode;
+    private static final long serialVersionUID = 0L;
+    private Node firstNode;
+    private Node secondNode;
+
+    public AndNode() {
+        super();
+    }
 
     public AndNode(ISourcePosition position, Node firstNode, Node secondNode) {
         super(position);
@@ -92,5 +100,17 @@ public class AndNode extends Node implements BinaryOperatorNode {
         if (!result.isTrue()) return result;
         
         return secondNode.interpret(runtime, context, self, aBlock);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(firstNode);
+        out.writeObject(secondNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        firstNode = (Node)in.readObject();
+        secondNode = (Node)in.readObject();
     }
 }

@@ -28,6 +28,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -48,9 +51,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  */
 // TODO: Store BEGIN and END information into this node
 public class RootNode extends Node {
+    private static final long serialVersionUID = 0L;
     private transient DynamicScope scope;
     private StaticScope staticScope;
     private Node bodyNode;
+
+    public RootNode() {
+        super();
+    }
 
     public RootNode(ISourcePosition position, DynamicScope scope, Node bodyNode) {
         super(position);
@@ -130,5 +138,17 @@ public class RootNode extends Node {
         } finally {
             context.postScopedBody();
         }    
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(staticScope);
+        out.writeObject(bodyNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        staticScope = (StaticScope)in.readObject();
+        bodyNode = (Node)in.readObject();
     }
 }

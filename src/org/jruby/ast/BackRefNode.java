@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -50,10 +53,15 @@ import org.jruby.runtime.builtin.IRubyObject;
  *    - $' what follows the last successful match
  */
 public class BackRefNode extends Node {
+    private static final long serialVersionUID = 0L;
     /**
      * the character which generated the back reference
      **/
-    private final char type;
+    private char type;
+
+    public BackRefNode() {
+        super();
+    }
 
     public BackRefNode(ISourcePosition position, int type) {
         super(position);
@@ -109,5 +117,15 @@ public class BackRefNode extends Node {
         IRubyObject backref = context.getCurrentScope().getBackRef(runtime);
         
         return backref instanceof RubyMatchData ? "$" + type : null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeChar(type);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        type = in.readChar();
     }
 }

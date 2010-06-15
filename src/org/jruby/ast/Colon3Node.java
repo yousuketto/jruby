@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -48,9 +51,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Object class) when referring to a constant or method.
  */
 public class Colon3Node extends Node implements INameNode {
+    private static final long serialVersionUID = 0L;
     protected String name;
-    private volatile transient IRubyObject cachedValue;
-    private volatile int generation;
+    protected volatile transient IRubyObject cachedValue;
+    protected volatile transient int generation = -1;
+
+    public Colon3Node() {
+        super();
+    }
     
     public Colon3Node(ISourcePosition position, String name) {
         super(position);
@@ -142,5 +150,15 @@ public class Colon3Node extends Node implements INameNode {
         if (value != null) generation = newGeneration;
 
         return value;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
     }
 }

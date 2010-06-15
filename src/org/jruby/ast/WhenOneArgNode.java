@@ -17,6 +17,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class WhenOneArgNode extends WhenNode {
+    private static final long serialVersionUID = 0L;
+    public WhenOneArgNode() {
+        super();
+    }
+    
     public WhenOneArgNode(ISourcePosition position, Node expressionNode, Node bodyNode, Node nextCase) {
         super(position, expressionNode, bodyNode, nextCase);
     }

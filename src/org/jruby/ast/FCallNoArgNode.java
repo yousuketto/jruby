@@ -16,6 +16,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class FCallNoArgNode extends FCallNode {
+    private static final long serialVersionUID = 0L;
+    public FCallNoArgNode() {
+        super();
+    }
+    
     // For 'foo'
     public FCallNoArgNode(ISourcePosition position, String name) {
         super(position, name, null, null);

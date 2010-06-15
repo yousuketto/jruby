@@ -43,6 +43,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A method or operator call.
  */
 public final class CallSpecialArgNode extends CallNode {
+    private static final long serialVersionUID = 0L;
+    public CallSpecialArgNode() {
+        super();
+    }
+    
     public CallSpecialArgNode(ISourcePosition position, Node receiverNode, String name, Node args) {
         super(position, receiverNode, name, args, null);
     }

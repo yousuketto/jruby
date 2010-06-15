@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -51,9 +54,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @see IterNode
  */
 public class ForNode extends IterNode {
+    private static final long serialVersionUID = 0L;
     public final CallSite callAdapter = MethodIndex.getCallSite("each");
 
     private Node iterNode;
+
+    public ForNode() {
+        super();
+    }
 
     public ForNode(ISourcePosition position, Node varNode, Node bodyNode, Node iterNode) {
         // For nodes do not have their own scope so we pass null to indicate this.
@@ -114,5 +122,15 @@ public class ForNode extends IterNode {
         } catch (JumpException.BreakJump bj) {
             return (IRubyObject) bj.getValue();
         }
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(iterNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        iterNode = (Node)in.readObject();
     }
 }

@@ -46,6 +46,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents 'self' keyword
  */
 public class SelfNode extends Node implements INameNode {
+    private static final long serialVersionUID = 0L;
+    public SelfNode() {
+        super();
+    }
+    
     public SelfNode(ISourcePosition position) {
         super(position);
     }

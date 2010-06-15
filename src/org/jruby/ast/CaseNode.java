@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -47,15 +50,20 @@ import org.jruby.runtime.builtin.IRubyObject;
  * when statements.
  */
 public class CaseNode extends Node {
+    private static final long serialVersionUID = 0L;
 	/**
 	 * the case expression.
 	 **/
-    private final Node caseNode;
+    private Node caseNode;
 	/**
 	 * A list of all choices including else
 	 */
-    private final ListNode cases;
+    private ListNode cases;
     private Node elseNode = null;
+
+    public CaseNode() {
+        super();
+    }
     
     public CaseNode(ISourcePosition position, Node caseNode, ListNode cases) {
         super(position);
@@ -136,5 +144,19 @@ public class CaseNode extends Node {
         }
 
         return elseNode != null ? elseNode.interpret(runtime, context, self, aBlock) : runtime.getNil();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(caseNode);
+        out.writeObject(cases);
+        out.writeObject(elseNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        caseNode = (Node)in.readObject();
+        cases = (ListNode)in.readObject();
+        elseNode = (Node)in.readObject();
     }
 }

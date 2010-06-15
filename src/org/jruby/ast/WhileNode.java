@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -57,11 +60,16 @@ import org.jruby.runtime.builtin.IRubyObject;
  * &lt;body&gt; 'while' &lt;condition&gt;
  */
 public class WhileNode extends Node {
-    private final Node conditionNode;
-    private final Node bodyNode;
-    private final boolean evaluateAtStart;
+    private static final long serialVersionUID = 0L;
+    private Node conditionNode;
+    private Node bodyNode;
+    private boolean evaluateAtStart;
     
     public boolean containsNonlocalFlow = false;
+
+    public WhileNode() {
+        super();
+    }
 
     public WhileNode(ISourcePosition position, Node conditionNode, Node bodyNode) {
         this(position, conditionNode, bodyNode, true);
@@ -162,5 +170,21 @@ public class WhileNode extends Node {
             result = runtime.getNil();
         }
         return ASTInterpreter.pollAndReturn(context, result);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(conditionNode);
+        out.writeObject(bodyNode);
+        out.writeBoolean(evaluateAtStart);
+        out.writeBoolean(containsNonlocalFlow);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        conditionNode = (Node)in.readObject();
+        bodyNode = (Node)in.readObject();
+        evaluateAtStart = in.readBoolean();
+        containsNonlocalFlow = in.readBoolean();
     }
 }

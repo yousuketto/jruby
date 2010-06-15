@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.Ruby;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Block;
@@ -43,7 +46,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A method or operator call.
  */
 public final class CallOneArgFixnumNode extends CallNode {
+    private static final long serialVersionUID = 0L;
     private long arg1;
+
+    public CallOneArgFixnumNode() {
+        super();
+    }
     
     public CallOneArgFixnumNode(ISourcePosition position, Node receiverNode, String name, ArrayNode args) {
         super(position, receiverNode, name, args, null);
@@ -63,5 +71,15 @@ public final class CallOneArgFixnumNode extends CallNode {
     @Override
     public Node setIterNode(Node iterNode) {
         return new CallOneArgBlockNode(getPosition(), getReceiverNode(), getName(), (ArrayNode) getArgsNode(), (IterNode) iterNode);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeLong(arg1);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        arg1 = in.readLong();
     }
 }

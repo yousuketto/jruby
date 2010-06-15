@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -49,13 +52,18 @@ import org.jruby.runtime.builtin.IRubyObject;
  * coercible to a proc.
  */
 public class BlockPassNode extends Node {
-    private final Node bodyNode;
+    private static final long serialVersionUID = 0L;
+    private Node bodyNode;
 
     /** Used by the arg_blk_pass and new_call, new_fcall and new_super
      * methods in ParserSupport to temporary save the args node.  This should
      * not be used directly by compiler or interpreter.
      */
     private Node argsNode;
+
+    public BlockPassNode() {
+        super();
+    }
 
     public BlockPassNode(ISourcePosition position, Node bodyNode) {
         super(position);
@@ -105,5 +113,17 @@ public class BlockPassNode extends Node {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block block) {
         return bodyNode == null ? runtime.getNil() : bodyNode.interpret(runtime, context, self, block);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(bodyNode);
+        out.writeObject(argsNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        bodyNode = (Node)in.readObject();
+        argsNode = (Node)in.readObject();
     }
 }

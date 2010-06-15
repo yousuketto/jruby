@@ -54,6 +54,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * method definition node.
  */
 public class DefnNode extends MethodDefNode implements INameNode {
+    private static final long serialVersionUID = 0L;
+    public DefnNode() {
+        super();
+    }
+    
     public DefnNode(ISourcePosition position, ArgumentNode nameNode, ArgsNode argsNode, 
             StaticScope scope, Node bodyNode) {
         super(position, nameNode, argsNode, scope, bodyNode);

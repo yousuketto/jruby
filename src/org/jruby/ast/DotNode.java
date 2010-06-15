@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -46,10 +49,15 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a range literal.
  */
 public class DotNode extends Node {
-    private final Node beginNode;
-    private final Node endNode;
-    private final boolean exclusive;
-    private final boolean isLiteral;
+    private static final long serialVersionUID = 0L;
+    private Node beginNode;
+    private Node endNode;
+    private boolean exclusive;
+    private boolean isLiteral;
+
+    public DotNode() {
+        super();
+    }
 
     public DotNode(ISourcePosition position, Node beginNode, Node endNode, boolean exclusive, 
             boolean isLiteral) {
@@ -121,5 +129,21 @@ public class DotNode extends Node {
                 beginNode.interpret(runtime,context, self, aBlock), 
                 endNode.interpret(runtime,context, self, aBlock), 
                 exclusive);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(beginNode);
+        out.writeObject(endNode);
+        out.writeBoolean(exclusive);
+        out.writeBoolean(isLiteral);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        beginNode = (Node)in.readObject();
+        endNode = (Node)in.readObject();
+        exclusive = in.readBoolean();
+        isLiteral = in.readBoolean();
     }
 }

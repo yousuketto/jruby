@@ -34,6 +34,11 @@ import org.jruby.lexer.yacc.ISourcePosition;
  * a bare '*'
  */
 public class UnnamedRestArgNode extends RestArgNode {
+    private static final long serialVersionUID = 0L;
+    public UnnamedRestArgNode() {
+        super();
+    }
+    
     public UnnamedRestArgNode(ISourcePosition position, int index) {
         super(position, "", index);
     }

@@ -1,5 +1,8 @@
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.lexer.yacc.Token;
@@ -13,7 +16,12 @@ import org.jruby.lexer.yacc.Token;
  * subtype which is not Object.
  */
 public class LiteralNode extends Node implements InvisibleNode {
+    private static final long serialVersionUID = 0L;
     private String name;
+
+    public LiteralNode() {
+        super();
+    }
 
     public LiteralNode(Token token) {
         super(token.getPosition());
@@ -42,4 +50,13 @@ public class LiteralNode extends Node implements InvisibleNode {
         return NodeType.LITERALNODE;
     }
 
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
+    }
 }

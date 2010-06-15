@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,8 +47,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a yield statement.
  */
 public class YieldNode extends Node {
-    private final Node argsNode;
-    private final boolean expandedArguments;
+    private static final long serialVersionUID = 0L;
+    private Node argsNode;
+    private boolean expandedArguments;
+
+    public YieldNode() {
+        super();
+    }
 
     /**
      * Construct a new YieldNode.
@@ -115,5 +123,17 @@ public class YieldNode extends Node {
     @Override
     public String definition(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return aBlock.isGiven() ? "yield" : null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(argsNode);
+        out.writeBoolean(expandedArguments);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        argsNode = (Node)in.readObject();
+        expandedArguments = in.readBoolean();
     }
 }

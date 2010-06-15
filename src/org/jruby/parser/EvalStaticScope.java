@@ -11,6 +11,11 @@ package org.jruby.parser;
  * scope. Also, for purposes of flip-flops, this acts like a local scope.
  */
 public class EvalStaticScope extends BlockStaticScope {
+    private static final long serialVersionUID = 0L;
+    public EvalStaticScope() {
+        super();
+    }
+    
     public EvalStaticScope(StaticScope parentScope) {
         super(parentScope, new String[0]);
     }

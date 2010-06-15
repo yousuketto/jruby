@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -47,7 +50,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a '::' constant access or method call (Java::JavaClass).
  */
 public abstract class Colon2Node extends Colon3Node implements INameNode {
-    protected final Node leftNode;
+    private static final long serialVersionUID = 0L;
+    protected Node leftNode;
+
+    public Colon2Node() {
+        super();
+    }
 
     public Colon2Node(ISourcePosition position, Node leftNode, String name) {
         super(position, name);
@@ -86,5 +94,15 @@ public abstract class Colon2Node extends Colon3Node implements INameNode {
     	if (leftNode != null && leftNode instanceof NilNode)
         	throw context.getRuntime().newTypeError("no outer class/module");
         return RuntimeHelpers.prepareClassNamespace(context, leftNode.interpret(runtime, context, self, aBlock));
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(leftNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        leftNode = (Node)in.readObject();
     }
  }

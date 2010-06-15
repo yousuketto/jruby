@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -49,10 +52,15 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A class statement (name, superClass, body). Classes bodies also define their own scope. 
  */
 public class ClassNode extends Node implements IScopingNode {
-    private final Colon3Node cpath;
-    private final StaticScope scope;
-    private final Node bodyNode;
-    private final Node superNode;
+    private static final long serialVersionUID = 0L;
+    private Colon3Node cpath;
+    private StaticScope scope;
+    private Node bodyNode;
+    private Node superNode;
+
+    public ClassNode() {
+        super();
+    }
     
     public ClassNode(ISourcePosition position, Colon3Node cpath, StaticScope scope, Node bodyNode, Node superNode) {
         super(position);
@@ -147,5 +155,21 @@ public class ClassNode extends Node implements IScopingNode {
         }
 
         return classBodyResult;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(cpath);
+        out.writeObject(scope);
+        out.writeObject(bodyNode);
+        out.writeObject(superNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        cpath = (Colon3Node)in.readObject();
+        scope = (StaticScope)in.readObject();
+        bodyNode = (Node)in.readObject();
+        superNode = (Node)in.readObject();
     }
 }

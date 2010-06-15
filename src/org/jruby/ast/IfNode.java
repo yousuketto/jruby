@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -45,9 +48,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * an 'if' statement.
  */
 public class IfNode extends Node {
-    private final Node condition;
-    private final Node thenBody;
-    private final Node elseBody;
+    private static final long serialVersionUID = 0L;
+    private Node condition;
+    private Node thenBody;
+    private Node elseBody;
+
+    public IfNode() {
+        super();
+    }
 
     public IfNode(ISourcePosition position, Node condition, Node thenBody, Node elseBody) {
         super(position);
@@ -118,5 +126,19 @@ public class IfNode extends Node {
         } else {
             return elseBody == null ? runtime.getNil() : elseBody.interpret(runtime, context, self, aBlock);
         }
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(condition);
+        out.writeObject(thenBody);
+        out.writeObject(elseBody);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        condition = (Node)in.readObject();
+        thenBody = (Node)in.readObject();
+        elseBody = (Node)in.readObject();
     }
 }

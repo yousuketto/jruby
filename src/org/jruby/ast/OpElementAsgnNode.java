@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -53,12 +56,17 @@ import org.jruby.runtime.builtin.IRubyObject;
  * </pre>
  */
 public class OpElementAsgnNode extends Node {
-    private final Node receiverNode;
-    private final Node argsNode;
-    private final Node valueNode;
-    public final CallSite callAdapter;
-    public final CallSite elementAdapter;
-    public final CallSite elementAsgnAdapter;
+    private static final long serialVersionUID = 0L;
+    private Node receiverNode;
+    private Node argsNode;
+    private Node valueNode;
+    public CallSite callAdapter;
+    public CallSite elementAdapter;
+    public CallSite elementAsgnAdapter;
+
+    public OpElementAsgnNode() {
+        super();
+    }
 
     public OpElementAsgnNode(ISourcePosition position, Node receiverNode, String operatorName, Node argsNode, Node valueNode) {
         super(position);
@@ -149,5 +157,25 @@ public class OpElementAsgnNode extends Node {
         elementAsgnAdapter.call(context, self, receiver, expandedArgs);
         
         return value;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(receiverNode);
+        out.writeObject(argsNode);
+        out.writeObject(valueNode);
+        out.writeUTF(callAdapter.methodName);
+        out.writeUTF(elementAdapter.methodName);
+        out.writeUTF(elementAsgnAdapter.methodName);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        receiverNode = (Node)in.readObject();
+        argsNode = (Node)in.readObject();
+        valueNode = (Node)in.readObject();
+        this.callAdapter = MethodIndex.getCallSite(in.readUTF());
+        this.elementAdapter = MethodIndex.getCallSite(in.readUTF());
+        this.elementAsgnAdapter = MethodIndex.getCallSite(in.readUTF());
     }
 }

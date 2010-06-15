@@ -42,6 +42,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A pre-execution construction (BEGIN { ... }).
  */
 public class PreExeNode extends IterNode {
+    private static final long serialVersionUID = 0L;
+    public PreExeNode() {
+        super();
+    }
+    
     public PreExeNode(ISourcePosition position, StaticScope scope, Node body) {
         super(position, null, null, scope, body);
     }

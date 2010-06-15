@@ -29,6 +29,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -40,7 +43,12 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class SplatNode extends Node {
-    protected final Node node;
+    private static final long serialVersionUID = 0L;
+    protected Node node;
+
+    public SplatNode() {
+        super();
+    }
 
     public SplatNode(ISourcePosition position, Node node) {
         super(position);
@@ -69,5 +77,15 @@ public class SplatNode extends Node {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return RuntimeHelpers.splatValue(node.interpret(runtime, context, self, aBlock));
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(node);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        node = (Node)in.readObject();
     }
 }

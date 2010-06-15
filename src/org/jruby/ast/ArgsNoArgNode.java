@@ -38,6 +38,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class ArgsNoArgNode extends ArgsNode {
+    private static final long serialVersionUID = 0L;
+    public ArgsNoArgNode() {
+        super();
+    }
+    
     public ArgsNoArgNode(ISourcePosition position) {
         super(position, null, null, null, null, null);
     }

@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -48,7 +51,12 @@ import org.jruby.util.ByteList;
  * Representing a simple String literal.
  */
 public class StrNode extends Node implements ILiteralNode {
-    private final ByteList value;
+    private static final long serialVersionUID = 0L;
+    private ByteList value;
+
+    public StrNode() {
+        super();
+    }
 
     public StrNode(ISourcePosition position, ByteList value) {
         super(position);
@@ -94,5 +102,15 @@ public class StrNode extends Node implements ILiteralNode {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return RubyString.newStringShared(runtime, value);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(value.bytes());
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        value = new ByteList((byte[])in.readObject(), false);
     }
 }

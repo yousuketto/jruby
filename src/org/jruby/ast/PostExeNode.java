@@ -43,6 +43,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Captures END statements (END {...})
  */
 public class PostExeNode extends IterNode {
+    private static final long serialVersionUID = 0L;
+    public PostExeNode() {
+        super();
+    }
+    
     public PostExeNode(ISourcePosition position, Node body) {
         super(position, null, null, null, body);
     }

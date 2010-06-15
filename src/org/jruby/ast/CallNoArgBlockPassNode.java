@@ -43,6 +43,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A method or operator call.
  */
 public final class CallNoArgBlockPassNode extends CallNode {
+    private static final long serialVersionUID = 0L;
+    public CallNoArgBlockPassNode() {
+        super();
+    }
+    
     // For 'b.foo()'.  Args are only significant in maintaining backwards compatible AST structure
     public CallNoArgBlockPassNode(ISourcePosition position, Node receiverNode, String name, Node args, BlockPassNode iter) {
         super(position, receiverNode, name, args, iter);

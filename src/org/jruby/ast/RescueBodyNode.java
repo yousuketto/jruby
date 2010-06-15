@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,9 +47,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents the contents of a rescue to be evaluated
  */
 public class RescueBodyNode extends Node {
-    private final Node exceptionNodes;
-    private final Node bodyNode;
-    private final RescueBodyNode optRescueNode;
+    private static final long serialVersionUID = 0L;
+    private Node exceptionNodes;
+    private Node bodyNode;
+    private RescueBodyNode optRescueNode;
+
+    public RescueBodyNode() {
+        super();
+    }
 
     public RescueBodyNode(ISourcePosition position, Node exceptionNodes, Node bodyNode, RescueBodyNode optRescueNode) {
         super(position);
@@ -106,5 +114,19 @@ public class RescueBodyNode extends Node {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return bodyNode.interpret(runtime, context, self, aBlock);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(exceptionNodes);
+        out.writeObject(bodyNode);
+        out.writeObject(optRescueNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        exceptionNodes = (Node)in.readObject();
+        bodyNode = (Node)in.readObject();
+        optRescueNode = (RescueBodyNode)in.readObject();
     }
 }

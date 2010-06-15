@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -49,9 +52,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * A call to super(...) with arguments to a method.
  */
 public class SuperNode extends Node implements BlockAcceptingNode {
-    private final Node argsNode;
+    private static final long serialVersionUID = 0L;
+    private Node argsNode;
     private Node iterNode;
-    private final CallSite callSite;
+    private final transient CallSite callSite = MethodIndex.getSuperCallSite();
+
+    public SuperNode() {
+        super();
+    }
 
     public SuperNode(ISourcePosition position, Node argsNode) {
         this(position, argsNode, null);
@@ -64,7 +72,6 @@ public class SuperNode extends Node implements BlockAcceptingNode {
         if (argsNode instanceof ArrayNode) {
             ((ArrayNode)argsNode).setLightweight(true);
         }
-        this.callSite = MethodIndex.getSuperCallSite();
     }
 
     public NodeType getNodeType() {
@@ -122,5 +129,17 @@ public class SuperNode extends Node implements BlockAcceptingNode {
         }
             
         return null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(argsNode);
+        out.writeObject(iterNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        argsNode = (Node)in.readObject();
+        iterNode = (Node)in.readObject();
     }
 }

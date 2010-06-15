@@ -30,9 +30,15 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime.load;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.RandomAccessFile;
 import org.jruby.Ruby;
+import org.jruby.ast.Node;
 
 import static org.jruby.util.JRubyFile.normalizeSeps;
 
@@ -49,6 +55,33 @@ public class ExternalScript implements Library {
             in = resource.getInputStream();
             String name = normalizeSeps(resource.getName());
 
+            if (runtime.getInstanceConfig().getSaveRbjFiles()) {
+                try {
+                    File source = new File(resource.getAbsolutePath());
+                    File rbj = new File(resource.getAbsolutePath() + "j");
+
+                    if (rbj.exists() && rbj.lastModified() > source.lastModified()) {
+                        RandomAccessFile raf = new RandomAccessFile(rbj, "r");
+                        byte[] bytes = new byte[(int)raf.length()];
+                        raf.readFully(bytes);
+//                        GZIPInputStream zis = new GZIPInputStream(fis);
+                        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
+                        Node node = (Node)ois.readObject();
+                        ois.close();
+//                        zis.close();
+                        raf.close();
+                        runtime.loadFile(name, node, wrap);
+                        System.out.println("loaded from 'j' file: " + rbj);
+                        return;
+                    }
+                } catch (FileNotFoundException fnfe) {
+                    fnfe.printStackTrace();
+                    // ignore
+                } catch (ClassNotFoundException cnfe) {
+                    // ignore
+                }
+            }
+
             if (runtime.getInstanceConfig().getCompileMode().shouldPrecompileAll()) {
                 runtime.compileAndLoadFile(name, in, wrap);
             } else {
@@ -58,7 +91,7 @@ public class ExternalScript implements Library {
                     name = normalizeSeps(path.getCanonicalPath());
                 }
 
-                runtime.loadFile(name, in, wrap);
+                runtime.loadFile(name, resource.getAbsolutePath(), in, wrap);
             }
 
 

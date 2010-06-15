@@ -27,6 +27,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -35,8 +38,13 @@ import org.jruby.lexer.yacc.ISourcePosition;
  * @author enebo
  */
 public class ArgAuxillaryNode extends Node {
+    private static final long serialVersionUID = 0L;
     private String name;
     private int offset;
+
+    public ArgAuxillaryNode() {
+        super();
+    }
 
     public ArgAuxillaryNode(ISourcePosition position, String name, int offset) {
         super(position);
@@ -64,5 +72,17 @@ public class ArgAuxillaryNode extends Node {
     @Override
     public List<Node> childNodes() {
         throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+        out.writeInt(offset);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
+        offset = in.readInt();
     }
 }

@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.ast.types.INameNode;
@@ -41,8 +44,13 @@ import org.jruby.lexer.yacc.ISourcePosition;
  *	An explicit block argument (&amp;my_block) in parameter list.
  */
 public class BlockArgNode extends Node implements INameNode {
-    private final int count;
+    private static final long serialVersionUID = 0L;
+    private int count;
     private String name;
+
+    public BlockArgNode() {
+        super();
+    }
 
     public BlockArgNode(ISourcePosition position, int count, String name) {
         super(position);
@@ -85,5 +93,17 @@ public class BlockArgNode extends Node implements INameNode {
 	
     public List<Node> childNodes() {
         return EMPTY_LIST;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeInt(count);
+        out.writeUTF(name);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        count = in.readInt();
+        name = in.readUTF();
     }
 }

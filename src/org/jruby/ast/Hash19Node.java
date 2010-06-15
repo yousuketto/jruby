@@ -41,6 +41,10 @@ import org.jruby.runtime.builtin.IRubyObject;
  * of default values in a method call.
  */
 public class Hash19Node extends HashNode {
+    private static final long serialVersionUID = 0L;
+    public Hash19Node() {
+        super();
+    }
     
     public Hash19Node(ISourcePosition position, ListNode listNode) {
         super(position, listNode);

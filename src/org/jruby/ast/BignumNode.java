@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.math.BigInteger;
 import java.util.List;
 
@@ -48,7 +51,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a big integer literal.
  */
 public class BignumNode extends Node implements ILiteralNode {
+    private static final long serialVersionUID = 0L;
     private BigInteger value;
+
+    public BignumNode() {
+        super();
+    }
 
     public BignumNode(ISourcePosition position, BigInteger value) {
         super(position);
@@ -82,5 +90,15 @@ public class BignumNode extends Node implements ILiteralNode {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return RubyBignum.newBignum(runtime, value);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(value);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        value = (BigInteger)in.readObject();
     }
 }

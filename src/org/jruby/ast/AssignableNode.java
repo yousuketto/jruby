@@ -30,6 +30,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.Ruby;
 import org.jruby.ast.types.IArityNode;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -42,7 +45,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Base class of any node which can be assigned to.
  */
 public abstract class AssignableNode extends Node implements IArityNode {
+    private static final long serialVersionUID = 0L;
     private Node valueNode;
+
+    public AssignableNode() {
+        super();
+    }
     
     public AssignableNode(ISourcePosition position) {
         super(position);
@@ -82,5 +90,15 @@ public abstract class AssignableNode extends Node implements IArityNode {
     @Override
     public String definition(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return "assignment";
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(valueNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        valueNode = (Node)in.readObject();
     }
 }

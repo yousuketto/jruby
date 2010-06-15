@@ -32,6 +32,9 @@
 package org.jruby.ast;
 
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.Ruby;
 import org.jruby.ast.types.ILiteralNode;
 import org.jruby.ast.visitor.NodeVisitor;
@@ -44,9 +47,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents an array. This could be an array literal, quoted words or some args stuff.
  */
 public class ArrayNode extends ListNode implements ILiteralNode {
+    private static final long serialVersionUID = 0L;
     // This field is used during argument processing to avoid putting RubyArray
     // instances that are purely for utility purposes into ObjectSpace.
     private boolean lightweight = false;
+
+    public ArrayNode() {
+        super();
+    }
     
     public ArrayNode(ISourcePosition position, Node firstNode) {
         super(position, firstNode);
@@ -95,5 +103,15 @@ public class ArrayNode extends ListNode implements ILiteralNode {
         }
 
         return array;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeBoolean(lightweight);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        lightweight = in.readBoolean();
     }
 }

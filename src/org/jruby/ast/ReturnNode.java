@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,8 +47,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a return statement.
  */
 public class ReturnNode extends Node implements NonLocalControlFlowNode {
-    private final Node valueNode;
-    private Object target;
+    private static final long serialVersionUID = 0L;
+    private Node valueNode;
+
+    public ReturnNode() {
+        super();
+    }
 
     public ReturnNode(ISourcePosition position, Node valueNode) {
         super(position);
@@ -75,12 +82,13 @@ public class ReturnNode extends Node implements NonLocalControlFlowNode {
         return valueNode != NilImplicitNode.NIL;
     }
 
+    @Deprecated
     public Object getTarget() {
-        return target;
+        return null;
     }
 
+    @Deprecated
     public void setTarget(Object target) {
-        this.target = target;
     }
     
     public List<Node> childNodes() {
@@ -90,5 +98,15 @@ public class ReturnNode extends Node implements NonLocalControlFlowNode {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         throw context.returnJump(valueNode.interpret(runtime, context, self, aBlock));
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(valueNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        valueNode = (Node)in.readObject();
     }
 }

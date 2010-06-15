@@ -28,6 +28,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.ast.types.INameNode;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -36,8 +39,13 @@ import org.jruby.lexer.yacc.ISourcePosition;
  * The rest argument for a method (def foo(a, *b, c)).
  */
 public class RestArgNode extends ArgumentNode implements INameNode {
+    private static final long serialVersionUID = 0L;
     // index of variable for this arg
     protected int index;
+
+    public RestArgNode() {
+        super();
+    }
 
     public RestArgNode(ISourcePosition position, String name, int index) {
         super(position, name);
@@ -56,5 +64,15 @@ public class RestArgNode extends ArgumentNode implements INameNode {
 
     public int getIndex() {
         return index;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeInt(index);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        index = in.readInt();
     }
 }

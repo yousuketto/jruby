@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -46,7 +49,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a $number ($0..$9) variable.
   */
 public class NthRefNode extends Node {
-    private final int matchNumber;
+    private static final long serialVersionUID = 0L;
+    private int matchNumber;
+
+    public NthRefNode() {
+        super();
+    }
 
     public NthRefNode(ISourcePosition position, int matchNumber) {
         super(position);
@@ -90,5 +98,15 @@ public class NthRefNode extends Node {
         }
         
         return null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeInt(matchNumber);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        matchNumber = in.readInt();
     }
 }

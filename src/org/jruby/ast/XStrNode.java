@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -47,7 +50,12 @@ import org.jruby.util.ByteList;
  * A Backtick(`) string
  */
 public class XStrNode extends Node implements ILiteralNode {
-    private final ByteList value;
+    private static final long serialVersionUID = 0L;
+    private ByteList value;
+
+    public XStrNode() {
+        super();
+    }
 
     public XStrNode(ISourcePosition position, ByteList value) {
         super(position);
@@ -81,5 +89,15 @@ public class XStrNode extends Node implements ILiteralNode {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return self.callMethod(context, "`", RubyString.newStringShared(runtime, value));
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(value.bytes());
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        value = new ByteList((byte[])in.readObject(), false);
     }
 }

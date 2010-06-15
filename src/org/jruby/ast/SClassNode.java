@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -55,9 +58,14 @@ import org.jruby.runtime.builtin.IRubyObject;
  * </pre>
  */
 public class SClassNode extends Node {
-    private final Node receiverNode;
-    private final StaticScope scope;
-    private final Node bodyNode;
+    private static final long serialVersionUID = 0L;
+    private Node receiverNode;
+    private StaticScope scope;
+    private Node bodyNode;
+
+    public SClassNode() {
+        super();
+    }
 
     public SClassNode(ISourcePosition position, Node recvNode, StaticScope scope, Node bodyNode) {
         super(position);
@@ -131,5 +139,19 @@ public class SClassNode extends Node {
         scope.setModule(singletonClass);
         
         return ASTInterpreter.evalClassDefinitionBody(runtime, context, scope, bodyNode, singletonClass, self, aBlock);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(receiverNode);
+        out.writeObject(scope);
+        out.writeObject(bodyNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        receiverNode = (Node)in.readObject();
+        scope = (StaticScope)in.readObject();
+        bodyNode = (Node)in.readObject();
     }
 }

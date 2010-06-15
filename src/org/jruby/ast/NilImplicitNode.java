@@ -8,6 +8,7 @@ import org.jruby.lexer.yacc.ISourcePosition;
  * so that IDE consumers can more easily ignore these.
  */
 public class NilImplicitNode extends NilNode implements InvisibleNode {
+    private static final long serialVersionUID = 0L;
     public static final NilImplicitNode NIL = new NilImplicitNode();
     
     public NilImplicitNode() {

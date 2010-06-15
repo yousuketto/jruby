@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -48,8 +51,13 @@ import org.jruby.runtime.builtin.IRubyObject;
 // FIXME: ConstDecl could be two seperate classes (or done differently since constNode and name
 // never exist at the same time.
 public class ConstDeclNode extends AssignableNode implements INameNode {
-    private final String name;
-    private final INameNode constNode;
+    private static final long serialVersionUID = 0L;
+    private String name;
+    private INameNode constNode;
+
+    public ConstDeclNode() {
+        super();
+    }
 
     // TODO: Split this into two sub-classes so that name and constNode can be specified seperately.
     public ConstDeclNode(ISourcePosition position, String name, INameNode constNode, Node valueNode) {
@@ -137,5 +145,17 @@ public class ConstDeclNode extends AssignableNode implements INameNode {
         ((RubyModule) module).fastSetConstant(getName(), value);
         
         return runtime.getNil();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(name);
+        out.writeObject(constNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = (String)in.readObject();
+        constNode = (INameNode)in.readObject();
     }
 }

@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,7 +47,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Begin/End block.  A Begin ... End block without rescue.
  */
 public class BeginNode extends Node {
-    private final Node bodyNode;
+    private static final long serialVersionUID = 0L;
+    private Node bodyNode;
+
+    public BeginNode() {
+        super();
+    }
 
     public BeginNode(ISourcePosition position, Node bodyNode) {
         super(position);
@@ -81,5 +89,15 @@ public class BeginNode extends Node {
     @Override
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return bodyNode.interpret(runtime, context, self, aBlock);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(bodyNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        bodyNode = (Node)in.readObject();
     }
 }

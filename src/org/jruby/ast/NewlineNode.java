@@ -32,6 +32,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -54,7 +57,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * The parser generates such a node around each separate statement.  
  */
 public class NewlineNode extends Node {
-    private final Node nextNode;
+    private static final long serialVersionUID = 0L;
+    private Node nextNode;
+
+    public NewlineNode() {
+        super();
+    }
 
     public NewlineNode(ISourcePosition position, Node nextNode) {
         super(position);
@@ -106,5 +114,15 @@ public class NewlineNode extends Node {
 
     public String definition(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         return nextNode.definition(runtime, context, self, aBlock);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(nextNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        nextNode = (Node)in.readObject();
     }
 }

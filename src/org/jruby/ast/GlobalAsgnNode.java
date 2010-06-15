@@ -33,6 +33,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -47,7 +50,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents an assignment to a global variable.
  */
 public class GlobalAsgnNode extends AssignableNode implements INameNode {
+    private static final long serialVersionUID = 0L;
     private String name;
+
+    public GlobalAsgnNode() {
+        super();
+    }
 
     public GlobalAsgnNode(ISourcePosition position, String name, Node valueNode) {
         super(position, valueNode);
@@ -93,5 +101,15 @@ public class GlobalAsgnNode extends AssignableNode implements INameNode {
         runtime.getGlobalVariables().set(name, value);
         
         return runtime.getNil();
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeUTF(name);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        name = in.readUTF();
     }
 }

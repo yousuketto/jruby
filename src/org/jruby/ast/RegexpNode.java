@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -47,9 +50,14 @@ import org.jruby.util.ByteList;
  * Represents a simple regular expression literal.
  */
 public class RegexpNode extends Node implements ILiteralNode {
-    private RubyRegexp pattern;
-    private final ByteList value;
-    private final int options;
+    private static final long serialVersionUID = 0L;
+    private transient RubyRegexp pattern;
+    private ByteList value;
+    private int options;
+
+    public RegexpNode() {
+        super();
+    }
 
     public RegexpNode(ISourcePosition position, ByteList value, int options) {
         super(position);
@@ -102,5 +110,17 @@ public class RegexpNode extends Node implements ILiteralNode {
         }
 
         return pattern;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(value.bytes());
+        out.writeInt(options);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        value = new ByteList((byte[])in.readObject(), false);
+        options = in.readInt();
     }
 }

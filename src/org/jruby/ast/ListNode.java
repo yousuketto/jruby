@@ -29,6 +29,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.ArrayList;
 import java.util.List;
 import org.jruby.ast.visitor.NodeVisitor;
@@ -41,7 +44,12 @@ import org.jruby.lexer.yacc.ISourcePosition;
  * the editor projects who want position info saved.
  */
 public class ListNode extends Node {
+    private static final long serialVersionUID = 0L;
     private List<Node> list;
+
+    public ListNode() {
+        super();
+    }
 
     /**
      * Create a new ListNode.
@@ -135,5 +143,23 @@ public class ListNode extends Node {
     
     public Node get(int idx) {
         return list.get(idx);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeInt(list.size());
+        for (Node node : list) {
+            out.writeObject(node);
+        }
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        int size = in.readInt();
+        ArrayList<Node> newList = new ArrayList(size);
+        for (int i = 0; i < size; i++) {
+            newList.add((Node)in.readObject());
+        }
+        list = newList;
     }
 }

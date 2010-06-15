@@ -1,3 +1,4 @@
+
 /***** BEGIN LICENSE BLOCK *****
  * Version: CPL 1.0/GPL 2.0/LGPL 2.1
  *
@@ -27,6 +28,10 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.lexer.yacc;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.runtime.PositionAware;
 
 /**
@@ -38,7 +43,7 @@ import org.jruby.runtime.PositionAware;
  * of 0 and an endOffset of 3 ( 0a1b2c3 ).
  * 
  */
-public interface ISourcePosition extends PositionAware {
+public interface ISourcePosition extends PositionAware, Externalizable {
     /**
      * Which file does this source position live in?
      * 
@@ -54,7 +59,13 @@ public interface ISourcePosition extends PositionAware {
 
 
     /** For nodes which are added to the AST which are not proper syntactical elements. */
-    public static final ISourcePosition INVALID_POSITION = new ISourcePosition() {
+    public static final ISourcePosition INVALID_POSITION = new InvalidPosition();
+    public static class InvalidPosition implements ISourcePosition {
+        private static final long serialVersionUID = 0L;
+        public InvalidPosition() {
+            super();
+        }
+
         public String getFile() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
@@ -66,5 +77,11 @@ public interface ISourcePosition extends PositionAware {
         public int getLine() {
             throw new UnsupportedOperationException("Not supported yet.");
         }
-    };
+
+        public void writeExternal(ObjectOutput out) throws IOException {
+        }
+
+        public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        }
+    }
 }

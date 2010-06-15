@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -46,7 +49,12 @@ import org.jruby.runtime.builtin.IRubyObject;
  * of default values in a method call.
  */
 public class HashNode extends Node {
-    private final ListNode listNode;
+    private static final long serialVersionUID = 0L;
+    private ListNode listNode;
+
+    public HashNode() {
+        super();
+    }
     
     public HashNode(ISourcePosition position, ListNode listNode) {
         super(position);
@@ -100,5 +108,15 @@ public class HashNode extends Node {
     
     protected void aset(Ruby runtime, RubyHash hash, IRubyObject key, IRubyObject value) {
         hash.fastASetCheckString(runtime, key, value);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(listNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        listNode = (ListNode)in.readObject();
     }
 }

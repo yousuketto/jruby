@@ -47,6 +47,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents 'true'.
  */
 public class TrueNode extends Node implements INameNode, IEqlNode {
+    private static final long serialVersionUID = 0L;
+    public TrueNode() {
+        super();
+    }
+    
     public TrueNode(ISourcePosition position) {
         super(position);
     }

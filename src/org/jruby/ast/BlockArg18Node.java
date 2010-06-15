@@ -1,5 +1,8 @@
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 import org.jruby.ast.visitor.NodeVisitor;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -14,8 +17,13 @@ import org.jruby.lexer.yacc.ISourcePosition;
  *
  */
 public class BlockArg18Node extends Node {
+    private static final long serialVersionUID = 0L;
     private Node normalBlockArgs;
     private Node blockArgAssignee;
+
+    public BlockArg18Node() {
+        super();
+    }
 
     public BlockArg18Node(ISourcePosition position, Node blockArgAssignee,
             Node normalBlockArgs) {
@@ -50,4 +58,15 @@ public class BlockArg18Node extends Node {
         return NodeType.BLOCKARG18NODE;
     }
 
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(normalBlockArgs);
+        out.writeObject(blockArgAssignee);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        normalBlockArgs = (Node)in.readObject();
+        blockArgAssignee = (Node)in.readObject();
+    }
 }

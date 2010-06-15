@@ -5,6 +5,9 @@
 
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import org.jruby.Ruby;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.Block;
@@ -16,8 +19,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  * @author enebo
  */
 public class YieldTwoNode extends YieldNode {
-    private final Node argument1;
-    private final Node argument2;
+    private static final long serialVersionUID = 0L;
+    private Node argument1;
+    private Node argument2;
+
+    public YieldTwoNode() {
+        super();
+    }
 
     public YieldTwoNode(ISourcePosition position, ArrayNode args) {
         super(position, args, true);
@@ -31,5 +39,17 @@ public class YieldTwoNode extends YieldNode {
         return context.getCurrentFrame().getBlock().yieldSpecific(context,
                 argument1.interpret(runtime, context, self, aBlock),
                 argument2.interpret(runtime, context, self, aBlock));
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(argument1);
+        out.writeObject(argument2);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        argument1 = (Node)in.readObject();
+        argument2 = (Node)in.readObject();
     }
 }

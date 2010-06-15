@@ -41,6 +41,11 @@ import org.jruby.runtime.builtin.IRubyObject;
  * In JRuby 2, we will rename this.
  */
 public class Colon2ImplicitNode extends Colon2Node {
+    private static final long serialVersionUID = 0L;
+    public Colon2ImplicitNode() {
+        super();
+    }
+    
     public Colon2ImplicitNode(ISourcePosition position, String name) {
         super(position, null, name);
     }

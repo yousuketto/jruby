@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -49,13 +52,18 @@ import org.jruby.runtime.builtin.IRubyObject;
  * Represents a block.  
  */
 public class IterNode extends Node {
-    private final Node varNode;
-    private final Node bodyNode;
-    private final Node blockVarNode; // This is only for 1.8 blocks
+    private static final long serialVersionUID = 0L;
+    private Node varNode;
+    private Node bodyNode;
+    private Node blockVarNode; // This is only for 1.8 blocks
     
     // What static scoping relationship exists when it comes into being.
     private StaticScope scope;
-    private BlockBody blockBody;
+    private transient BlockBody blockBody;
+
+    public IterNode() {
+        super();
+    }
     
     public IterNode(ISourcePosition position, Node args, BlockPassNode iter, StaticScope scope, Node body) {
         super(position);
@@ -131,5 +139,23 @@ public class IterNode extends Node {
     public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
         assert false : "Call nodes deal with these directly";
         return null;
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(varNode);
+        out.writeObject(bodyNode);
+        out.writeObject(blockVarNode);
+        out.writeObject(scope);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        varNode = (Node)in.readObject();
+        bodyNode = (Node)in.readObject();
+        blockVarNode = (Node)in.readObject();
+        scope = (StaticScope)in.readObject();
+        NodeType argsNodeId = BlockBody.getArgumentTypeWackyHack(this);
+        this.blockBody = InterpretedBlock.newBlockBody(this, Arity.procArityOf(varNode), BlockBody.asArgumentType(argsNodeId));
     }
 }

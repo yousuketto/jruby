@@ -48,6 +48,11 @@ import org.jruby.runtime.Arity;
  *
  */
 public class ZeroArgNode extends Node implements IArityNode {
+    private static final long serialVersionUID = 0L;
+    public ZeroArgNode() {
+        super();
+    }
+    
     public ZeroArgNode(ISourcePosition position) {
         super(position);
     }

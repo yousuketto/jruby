@@ -31,6 +31,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.ast;
 
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.util.List;
 
 import org.jruby.Ruby;
@@ -44,8 +47,13 @@ import org.jruby.runtime.builtin.IRubyObject;
  *	An 'ensure' statement.
  */
 public class EnsureNode extends Node {
-    private final Node bodyNode;
-    private final Node ensureNode;
+    private static final long serialVersionUID = 0L;
+    private Node bodyNode;
+    private Node ensureNode;
+
+    public EnsureNode() {
+        super();
+    }
 
     public EnsureNode(ISourcePosition position, Node bodyNode, Node ensureNode) {
         super(position);
@@ -100,5 +108,17 @@ public class EnsureNode extends Node {
         }
 
         return bodyNode.interpret(runtime, context, self, aBlock);
+    }
+
+    public void writeExternal(ObjectOutput out) throws IOException {
+        super.writeExternal(out);
+        out.writeObject(bodyNode);
+        out.writeObject(ensureNode);
+    }
+
+    public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+        super.readExternal(in);
+        bodyNode = (Node)in.readObject();
+        ensureNode = (Node)in.readObject();
     }
 }
