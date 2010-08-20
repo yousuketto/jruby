@@ -37,6 +37,11 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import clojure.lang.APersistentMap;
+import clojure.lang.IPersistentMap;
+import clojure.lang.LockingTransaction;
+import clojure.lang.PersistentHashMap;
+import clojure.lang.Ref;
 import static org.jruby.anno.FrameField.VISIBILITY;
 import static org.jruby.runtime.Visibility.MODULE_FUNCTION;
 import static org.jruby.runtime.Visibility.PRIVATE;
@@ -55,6 +60,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.jruby.anno.JRubyClass;
@@ -182,11 +188,15 @@ public class RubyModule extends RubyObject {
     }
 
     public Map<String, IRubyObject> getConstantMap() {
-        return constants;
+        return (Map<String, IRubyObject>)constants.deref();
+    }
+
+    public IPersistentMap getPersistentConstants() {
+        return (IPersistentMap)constants.deref();
     }
 
     public synchronized Map<String, IRubyObject> getConstantMapForWrite() {
-        return constants == Collections.EMPTY_MAP ? constants = new ConcurrentHashMap<String, IRubyObject>(4, 0.9f, 1) : constants;
+        return (Map<String, IRubyObject>)constants.deref();
     }
     
     public void addIncludingHierarchy(IncludedModuleWrapper hierarchy) {
@@ -207,6 +217,11 @@ public class RubyModule extends RubyObject {
         // if (parent == null) parent = runtime.getObject();
         setFlag(USER7_F, !isClass());
         generation = runtime.getNextModuleGeneration();
+        try {
+            constants = new Ref(PersistentHashMap.EMPTY);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
     
     /** used by MODULE_ALLOCATOR and RubyClass constructors
@@ -1069,19 +1084,28 @@ public class RubyModule extends RubyObject {
         }
         invalidateCacheDescendants();
     }
-
+    
     /** this method should be used only by interpreter or compiler 
      * 
      */
     public RubyClass defineOrGetClassUnder(String name, RubyClass superClazz) {
+        return defineOrGetClassUnder(name, superClazz, null);
+    }
+
+    public interface ModuleCallback {
+        public void call(RubyModule cls);
+    }
+
+    /** this method should be used only by interpreter or compiler
+     *
+     */
+    public RubyClass defineOrGetClassUnder(final String name, final RubyClass superClazz, final ModuleCallback body) {
         // This method is intended only for defining new classes in Ruby code,
         // so it uses the allocator of the specified superclass or default to
         // the Object allocator. It should NOT be used to define classes that require a native allocator.
-
-        Ruby runtime = getRuntime();
+        final Ruby runtime = getRuntime();
         IRubyObject classObj = getConstantAt(name);
         RubyClass clazz;
-
         if (classObj != null) {
             if (!(classObj instanceof RubyClass)) throw runtime.newTypeError(name + " is not a class");
             clazz = (RubyClass)classObj;
@@ -1095,26 +1119,48 @@ public class RubyModule extends RubyObject {
             }
 
             if (runtime.getSafeLevel() >= 4) throw runtime.newTypeError("extending class prohibited");
+            return clazz;
         } else if (classProviders != null && (clazz = searchProvidersForClass(name, superClazz)) != null) {
             // reopen a java class
         } else {
-            if (superClazz == null) superClazz = runtime.getObject();
-            if (superClazz == runtime.getObject() && RubyInstanceConfig.REIFY_RUBY_CLASSES) {
-                clazz = RubyClass.newClass(runtime, superClazz, name, REIFYING_OBJECT_ALLOCATOR, this, true);
-            } else {
-                clazz = RubyClass.newClass(runtime, superClazz, name, superClazz.getAllocator(), this, true);
+            try {
+                clazz = (RubyClass)LockingTransaction.runInTransaction(new Callable() {
+                    public Object call() throws Exception {
+                        RubyClass superCls = superClazz;
+                        RubyClass localClazz;
+                        if (superCls == null) superCls = runtime.getObject();
+                        if (superCls == runtime.getObject() && RubyInstanceConfig.REIFY_RUBY_CLASSES) {
+                            localClazz = RubyClass.newClass(runtime, superCls, name, REIFYING_OBJECT_ALLOCATOR, RubyModule.this, true);
+                        } else {
+                            localClazz = RubyClass.newClass(runtime, superCls, name, superCls.getAllocator(), RubyModule.this, true);
+                        }
+                        if (body != null) {
+                            body.call(localClazz);
+                        }
+                        return localClazz;
+                    }
+                });
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-        }
 
+        }
         return clazz;
+    }
+
+    /** this method should be used only by interpreter or compiler
+     *
+     */
+    public RubyModule defineOrGetModuleUnder(String name) {
+        return defineOrGetModuleUnder(name, null);
     }
 
     /** this method should be used only by interpreter or compiler 
      * 
      */
-    public RubyModule defineOrGetModuleUnder(String name) {
+    public RubyModule defineOrGetModuleUnder(final String name, final ModuleCallback body) {
         // This method is intended only for defining new modules in Ruby code
-        Ruby runtime = getRuntime();
+        final Ruby runtime = getRuntime();
         IRubyObject moduleObj = getConstantAt(name);
         RubyModule module;
         if (moduleObj != null) {
@@ -1124,7 +1170,19 @@ public class RubyModule extends RubyObject {
         } else if (classProviders != null && (module = searchProvidersForModule(name)) != null) {
             // reopen a java module
         } else {
-            module = RubyModule.newModule(runtime, name, this, true); 
+            try {
+                module = (RubyModule)LockingTransaction.runInTransaction(new Callable() {
+                    public Object call() throws Exception {
+                        RubyModule module = RubyModule.newModule(runtime, name, RubyModule.this, true);
+                        if (body != null) {
+                            body.call(module);
+                        }
+                        return module;
+                    }
+                });
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
         return module;
     }
@@ -1447,9 +1505,15 @@ public class RubyModule extends RubyObject {
         return this;
     }
 
-    public void syncConstants(RubyModule other) {
-        if (other.getConstantMap() != Collections.EMPTY_MAP) {
-            getConstantMapForWrite().putAll(other.getConstantMap());
+    public void syncConstants(final RubyModule other) {
+        try {
+            LockingTransaction.runInTransaction(new Callable() {
+                public Object call() throws Exception {
+                    return constants.set(getPersistentConstants().cons(other.getPersistentConstants()));
+                }
+            });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -3082,18 +3146,33 @@ public class RubyModule extends RubyObject {
         return getConstantMap().get(internedName);
     }
     
-    protected IRubyObject constantTableStore(String name, IRubyObject value) {
-        getConstantMapForWrite().put(name, value);
+    protected IRubyObject constantTableStore(final String name, final IRubyObject value) {
+        try {
+            LockingTransaction.runInTransaction(new Callable() {
+                public Object call() throws Exception {
+                    return constants.set(((IPersistentMap)constants.deref()).assoc(name, value));
+                }
+            });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         return value;
     }
     
-    protected IRubyObject constantTableFastStore(String internedName, IRubyObject value) {
-        getConstantMapForWrite().put(internedName, value);
-        return value;
+    protected IRubyObject constantTableFastStore(final String internedName, final IRubyObject value) {
+        return constantTableStore(internedName, value);
     }
         
-    protected IRubyObject constantTableRemove(String name) {
-        return getConstantMapForWrite().remove(name);
+    protected IRubyObject constantTableRemove(final String name) {
+        try {
+            return (IRubyObject)LockingTransaction.runInTransaction(new Callable() {
+                public Object call() throws Exception {
+                    return constants.set(((IPersistentMap)constants.deref()).without(name));
+                }
+            });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static void define(RubyModule module, JavaMethodDescriptor desc, DynamicMethod dynamicMethod) {
@@ -3182,7 +3261,7 @@ public class RubyModule extends RubyObject {
     // If it is null, then it an anonymous class.
     protected String classId;
 
-    private volatile Map<String, IRubyObject> constants = Collections.EMPTY_MAP;
+    private final Ref constants;
     private volatile Map<String, DynamicMethod> methods = Collections.EMPTY_MAP;
     private Map<String, CacheEntry> cachedMethods = Collections.EMPTY_MAP;
     protected int generation;

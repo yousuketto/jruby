@@ -106,17 +106,21 @@ public class ModuleNode extends Node implements IScopingNode {
     }
     
     @Override
-    public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
+    public IRubyObject interpret(final Ruby runtime, final ThreadContext context, final IRubyObject self, final Block aBlock) {
         RubyModule enclosingModule = cpath.getEnclosingModule(runtime, context, self, aBlock);
 
+        // TODO: Figure out how this can happen and possibly remove
         if (enclosingModule == null) throw runtime.newTypeError("no outer class/module");
 
-        String name = cpath.getName();        
+        final IRubyObject[] moduleBodyResult = new IRubyObject[1];
+        RubyModule module = enclosingModule.defineOrGetModuleUnder(cpath.getName(), new RubyModule.ModuleCallback() {
+            public void call(RubyModule module) {
+                scope.setModule(module);
 
-        RubyModule module = enclosingModule.defineOrGetModuleUnder(name);
+                moduleBodyResult[0] = ASTInterpreter.evalClassDefinitionBody(runtime, context, scope, bodyNode, module, self, aBlock);
+            }
+        });
 
-        scope.setModule(module);        
-
-        return ASTInterpreter.evalClassDefinitionBody(runtime, context, scope, bodyNode, module, self, aBlock);
+        return moduleBodyResult[0];
     }
 }

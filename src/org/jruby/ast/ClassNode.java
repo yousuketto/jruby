@@ -118,7 +118,7 @@ public class ClassNode extends Node implements IScopingNode {
     }
     
     @Override
-    public IRubyObject interpret(Ruby runtime, ThreadContext context, IRubyObject self, Block aBlock) {
+    public IRubyObject interpret(final Ruby runtime, final ThreadContext context, final IRubyObject self, final Block aBlock) {
         RubyModule enclosingClass = cpath.getEnclosingModule(runtime, context, self, aBlock);
 
         // TODO: Figure out how this can happen and possibly remove
@@ -132,14 +132,15 @@ public class ClassNode extends Node implements IScopingNode {
             superClass = (RubyClass)superObj;
         }
 
-        boolean definedAlready = enclosingClass.isConstantDefined(cpath.getName());
-        
-        RubyClass clazz = enclosingClass.defineOrGetClassUnder(cpath.getName(), superClass);
+        final IRubyObject[] classBodyResult = new IRubyObject[1];
+        RubyClass clazz = enclosingClass.defineOrGetClassUnder(cpath.getName(), superClass, new RubyModule.ModuleCallback() {
+            public void call(RubyModule cls) {
+                scope.setModule(cls);
 
-        scope.setModule(clazz);
+                classBodyResult[0] = ASTInterpreter.evalClassDefinitionBody(runtime, context, scope, bodyNode, cls, self, aBlock);
+            }
+        });
 
-        IRubyObject classBodyResult = ASTInterpreter.evalClassDefinitionBody(runtime, context, scope, bodyNode, clazz, self, aBlock);
-
-        return classBodyResult;
+        return classBodyResult[0];
     }
 }
