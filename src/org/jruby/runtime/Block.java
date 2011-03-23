@@ -41,6 +41,7 @@
 
 package org.jruby.runtime;
 
+import java.io.Serializable;
 import org.jruby.RubyModule;
 import org.jruby.RubyProc;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -48,7 +49,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 /**
  *  Internal live representation of a block ({...} or do ... end).
  */
-public final class Block {
+public final class Block implements Serializable {
     public enum Type { NORMAL, PROC, LAMBDA, THREAD }
     
     /**

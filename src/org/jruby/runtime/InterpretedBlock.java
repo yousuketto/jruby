@@ -32,6 +32,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
+import java.io.Serializable;
 import org.jruby.Ruby;
 import org.jruby.RubyModule;
 import org.jruby.ast.IterNode;
@@ -76,7 +77,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * 
  * @see SharedScopeBlock, CompiledBlock
  */
-public class InterpretedBlock extends BlockBody {
+public class InterpretedBlock extends BlockBody implements Serializable {
     /** This block has no arguments at all (simple secondary optimization @see assignerFor for an
      * explanation).
      */

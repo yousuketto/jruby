@@ -483,4 +483,21 @@ public abstract class StaticScope implements Serializable, Externalizable {
             
         return buf.toString();
     }
+    
+    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+        out.defaultWriteObject();
+        if (cref != null) {
+            out.writeObject(cref.getName());
+        } else {
+            out.writeObject(null);
+        }
+    }
+    
+    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        Object crefName = in.readObject();
+        if (crefName != null) {
+            cref = Ruby.getGlobalRuntime().getClassFromPath(crefName.toString());
+        }
+    }
 }

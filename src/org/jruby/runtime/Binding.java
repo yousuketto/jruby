@@ -32,6 +32,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
+import java.io.Serializable;
 import org.jruby.RubyModule;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -39,13 +40,13 @@ import org.jruby.runtime.builtin.IRubyObject;
 /**
  *  Internal live representation of a block ({...} or do ... end).
  */
-public class Binding {
+public class Binding implements Serializable {
     
     /**
      * frame of method which defined this block
      */
     private final Frame frame;
-    private final RubyModule klass;
+    private transient final RubyModule klass;
 
     private Visibility visibility;
     /**

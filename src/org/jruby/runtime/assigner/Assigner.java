@@ -29,6 +29,7 @@
 
 package org.jruby.runtime.assigner;
 
+import java.io.Serializable;
 import org.jruby.Ruby;
 import org.jruby.ast.util.ArgsUtil;
 import org.jruby.runtime.Block;
@@ -50,7 +51,7 @@ import org.jruby.runtime.builtin.IRubyObject;
  * There is also some logic about expanded/non-expanded arguments.  This refers to
  * ParserSupport.new_yield and YieldNode expanded attribute.
  */
-public abstract class Assigner {
+public abstract class Assigner implements Serializable {
 
     public abstract void assign(Ruby runtime, ThreadContext context, IRubyObject self, Block block);
     public abstract void assign(Ruby runtime, ThreadContext context, IRubyObject self, IRubyObject value1,

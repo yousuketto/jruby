@@ -8,6 +8,7 @@
 
 package org.jruby.runtime;
 
+import java.io.Serializable;
 import org.jruby.Ruby;
 import org.jruby.parser.BlockStaticScope;
 import org.jruby.runtime.scope.ManyVarsDynamicScope;
@@ -21,7 +22,7 @@ import org.jruby.runtime.scope.FourVarDynamicScope;
 import org.jruby.runtime.scope.ThreeVarDynamicScope;
 import org.jruby.runtime.scope.TwoVarDynamicScope;
 
-public abstract class DynamicScope {
+public abstract class DynamicScope implements Serializable {
     // Static scoping information for this scope
     protected final StaticScope staticScope;
 

@@ -27,6 +27,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -1896,5 +1897,15 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
                     finalizer.getRuntime().getCurrentContext(),
                     finalizer, "call", id);
         }
+    }
+    
+    private void writeObject(java.io.ObjectOutputStream out) throws IOException {
+        out.defaultWriteObject();
+        out.writeUTF(metaClass.getName());
+    }
+    
+    private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        metaClass = (RubyClass)Ruby.getGlobalRuntime().getClassFromPath(in.readUTF());
     }
 }

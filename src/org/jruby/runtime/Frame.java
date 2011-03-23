@@ -32,6 +32,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
+import java.io.Serializable;
 import org.jruby.RubyModule;
 import org.jruby.runtime.builtin.IRubyObject;
 
@@ -60,9 +61,9 @@ import org.jruby.runtime.builtin.IRubyObject;
  * 
  * @see ThreadContext
  */
-public final class Frame {
+public final class Frame implements Serializable {
     /** The class against which this call is executing. */
-    private RubyModule klazz;
+    private transient RubyModule klazz;
     
     /** The 'self' for this frame. */
     private IRubyObject self;
