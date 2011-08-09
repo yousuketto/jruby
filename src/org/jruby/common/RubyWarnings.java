@@ -27,6 +27,9 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.common;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.joni.WarnCallback;
 import org.jruby.Ruby;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -39,6 +42,10 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class RubyWarnings implements IRubyWarnings, WarnCallback {
     private final Ruby runtime;
 
+    // Collections.newSetFromMap is from 1.6
+    // private final Set<ID> warned = Collections.newSetFromMap(new ConcurrentHashMap<ID, Boolean>());
+    private final Map<ID, ID> warned = new ConcurrentHashMap<ID, ID>();
+    
     public RubyWarnings(Ruby runtime) {
         this.runtime = runtime;
     }
@@ -67,6 +74,11 @@ public class RubyWarnings implements IRubyWarnings, WarnCallback {
      */
     public void warn(ID id, String fileName, int lineNumber, String message) {
         if (!runtime.warningsEnabled()) return; // TODO make an assert here
+        
+        if (id.isOneTime()) {
+            if (warned.containsKey(id)) return;
+            warned.put(id, id);
+        }
 
         StringBuilder buffer = new StringBuilder(100);
 

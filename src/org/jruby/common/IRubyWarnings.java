@@ -79,7 +79,7 @@ public interface IRubyWarnings {
         REGEXP_IGNORED_FLAGS("REGEXP_IGNORED_FLAGS"),
         REGEXP_LITERAL_IN_CONDITION("REGEXP_LITERAL_IN_CONDITION"),
         REGEXP_MATCH_AGAINST_STRING("REGEXP_MATCH_AGAINST_STRING"),
-        SAFE_NOT_SUPPORTED("SAFE_NOT_SUPPORTED"),
+        SAFE_NOT_SUPPORTED("SAFE_NOT_SUPPORTED", true),
         STRUCT_CONSTANT_REDEFINED("STRUCT_CONSTANT_REDEFINED"),
         SYMBOL_AS_INTEGER("SYMBOL_AS_INTEGER"),
         SYSSEEK_BUFFERED_IO("SYSSEEK_BUFFERED_IO"),
@@ -93,12 +93,24 @@ public interface IRubyWarnings {
         
         private final String id;
         
+        private final boolean oneTime;
+        
         ID(String id) {
             this.id = id;
+            this.oneTime = false;
+        }
+        
+        ID(String id, boolean oneTime) {
+            this.id = id;
+            this.oneTime = oneTime;
         }
         
         public String getID() {
             return id;
+        }
+        
+        public boolean isOneTime() {
+            return oneTime;
         }
     }
 
