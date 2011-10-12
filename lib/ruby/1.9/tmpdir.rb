@@ -22,6 +22,15 @@ class Dir
     if $SAFE > 0
       tmp = @@systmpdir
     else
+      # Search for a directory which isn't world-writable. In JRuby,
+      # FileUtils.remove_entry_secure does not work for directories which is
+      # under a world-writable directory.
+      for dir in [ENV['TMPDIR'], ENV['TMP'], ENV['TEMP'],
+                  ENV['USERPROFILE'], @@systmpdir, '/tmp', tmp]
+        if dir and File.directory?(dir) and File.writable?(dir) and (File.stat(dir).mode & 0002) == 0
+          return File.expand_path(dir)
+        end
+      end
       for dir in [ENV['TMPDIR'], ENV['TMP'], ENV['TEMP'], @@systmpdir, '/tmp']
 	if dir and stat = File.stat(dir) and stat.directory? and stat.writable?
 	  tmp = dir
