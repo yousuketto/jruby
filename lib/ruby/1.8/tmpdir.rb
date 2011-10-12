@@ -75,7 +75,7 @@ class Dir
   # If a block is given,
   # it is yielded with the path of the directory.
   # The directory and its contents are removed
-  # using FileUtils.remove_entry before Dir.mktmpdir returns.
+  # using FileUtils.remove_entry_secure before Dir.mktmpdir returns.
   # The value of the block is returned.
   #
   #  Dir.mktmpdir {|dir|
@@ -93,7 +93,7 @@ class Dir
   #    open("#{dir}/foo", "w") { ... }
   #  ensure
   #    # remove the directory.
-  #    FileUtils.remove_entry dir
+  #    FileUtils.remove_entry_secure dir
   #  end
   #
   def Dir.mktmpdir(prefix_suffix=nil, tmpdir=nil)
@@ -128,7 +128,7 @@ class Dir
       begin
         yield path
       ensure
-        FileUtils.remove_entry path
+        FileUtils.remove_entry_secure path
       end
     else
       path
