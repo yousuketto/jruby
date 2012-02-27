@@ -610,8 +610,7 @@ public class Interpreter {
                             resultVar = ((ResultInstr) lastInstr).getResult();
                             if (resultVar instanceof TemporaryVariable) {
                                 temp[((TemporaryVariable)resultVar).offset] = bj.breakValue;
-                            }
-                            else {
+                            } else {
                                 LocalVariable lv = (LocalVariable)resultVar;
                                 currDynScope.setValue((IRubyObject) bj.breakValue, lv.getLocation(), lv.getScopeDepth());
                             }

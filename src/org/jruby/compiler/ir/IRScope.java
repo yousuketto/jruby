@@ -581,6 +581,7 @@ public abstract class IRScope {
         ListIterator<Instr> instrsIterator = instrs.listIterator();
         while (instrsIterator.hasNext()) {
             Instr i = instrsIterator.next();
+            // if (buildExprTrees) i = i.clone();
             iCount++;
 
             // Assign new vars
@@ -595,11 +596,16 @@ public abstract class IRScope {
                         if ((uses != null) && (uses.size() == 1) && (defs != null) && (defs.size() == 1)) {
                             Instr use = uses.get(0);
                             Instr def = defs.get(0);
-                            if (instrToBBMap.get(use) == instrToBBMap.get(def)) {
+                            // Constraints:
+                            // 1. We cannot create an expression trees across basic-block boundaries. 
+                            // 2. The interpreter currently cannot distinguish breaks originating from the break itself  
+                            //    versus orginating in a call that has been collapsed into the break.  The two scenarios
+                            //    have to be handled differently.  So, for now, breaks cannot be part of expression trees.
+                            if (instrToBBMap.get(use) == instrToBBMap.get(def) && (use.getOperation() != Operation.BREAK)) {
                                 i.markDead();
                                 ((ResultInstr)i).updateResult(null);
                                 instrsIterator.remove();
-                                newVarMap.put(result, new InstrResult(i));
+                                newVarMap.put(result, new InstrResult(this, i));
                                 removed = true;
                             }
                         }
