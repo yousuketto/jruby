@@ -95,6 +95,7 @@ public class Options {
     public static final Option<Boolean> IR_COMPILER_DEBUG = bool(IR, "ir.compiler.debug", false, "Debug compilation of JRuby IR.");
     public static final Option<Boolean> IR_PASS_LIVEVARIABLE = bool(IR, "ir.pass.live_variable", false, "Enable live variable analysis of IR.");
     public static final Option<Boolean> IR_PASS_DEADCODE = bool(IR, "ir.pass.dead_code", false, "Enable dead code elimination in IR.");
+    public static final Option<Boolean> IR_EXPR_TREE = bool(IR, "ir.expr_tree", false, "Convert instructions to expression trees for interpretation");
     public static final Option<String> IR_PASS_TESTINLINER = string(IR, "ir.pass.test_inliner", null, "none", "Use specified class for inlining pass in IR.");
     
     public static final Option<Boolean> NATIVE_ENABLED = bool(NATIVE, "native.enabled", true, "Enable/disable native code, including POSIX features and C exts.");

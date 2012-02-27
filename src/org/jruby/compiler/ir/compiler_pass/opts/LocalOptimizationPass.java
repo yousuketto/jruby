@@ -5,17 +5,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+
 import org.jruby.compiler.ir.IRClosure;
 import org.jruby.compiler.ir.IRScope;
-import org.jruby.compiler.ir.Operation;
-import org.jruby.compiler.ir.compiler_pass.CompilerPass;
 import org.jruby.compiler.ir.instructions.CallInstr;
+import org.jruby.compiler.ir.instructions.CallBase;
 import org.jruby.compiler.ir.instructions.CopyInstr;
 import org.jruby.compiler.ir.instructions.Instr;
 import org.jruby.compiler.ir.instructions.ResultInstr;
+import org.jruby.compiler.ir.Operation;
 import org.jruby.compiler.ir.operands.Operand;
-import org.jruby.compiler.ir.operands.TemporaryVariable;
 import org.jruby.compiler.ir.operands.Variable;
+import org.jruby.compiler.ir.operands.TemporaryVariable;
+import org.jruby.compiler.ir.compiler_pass.CompilerPass;
 import org.jruby.compiler.ir.representations.BasicBlock;
 import org.jruby.compiler.ir.representations.CFG;
 
@@ -43,19 +45,6 @@ public class LocalOptimizationPass implements CompilerPass {
                 runLocalOptsOnInstrList(s, b.getInstrs().listIterator(), false);
             }
         }
-    }
-
-    private static void allocVar(Operand oldVar, IRScope s, List<TemporaryVariable> freeVarsList, Map<Operand, Operand> newVarMap) {
-        // If we dont have a var mapping, get a new var -- try the free list first
-        // and if none available, allocate a fresh one
-        if (newVarMap.get(oldVar) == null) {
-            newVarMap.put(oldVar, freeVarsList.isEmpty() ? s.getNewTemporaryVariable() : freeVarsList.remove(0));
-        }
-    }
-
-    private static void freeVar(TemporaryVariable newVar, List<TemporaryVariable> freeVarsList) {
-        // Put the new var onto the free list (but only if it is not already there).
-        if (!freeVarsList.contains(newVar)) freeVarsList.add(0, newVar); 
     }
 
     private static void optimizeTmpVars(IRScope s) {
@@ -153,30 +142,6 @@ public class LocalOptimizationPass implements CompilerPass {
 
         // Pass 3: Replace all single use operands with constants they were assigned to.
         // Using operand -> operand signature because simplifyOperands works on operands
-        //
-        // In parallel, compute last use of temporary variables -- this effectively is the
-        // end of the live range that started with its first definition.  This implicitly
-        // encodes the live range of the temporary variable.  
-        //
-        // These live ranges are valid because these instructions are generated from an AST
-        // and they haven't been rearranged yet.  In addition, since temporaries are used to
-        // communicate results from lower levels to higher levels in the tree, a temporary
-        // defined outside a loop cannot be used within the loop.  So, the first definition
-        // of a temporary and the last use of the temporary delimit its live range.  
-        //
-        // %current-scope and %current-module are the two "temporary" variables that violate
-        // this contract right now since they are used everywhere in the scope.  
-        // So, in the presence of loops, we:
-        // - either assume that the live range of these  variables extends to
-        //   the end of the outermost loop in which they are used
-        // - or we do not rename %current-scope and %current-module in such scopes.
-        //
-        // SSS FIXME: For now, we just extend the live range of these vars all the
-        // way to the end of the scope!
-        //
-        // NOTE: It is sufficient to just track last use for renaming purposes.
-        // At the first definition, we allocate a variable which then starts the live range
-        Map<TemporaryVariable, Integer> lastVarUseOrDef = new HashMap<TemporaryVariable, Integer>();
         int iCount = -1;
         for (Instr i: s.getInstrs()) {
             iCount++;
@@ -186,63 +151,12 @@ public class LocalOptimizationPass implements CompilerPass {
                 Variable v = ((ResultInstr)i).getResult();
                 if (v instanceof TemporaryVariable) {
                     Variable ci = removableCopies.get((TemporaryVariable)v);
-                    if (ci != null) {
-                        ((ResultInstr)i).updateResult(ci);
-                        if (ci instanceof TemporaryVariable) lastVarUseOrDef.put((TemporaryVariable)ci, iCount);
-                    } else {
-                        lastVarUseOrDef.put((TemporaryVariable)v, iCount);
-                    }
+                    if (ci != null) ((ResultInstr)i).updateResult(ci);
                 }
             }
 
             // rename uses
             i.simplifyOperands(constValMap, true);
-
-            // compute last use
-            for (Variable v: i.getUsedVariables()) {
-                if (v instanceof TemporaryVariable) lastVarUseOrDef.put((TemporaryVariable)v, iCount);
-            }
-        }
-
-        // If the scope has loops, extend live range of %current-module and %current-scope
-        // to end of scope (see note earlier).
-        if (s.hasLoops()) {
-            lastVarUseOrDef.put((TemporaryVariable)s.getCurrentScopeVariable(), iCount);
-            lastVarUseOrDef.put((TemporaryVariable)s.getCurrentModuleVariable(), iCount);
-        }
-
-        // Pass 4: Reallocate temporaries based on last uses to minimize # of unique vars.
-        Map<Operand, Operand>   newVarMap    = new HashMap<Operand, Operand>();
-        List<TemporaryVariable> freeVarsList = new ArrayList<TemporaryVariable>();
-        iCount = -1;
-        s.resetTemporaryVariables();
-
-        for (Instr i: s.getInstrs()) {
-            iCount++;
-
-            // Assign new vars
-            Variable result = null;
-            if (i instanceof ResultInstr) {
-                result = ((ResultInstr)i).getResult();
-                if (result instanceof TemporaryVariable) allocVar(result, s, freeVarsList, newVarMap);
-            }
-            for (Variable v: i.getUsedVariables()) {
-                if (v instanceof TemporaryVariable) allocVar(v, s, freeVarsList, newVarMap);
-            }
-
-            // Free dead vars
-            if ((result instanceof TemporaryVariable) && lastVarUseOrDef.get((TemporaryVariable)result) == iCount) {
-                freeVar((TemporaryVariable)newVarMap.get(result), freeVarsList);
-            }
-            for (Variable v: i.getUsedVariables()) {
-                if (v instanceof TemporaryVariable) {
-                    TemporaryVariable tv = (TemporaryVariable)v;
-                    if (lastVarUseOrDef.get(tv) == iCount) freeVar((TemporaryVariable)newVarMap.get(tv), freeVarsList);
-                }
-            }
-
-            // Rename
-            i.renameVars(newVarMap);
         }
     }
 

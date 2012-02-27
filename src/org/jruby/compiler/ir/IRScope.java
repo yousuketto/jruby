@@ -3,6 +3,7 @@ package org.jruby.compiler.ir;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
@@ -27,6 +28,7 @@ import org.jruby.compiler.ir.instructions.ReceiveSelfInstr;
 import org.jruby.compiler.ir.instructions.ResultInstr;
 import org.jruby.compiler.ir.instructions.ThreadPollInstr;
 import org.jruby.compiler.ir.instructions.ZSuperInstr;
+import org.jruby.compiler.ir.operands.InstrResult;
 import org.jruby.compiler.ir.operands.Label;
 import org.jruby.compiler.ir.operands.LocalVariable;
 import org.jruby.compiler.ir.operands.Operand;
@@ -484,6 +486,153 @@ public abstract class IRScope {
 
         if (!isPreOrder) p.run(this);
     }
+
+    private void allocVar(Operand oldVar, IRScope s, List<TemporaryVariable> freeVarsList, Map<Operand, Operand> newVarMap) {
+        // If we dont have a var mapping, get a new var -- try the free list first
+        // and if none available, allocate a fresh one
+        if (newVarMap.get(oldVar) == null) {
+            newVarMap.put(oldVar, freeVarsList.isEmpty() ? getNewTemporaryVariable() : freeVarsList.remove(0));
+        }
+    }
+
+    private void freeVar(TemporaryVariable newVar, List<TemporaryVariable> freeVarsList) {
+        // Put the new var onto the free list (but only if it is not already there).
+        if (!freeVarsList.contains(newVar)) freeVarsList.add(0, newVar); 
+    }
+
+    private void buildExprTreesAndMinimizeTmpVars(List<Instr> instrs) {
+        Map<Instr, BasicBlock> instrToBBMap = new HashMap<Instr, BasicBlock>();
+        for (BasicBlock b: cfg.getBasicBlocks()) {
+            for (Instr i: b.getInstrs()) instrToBBMap.put(i, b);
+        }
+
+        // Compute last use of temporary variables -- this effectively is the
+        // end of the live range that started with its first definition.  This implicitly
+        // encodes the live range of the temporary variable.  
+        //
+        // These live ranges are valid because these instructions are generated from an AST
+        // and they haven't been rearranged yet.  In addition, since temporaries are used to
+        // communicate results from lower levels to higher levels in the tree, a temporary
+        // defined outside a loop cannot be used within the loop.  So, the first definition
+        // of a temporary and the last use of the temporary delimit its live range.  
+        //
+        // %current-scope and %current-module are the two "temporary" variables that violate
+        // this contract right now since they are used everywhere in the scope.  
+        // So, in the presence of loops, we:
+        // - either assume that the live range of these  variables extends to
+        //   the end of the outermost loop in which they are used
+        // - or we do not rename %current-scope and %current-module in such scopes.
+        //
+        // SSS FIXME: For now, we just extend the live range of these vars all the
+        // way to the end of the scope!
+        //
+        // NOTE: It is sufficient to just track last use for renaming purposes.
+        // At the first definition, we allocate a variable which then starts the live range
+        Map<TemporaryVariable, List<Instr>> tmpVarUses = new HashMap<TemporaryVariable, List<Instr>>();
+        Map<TemporaryVariable, List<Instr>> tmpVarDefs = new HashMap<TemporaryVariable, List<Instr>>();
+        Map<TemporaryVariable, Integer> lastVarUseOrDef = new HashMap<TemporaryVariable, Integer>();
+        int iCount = -1;
+        for (Instr i: instrs) {
+            iCount++;
+
+            if (i instanceof ResultInstr) {
+                Variable v = ((ResultInstr)i).getResult();
+                if (v instanceof TemporaryVariable) {
+                    TemporaryVariable tv = (TemporaryVariable)v;
+                    List<Instr> defs = tmpVarDefs.get(tv);
+                    if (defs == null) {
+                        defs = new ArrayList<Instr>();
+                        tmpVarDefs.put(tv, defs);
+                    }
+                    defs.add(i);
+                    lastVarUseOrDef.put(tv, iCount);
+                }
+            }
+
+            // compute last use
+            for (Variable v: i.getUsedVariables()) {
+                if (v instanceof TemporaryVariable) {
+                    TemporaryVariable tv = (TemporaryVariable)v;
+                    List<Instr> uses = tmpVarUses.get(tv);
+                    if (uses == null) {
+                        uses = new ArrayList<Instr>();
+                        tmpVarUses.put(tv, uses);
+                    }
+                    uses.add(i);
+                    lastVarUseOrDef.put(tv, iCount);
+                }
+            }
+        }
+
+        // If the scope has loops, extend live range of %current-module and %current-scope
+        // to end of scope (see note earlier).
+        if (hasLoops()) {
+            lastVarUseOrDef.put((TemporaryVariable)getCurrentScopeVariable(), iCount);
+            lastVarUseOrDef.put((TemporaryVariable)getCurrentModuleVariable(), iCount);
+        }
+
+        // Pass 2: Reallocate temporaries based on last uses to minimize # of unique vars.
+        Map<Operand, Operand>   newVarMap    = new HashMap<Operand, Operand>();
+        List<TemporaryVariable> freeVarsList = new ArrayList<TemporaryVariable>();
+        iCount = -1;
+        resetTemporaryVariables();
+
+        boolean buildExprTrees = RubyInstanceConfig.IR_EXPR_TREE;
+        ListIterator<Instr> instrsIterator = instrs.listIterator();
+        while (instrsIterator.hasNext()) {
+            Instr i = instrsIterator.next();
+            iCount++;
+
+            // Assign new vars
+            Variable result = null;
+            if (i instanceof ResultInstr) {
+                result = ((ResultInstr)i).getResult();
+                if (result instanceof TemporaryVariable) {
+                    boolean removed = false;
+                    if (buildExprTrees) {
+                        List<Instr> uses = tmpVarUses.get((TemporaryVariable)result);
+                        List<Instr> defs = tmpVarDefs.get((TemporaryVariable)result);
+                        if ((uses != null) && (uses.size() == 1) && (defs != null) && (defs.size() == 1)) {
+                            Instr use = uses.get(0);
+                            Instr def = defs.get(0);
+                            if (instrToBBMap.get(use) == instrToBBMap.get(def)) {
+                                i.markDead();
+                                ((ResultInstr)i).updateResult(null);
+                                instrsIterator.remove();
+                                newVarMap.put(result, new InstrResult(i));
+                                removed = true;
+                            }
+                        }
+                    }
+
+                    if (!removed) allocVar(result, this, freeVarsList, newVarMap);
+                }
+            }
+            for (Variable v: i.getUsedVariables()) {
+                if (v instanceof TemporaryVariable) {
+                    // Dont rename vars that will get replaced with a chained instr.
+                    if (!(newVarMap.get(v) instanceof InstrResult)) allocVar(v, this, freeVarsList, newVarMap);
+                }
+            }
+
+            // Free dead vars
+            if ((result instanceof TemporaryVariable) && lastVarUseOrDef.get((TemporaryVariable)result) == iCount) {
+                freeVar((TemporaryVariable)newVarMap.get(result), freeVarsList);
+            }
+            for (Variable v: i.getUsedVariables()) {
+                if ((v instanceof TemporaryVariable) && !(newVarMap.get(v) instanceof InstrResult)) {
+                    TemporaryVariable tv = (TemporaryVariable)v;
+                    if (lastVarUseOrDef.get(tv) == iCount) freeVar((TemporaryVariable)newVarMap.get(tv), freeVarsList);
+                }
+            }
+
+            // Rename -- everything if this is still alive, only uses if this has been targeted for chaining
+            if (i.isDead()) i.simplifyOperands(newVarMap, true);
+            else i.renameVars(newVarMap);
+        }
+
+        //System.out.println("# tmp vars: " + getTemporaryVariableSize());
+    }
     
     private Instr[] prepareInstructionsForInterpretation() {
         if (relinearizeCFG) {
@@ -504,19 +653,28 @@ public abstract class IRScope {
             throw e;
         }
 
+        List<Instr> newInstrs = new ArrayList<Instr>();
+        for (BasicBlock b : linearizedBBList) {
+            for (Instr i : b.getInstrs()) {
+                if (!(i instanceof ReceiveSelfInstr)) newInstrs.add(i);
+            }
+        }
+
+        // Instruction chaining + tmp var minimization 
+        buildExprTreesAndMinimizeTmpVars(newInstrs);
+
         // Set up IPCs
         HashMap<Label, Integer> labelIPCMap = new HashMap<Label, Integer>();
         List<Label> labelsToFixup = new ArrayList<Label>();
-        List<Instr> newInstrs = new ArrayList<Instr>();
         int ipc = 0;
         for (BasicBlock b : linearizedBBList) {
             labelIPCMap.put(b.getLabel(), ipc);
             labelsToFixup.add(b.getLabel());
-            for (Instr i : b.getInstrs()) {
-                if (!(i instanceof ReceiveSelfInstr)) {
-                    newInstrs.add(i);
-                    ipc++;
-                }
+            ListIterator<Instr> bInstrs = b.getInstrs().listIterator();
+            while (bInstrs.hasNext()) {
+                Instr i = bInstrs.next();
+                if (i.isDead()) bInstrs.remove();
+                else if (!(i instanceof ReceiveSelfInstr)) ipc++;
             }
         }
 

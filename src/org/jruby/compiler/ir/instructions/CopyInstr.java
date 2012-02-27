@@ -11,9 +11,6 @@ import org.jruby.compiler.ir.operands.Operand;
 import org.jruby.compiler.ir.operands.Variable;
 import org.jruby.compiler.ir.representations.InlinerInfo;
 import org.jruby.compiler.ir.targets.JVM;
-import org.jruby.runtime.Block;
-import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.builtin.IRubyObject;
 
 public class CopyInstr extends Instr implements ResultInstr {
     private Operand arg;
@@ -72,5 +69,4 @@ public class CopyInstr extends Instr implements ResultInstr {
         jvm.emit(getSource());
         jvm.method().storeLocal(index);
     }
-
 }
