@@ -205,8 +205,8 @@ public class IRClosure extends IRScope {
         if (lvar != null) return lvar;
 
         int newDepth = isForLoopBody ? scopeDepth : scopeDepth - 1;
-        if (newDepth >= 0) return getLexicalParent().findExistingLocalVariable(name, newDepth);
-        else return null;
+
+        return newDepth >= 0 ? getLexicalParent().findExistingLocalVariable(name, newDepth) : null;
     }
 
     public LocalVariable getNewLocalVariable(String name, int depth) {
@@ -232,7 +232,7 @@ public class IRClosure extends IRScope {
 
         return lvar;
     }
-
+    
     public int getNestingDepth() {
         return nestingDepth;
     }
