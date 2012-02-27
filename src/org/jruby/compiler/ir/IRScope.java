@@ -601,7 +601,11 @@ public abstract class IRScope {
                             // 2. The interpreter currently cannot distinguish breaks originating from the break itself  
                             //    versus orginating in a call that has been collapsed into the break.  The two scenarios
                             //    have to be handled differently.  So, for now, breaks cannot be part of expression trees.
-                            if (instrToBBMap.get(use) == instrToBBMap.get(def) && (use.getOperation() != Operation.BREAK)) {
+                            // 3. (Hack!) Dont collapse define_* instructions since they need access to "block" and Operand.retrieve
+                            //    dont get block passed into them.  So, a hack till we upgrade that API to pass block into them 
+                            Operation useOp = use.getOperation();
+                            Operation defOp = def.getOperation();
+                            if (instrToBBMap.get(use) == instrToBBMap.get(def) && (useOp != Operation.BREAK) && !defOp.modifiesCode()) {
                                 i.markDead();
                                 ((ResultInstr)i).updateResult(null);
                                 instrsIterator.remove();
