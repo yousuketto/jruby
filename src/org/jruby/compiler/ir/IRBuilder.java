@@ -742,16 +742,14 @@ public class IRBuilder {
         case MULTIPLEASGNNODE: {
             Operand valuesArg;
             MultipleAsgnNode childNode = (MultipleAsgnNode) node;
+            Variable result = s.getNewTemporaryVariable();
             if (childNode.getHeadNode() != null && ((ListNode)childNode.getHeadNode()).childNodes().size() > 0) {
                 // Invoke to_ary on the operand only if it is not an array already
-                Variable result = s.getNewTemporaryVariable();
                 s.addInstr(new ToAryInstr(result, v, manager.getTrue()));
-                valuesArg = result;
             } else {
-                s.addInstr(new EnsureRubyArrayInstr(v, v));
-                valuesArg = v;
+                s.addInstr(new EnsureRubyArrayInstr(result, v));
             }
-            buildMultipleAsgnAssignment(childNode, s, null, valuesArg);
+            buildMultipleAsgnAssignment(childNode, s, null, result);
             break;
         }
         default: 
@@ -1068,7 +1066,6 @@ public class IRBuilder {
             WhenNode whenNode = (WhenNode)aCase;
             Label bodyLabel = s.getNewLabel();
 
-            Variable eqqResult = s.getNewTemporaryVariable();
             labels.add(bodyLabel);
             Operand v1, v2;
             if (whenNode.getExpressionNodes() instanceof ListNode) {
@@ -1093,6 +1090,7 @@ public class IRBuilder {
                     v2 = build(whenNode.getExpressionNodes(), s);
                 }
             } else {
+                Variable eqqResult = s.getNewTemporaryVariable();
                 s.addInstr(new EQQInstr(eqqResult, build(whenNode.getExpressionNodes(), s), value));
                 v1 = eqqResult;
                 v2 = manager.getTrue();
