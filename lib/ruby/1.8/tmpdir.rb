@@ -47,15 +47,15 @@ class Dir
       # Opening directory is not allowed in Java.
       dirs = [ENV['TMPDIR'], ENV['TMP'], ENV['TEMP'], ENV['USERPROFILE'], @@systmpdir, '/tmp', tmp]
       for dir in dirs
-	if dir and File.directory?(dir) and File.writable?(dir) and (File.stat(dir).mode & 0002) == 0
+        if dir and File.directory?(dir) and File.writable?(dir) and (File.stat(dir).mode & 0002) == 0
           return File.expand_path(dir)
-	end
+        end
       end
       for dir in dirs
-	if dir and File.directory?(dir) and File.writable?(dir)
-	  tmp = dir
-	  break
-	end
+        if dir and File.directory?(dir) and File.writable?(dir)
+          tmp = dir
+          break
+        end
       end
       File.expand_path(tmp)
     end

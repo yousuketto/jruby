@@ -28,15 +28,15 @@ class Dir
       # Opening directory is not allowed in Java.
       dirs = [ENV['TMPDIR'], ENV['TMP'], ENV['TEMP'], @@systmpdir, '/tmp', tmp]
       for dir in dirs
-	if dir and stat = File.stat(dir) and stat.directory? and stat.writable? and !stat.world_writable?
+        if dir and stat = File.stat(dir) and stat.directory? and stat.writable? and !stat.world_writable?
           return File.expand_path(dir)
         end
       end
       for dir in dirs
-	if dir and stat = File.stat(dir) and stat.directory? and stat.writable?
-	  tmp = dir
-	  break
-	end rescue nil
+        if dir and stat = File.stat(dir) and stat.directory? and stat.writable?
+          tmp = dir
+          break
+        end rescue nil
       end
       File.expand_path(tmp)
     end
