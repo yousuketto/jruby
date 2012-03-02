@@ -27,7 +27,7 @@ class Dir
       # under a world-writable directory.
       for dir in [ENV['TMPDIR'], ENV['TMP'], ENV['TEMP'],
                   ENV['USERPROFILE'], @@systmpdir, '/tmp', tmp]
-        if dir and File.directory?(dir) and File.writable?(dir) and (File.stat(dir).mode & 0002) == 0
+        if dir and File.directory?(dir) and File.writable?(dir) and !File.stat(dir).world_writable?
           return File.expand_path(dir)
         end
       end
