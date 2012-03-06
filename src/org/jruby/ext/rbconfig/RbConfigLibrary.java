@@ -40,6 +40,7 @@ import org.jruby.CompatVersion;
 
 import org.jruby.Ruby;
 import org.jruby.RubyHash;
+import org.jruby.RubyKernel;
 import org.jruby.RubyModule;
 import org.jruby.anno.JRubyMethod;
 import jnr.posix.util.Platform;
@@ -111,13 +112,20 @@ public class RbConfigLibrary implements Library {
      * <code>EXEEXT</code>.
      */
     public void load(Ruby runtime, boolean wrap) {
-        RubyModule configModule = runtime.defineModule("Config");
+        RubyModule configModule;
+
+        if (runtime.is1_9()) {
+            configModule = runtime.defineModule("RbConfig");
+            RubyKernel.autoload(runtime.getObject(), runtime.newSymbol("Config"), runtime.newString("rbconfig/obsolete.rb"));
+        } else {
+            configModule = runtime.defineModule("Config");
+            runtime.getObject().defineConstant("RbConfig", configModule);
+        }
         
         configModule.defineAnnotatedMethods(RbConfigLibrary.class);
         
         RubyHash configHash = RubyHash.newHash(runtime);
         configModule.defineConstant("CONFIG", configHash);
-        runtime.getObject().defineConstant("RbConfig", configModule);
 
         String[] versionParts;
         if (runtime.is1_9()) {
@@ -293,7 +301,6 @@ public class RbConfigLibrary implements Library {
         } else if (Platform.IS_MAC) {
             ldsharedflags = " -dynamic -bundle -undefined dynamic_lookup ";
             cflags = " -fPIC -DTARGET_RT_MAC_CFM=0 " + cflags;
-            ldflags += " -bundle -framework JavaVM -Wl,-syslibroot,$(SDKROOT) -mmacosx-version-min=10.5 ";
             archflags = " -arch " + Platform.ARCH;
             cppflags = " -D_XOPEN_SOURCE -D_DARWIN_C_SOURCE " + cppflags;
             setConfig(mkmfHash, "DLEXT", "bundle");
@@ -364,7 +371,7 @@ public class RbConfigLibrary implements Library {
     @JRubyMethod(name = "ruby", module = true, compat = CompatVersion.RUBY1_9)
     public static IRubyObject ruby(ThreadContext context, IRubyObject recv) {
         Ruby runtime = context.getRuntime();
-        RubyHash configHash = (RubyHash) runtime.getModule("Config").getConstant("CONFIG");
+        RubyHash configHash = (RubyHash) runtime.getModule("RbConfig").getConstant("CONFIG");
 
         IRubyObject bindir            = configHash.op_aref(context, runtime.newString("bindir"));
         IRubyObject ruby_install_name = configHash.op_aref(context, runtime.newString("ruby_install_name"));

@@ -1,5 +1,7 @@
 package org.jruby.ext.ffi.jffi;
 
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -11,9 +13,7 @@ import org.jruby.util.WeakReferenceReaper;
 final class AllocatedNativeMemoryIO extends BoundedNativeMemoryIO implements AllocatedDirectMemoryIO {
     /** Keeps strong references to the memory bucket until cleanup */
     private static final Map<AllocationGroup, Boolean> referenceSet = new ConcurrentHashMap<AllocationGroup, Boolean>();
-    private static final ThreadLocal<AllocationGroup> currentBucket = new ThreadLocal<AllocationGroup>();
-    static final AtomicLong nativeMemoryUsed = new AtomicLong(0);
-    static final long NATIVE_MEMORY_HIGHWATER = 512L * 1024 * 1024;
+    private static final ThreadLocal<Reference<AllocationGroup>> currentBucket = new ThreadLocal<Reference<AllocationGroup>>();
 
     private final MemoryAllocation allocation;
     private final Object sentinel;
@@ -39,9 +39,13 @@ final class AllocatedNativeMemoryIO extends BoundedNativeMemoryIO implements All
      * @param clear Whether the memory should be cleared (zeroed)
      * @return A new {@link AllocatedDirectMemoryIO}
      */
-    static final AllocatedNativeMemoryIO allocateAligned(Ruby runtime, int size, int align, boolean clear) {
-        final long address = IO.allocateMemory(size + align - 1, clear);
-        if (address == 0) {
+    static AllocatedNativeMemoryIO allocateAligned(Ruby runtime, int size, int align, boolean clear) {
+        long address;
+        for (int i = 0; (address = IO.allocateMemory(size + align - 1, clear)) == 0L && i < 100; i++) {
+            // No available memory; trigger a full GC to reclaim some memory
+            System.gc();
+        }
+        if (address == 0L) {
             throw runtime.newRuntimeError("failed to allocate " + size + " bytes of native memory");
         }
 
@@ -55,15 +59,13 @@ final class AllocatedNativeMemoryIO extends BoundedNativeMemoryIO implements All
             *
             * This reduces the overhead of automatically freed native memory allocations by about 70%
             */
-            AllocationGroup allocationGroup = currentBucket.get();
+            Reference<AllocationGroup> allocationGroupReference = currentBucket.get();
+            AllocationGroup allocationGroup = allocationGroupReference != null ? allocationGroupReference.get() : null;
             Object sentinel = allocationGroup != null ? allocationGroup.get() : null;
 
             if (sentinel == null || !allocationGroup.canAccept(size)) {
-                if (nativeMemoryUsed.addAndGet(AllocationGroup.MAX_BYTES_PER_BUCKET) >= NATIVE_MEMORY_HIGHWATER) {
-                    System.gc();
-                }
                 referenceSet.put(allocationGroup = new AllocationGroup(sentinel = new Object()), Boolean.TRUE);
-                currentBucket.set(allocationGroup);
+                currentBucket.set(new SoftReference<AllocationGroup>(allocationGroup));
             }
 
             AllocatedNativeMemoryIO io = new AllocatedNativeMemoryIO(runtime, sentinel, address, size, align);
@@ -129,7 +131,6 @@ final class AllocatedNativeMemoryIO extends BoundedNativeMemoryIO implements All
                 }
                 m = m.next;
             }
-            nativeMemoryUsed.addAndGet(0L - MAX_BYTES_PER_BUCKET);
         }
     }
 

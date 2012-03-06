@@ -26,6 +26,7 @@ import org.jruby.compiler.ir.instructions.Instr;
 import org.jruby.compiler.ir.instructions.ReceiveClosureInstr;
 import org.jruby.compiler.ir.instructions.ReceiveSelfInstr;
 import org.jruby.compiler.ir.instructions.ResultInstr;
+import org.jruby.compiler.ir.instructions.Specializeable;
 import org.jruby.compiler.ir.instructions.ThreadPollInstr;
 import org.jruby.compiler.ir.instructions.ZSuperInstr;
 import org.jruby.compiler.ir.operands.InstrResult;
@@ -106,7 +107,7 @@ public abstract class IRScope {
     private CFG cfg;
 
     /** List of (nested) closures in this scope */
-    private List<IRClosure> closures;
+    private List<IRClosure> nestedClosures;
 
     /** Local variables defined in this scope */
     private Set<Variable> definedLocalVars;
@@ -129,7 +130,7 @@ public abstract class IRScope {
 
     // Index values to guarantee we don't assign same internal index twice
     private int nextClosureIndex;
-    
+
     protected static class LocalVariableAllocator {
         public int nextSlot;
         public Map<String, LocalVariable> varMap;
@@ -232,7 +233,7 @@ public abstract class IRScope {
         this.hasLoops = s.hasLoops;
         this.hasUnusedImplicitBlockArg = s.hasUnusedImplicitBlockArg;
         this.instrList = null;
-        this.closures = new ArrayList<IRClosure>();
+        this.nestedClosures = new ArrayList<IRClosure>();
         this.dfProbs = new HashMap<String, DataFlowProblem>();
         this.nextVarIndex = new HashMap<String, Integer>(); // SSS FIXME: clone!
         this.cfg = null;
@@ -261,7 +262,7 @@ public abstract class IRScope {
         this.nextClosureIndex = 0;
         this.temporaryVariableIndex = -1;
         this.instrList = new ArrayList<Instr>();
-        this.closures = new ArrayList<IRClosure>();
+        this.nestedClosures = new ArrayList<IRClosure>();
         this.dfProbs = new HashMap<String, DataFlowProblem>();
         this.nextVarIndex = new HashMap<String, Integer>();
         this.cfg = null;
@@ -288,7 +289,7 @@ public abstract class IRScope {
     }
 
     public void addClosure(IRClosure c) {
-        closures.add(c);
+        nestedClosures.add(c);
     }
     
     public Instr getLastInstr() {
@@ -322,7 +323,7 @@ public abstract class IRScope {
     }    
 
     public List<IRClosure> getClosures() {
-        return closures;
+        return nestedClosures;
     }
     
     public IRManager getManager() {
@@ -680,11 +681,22 @@ public abstract class IRScope {
         for (BasicBlock b : linearizedBBList) {
             labelIPCMap.put(b.getLabel(), ipc);
             labelsToFixup.add(b.getLabel());
-            ListIterator<Instr> bInstrs = b.getInstrs().listIterator();
-            while (bInstrs.hasNext()) {
-                Instr i = bInstrs.next();
-                if (i.isDead()) bInstrs.remove();
-                else if (!(i instanceof ReceiveSelfInstr)) ipc++;
+            ListIterator<Instr> bbInstrs = b.getInstrs().listIterator();
+            while (bbInstrs.hasNext()) {
+                Instr instr = bbInstrs.next();
+                if (instr.isDead()) {
+                    bbInstrs.remove();
+                } else {
+                    if (instr instanceof Specializeable) {
+                        instr = ((Specializeable) instr).specializeForInterpretation();
+                        bbInstrs.set(instr);
+                    }
+                    
+                    if (!(instr instanceof ReceiveSelfInstr)) {
+                        newInstrs.add(instr);
+                        ipc++;
+                    }
+                }
             }
         }
 
@@ -699,7 +711,7 @@ public abstract class IRScope {
         linearizedInstrArray = newInstrs.toArray(new Instr[newInstrs.size()]);
         return linearizedInstrArray;
     }
-
+    
     private void printPass(String message) {
         if (RubyInstanceConfig.IR_COMPILER_DEBUG) {
             LOG.info("################## " + message + "##################");
@@ -760,25 +772,51 @@ public abstract class IRScope {
         return prepareInstructionsForInterpretation();
     }
 
+    /* SSS FIXME: Do we need to synchronize on this?  Cache this info in a scope field? */
     /** Run any necessary passes to get the IR ready for compilation */
-    public synchronized void prepareForCompilation() {
+    public Tuple<Instr[], Map<Integer,Label[]>> prepareForCompilation() {
         // Build CFG and run compiler passes, if necessary
         if (getCFG() == null) runCompilerPasses();
+
+        try {
+            buildLinearization(); // FIXME: compiler passes should have done this
+            depends(linearization());
+        } catch (RuntimeException e) {
+            LOG.error("Error linearizing cfg: ", e);
+            CFG c = cfg();
+            LOG.error("\nGraph:\n" + c.toStringGraph());
+            LOG.error("\nInstructions:\n" + c.toStringInstrs());
+            throw e;
+        }
+
+        // Set up IPCs
+        // FIXME: Would be nice to collapse duplicate labels; for now, using Label[]
+        HashMap<Integer, Label[]> ipcLabelMap = new HashMap<Integer, Label[]>();
+        List<Instr> newInstrs = new ArrayList<Instr>();
+        int ipc = 0;
+        for (BasicBlock b : linearizedBBList) {
+            ipcLabelMap.put(ipc, catLabels(ipcLabelMap.get(ipc), b.getLabel()));
+            for (Instr i : b.getInstrs()) {
+                if (!(i instanceof ReceiveSelfInstr)) {
+                    newInstrs.add(i);
+                    ipc++;
+                }
+            }
+        }
+
+        return new Tuple<Instr[], Map<Integer,Label[]>>(newInstrs.toArray(new Instr[newInstrs.size()]), ipcLabelMap);
+    }
+    
+    private static Label[] catLabels(Label[] labels, Label cat) {
+        if (labels == null) return new Label[] {cat};
+        Label[] newLabels = new Label[labels.length + 1];
+        System.arraycopy(labels, 0, newLabels, 0, labels.length);
+        newLabels[labels.length] = cat;
+        return newLabels;
     }
 
-    // SSS FIXME: This method does nothing useful right now.
-    // hasEscapedBinding is the crucial flag and it continues to be unconditionally true.
-    public void computeScopeFlags() {
-        // init
-        canModifyCode = true;
-        canCaptureCallersBinding = false;
-        usesZSuper = false;
-
-        // recompute flags -- we could be calling this method different times
-        // definitely once after ir generation and local optimizations propagates constants locally
-        // but potentially at a later time after doing ssa generation and constant propagation
-        boolean receivesClosureArg = false;
-        for (Instr i: getInstrs()) {
+    private boolean computeScopeFlags(boolean receivesClosureArg, List<Instr> instrs) {
+        for (Instr i: instrs) {
             if (i instanceof ReceiveClosureInstr)
                 receivesClosureArg = true;
 
@@ -801,11 +839,42 @@ public abstract class IRScope {
                     }
                 }
 
-                // If this method receives a closure arg, and this call is an eval that has more than 1 argument,
-                // it could be using the closure as a binding -- which means it could be using pretty much any
-                // variable from the caller's binding!
-                if (receivesClosureArg && call.canBeEval() && (call.getCallArgs().length > 1))
-                    canCaptureCallersBinding = true;
+                if (call.canBeEval()) {
+                    usesEval = true;
+
+                    // If this method receives a closure arg, and this call is an eval that has more than 1 argument,
+                    // it could be using the closure as a binding -- which means it could be using pretty much any
+                    // variable from the caller's binding!
+                    if (receivesClosureArg && (call.getCallArgs().length > 1))
+                        canCaptureCallersBinding = true;
+                }
+            }
+        }
+
+        return receivesClosureArg;
+    }
+
+    // SSS FIXME: This method does nothing a whole lot useful right now.
+    // hasEscapedBinding is the crucial flag and it continues to be unconditionally true.
+    //
+    // This can help use eliminate writes to %block that are not used since this is
+    // a special local-variable, not programmer-defined local-variable
+    public void computeScopeFlags() {
+        // init
+        canModifyCode = true;
+        canCaptureCallersBinding = false;
+        usesZSuper = false;
+        usesEval = false;
+
+        // recompute flags -- we could be calling this method different times
+        // definitely once after ir generation and local optimizations propagates constants locally
+        // but potentially at a later time after doing ssa generation and constant propagation
+        if (cfg == null) {
+            computeScopeFlags(false, getInstrs());
+        } else {
+            boolean receivesClosureArg = false;
+            for (BasicBlock b: cfg.getBasicBlocks()) {
+                receivesClosureArg = computeScopeFlags(receivesClosureArg, b.getInstrs());
             }
         }
     }
@@ -829,9 +898,9 @@ public abstract class IRScope {
             i++;
         }
 
-        if (!closures.isEmpty()) {
+        if (!nestedClosures.isEmpty()) {
             b.append("\n\n------ Closures encountered in this scope ------\n");
-            for (IRClosure c: closures)
+            for (IRClosure c: nestedClosures)
                 b.append(c.toStringBody());
             b.append("------------------------------------------------\n");
         }
@@ -1126,25 +1195,46 @@ public abstract class IRScope {
 //            }
 //        }
 //
-//        List<IRClosure> closures = _scope.getClosures();
-//        if (!closures.isEmpty()) {
-//            for (IRClosure c : closures) {
+//        List<IRClosure> nestedClosures = _scope.getClosures();
+//        if (!nestedClosures.isEmpty()) {
+//            for (IRClosure c : nestedClosures) {
 //                c.getCFG().splitCalls();
 //            }
 //        }
-    }    
+    }
+
+    public void resetDFProblemsState() {
+        dfProbs = new HashMap<String, DataFlowProblem>();
+        for (IRClosure c: nestedClosures) c.resetDFProblemsState();
+    }
+
+    public void resetState() {
+        relinearizeCFG = true;
+        linearizedInstrArray = null;
+        cfg.resetState();
+
+        // reset flags
+        canModifyCode = true;
+        canCaptureCallersBinding = true;
+        bindingHasEscaped = true;
+        usesEval = true;
+        usesZSuper = true;
+
+        // Reset dataflow problems state
+        resetDFProblemsState();
+    }
 
     public void inlineMethod(IRScope method, RubyModule implClass, int classToken, BasicBlock basicBlock, CallBase call) {
+        // Inline
         depends(cfg());
         new CFGInliner(cfg).inlineMethod(method, implClass, classToken, basicBlock, call);
 
         // Reset state
-        relinearizeCFG = true;
-        linearizedInstrArray = null;
-        dfProbs = new HashMap<String, DataFlowProblem>();
+        resetState();
+
+        // Re-run opts
         runCompilerPass(new LocalOptimizationPass());
-        // SSS FIXME: Some bug in the LVA/DCE/Inlining combination
-        // runCompilerPass(new DeadCodeElimination());
+        if (RubyInstanceConfig.IR_DEAD_CODE) runCompilerPass(new DeadCodeElimination());
     }
     
     

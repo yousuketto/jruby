@@ -4,10 +4,7 @@ import org.jruby.compiler.ir.Operation;
 import org.jruby.compiler.ir.instructions.Instr;
 import org.jruby.compiler.ir.operands.Operand;
 import org.jruby.compiler.ir.representations.InlinerInfo;
-import org.jruby.runtime.Arity;
-import org.jruby.runtime.Block;
-import org.jruby.runtime.ThreadContext;
-import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.compiler.ir.targets.JVM;
 
 public class CheckArityInstr extends Instr {
     public final int required;
@@ -34,18 +31,26 @@ public class CheckArityInstr extends Instr {
 
     @Override
     public Instr cloneForInlinedScope(InlinerInfo ii) {
-        // Since we know arity at a callsite, arity check passes or we have an ArgumentError
-        int numArgs = ii.getArgsCount();
-        
-        if ((numArgs < required) || ((rest == -1) && (numArgs > (required + opt)))) {
-            return new RaiseArgumentErrorInstr(required, opt, rest, rest);
-        }
+        if (ii.canMapArgsStatically()) {
+            // Since we know arity at a callsite, arity check passes or we have an ArgumentError
+            int numArgs = ii.getArgsCount();
+            if ((numArgs < required) || ((rest == -1) && (numArgs > (required + opt)))) {
+                return new RaiseArgumentErrorInstr(required, opt, rest, rest);
+            }
 
-        return null;
+            return null;
+        } else {
+            return new CheckArgsArrayArityInstr(ii.getArgs(), required, opt, rest);
+        }
     }
 
     @Override
     public Instr cloneForBlockCloning(InlinerInfo ii) {
         return new CheckArityInstr(required, opt, rest);
+    }
+
+    @Override
+    public void compile(JVM jvm) {
+        // no-op right now
     }
 }

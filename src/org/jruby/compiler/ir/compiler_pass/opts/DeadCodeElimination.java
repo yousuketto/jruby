@@ -12,10 +12,8 @@ public class DeadCodeElimination implements CompilerPass {
     }
 
     public void run(IRScope scope) {
-        if (scope instanceof IRClosure && ((IRClosure)scope).hasBeenInlined()) return;
-
         LiveVariablesProblem lvp = (LiveVariablesProblem) scope.getDataFlowSolution(DataFlowConstants.LVP_NAME);
-        
+
         if (lvp == null) {
             lvp = new LiveVariablesProblem();
             lvp.setup(scope);

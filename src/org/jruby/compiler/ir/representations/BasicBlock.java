@@ -1,21 +1,13 @@
 package org.jruby.compiler.ir.representations;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
 import org.jruby.compiler.ir.IRScope;
-import org.jruby.compiler.ir.IRClosure;
 import org.jruby.compiler.ir.instructions.CallBase;
 import org.jruby.compiler.ir.instructions.Instr;
-import org.jruby.compiler.ir.instructions.ResultInstr;
 import org.jruby.compiler.ir.instructions.YieldInstr;
-import org.jruby.compiler.ir.operands.Array;
 import org.jruby.compiler.ir.operands.Label;
-import org.jruby.compiler.ir.operands.LocalVariable;
 import org.jruby.compiler.ir.operands.Operand;
-import org.jruby.compiler.ir.operands.Variable;
 import org.jruby.compiler.ir.operands.WrappedIRClosure;
 import org.jruby.compiler.ir.util.ExplicitVertexID;
 
@@ -24,21 +16,13 @@ public class BasicBlock implements ExplicitVertexID {
     private CFG cfg;                       // CFG that this basic block belongs to
     private Label label;                   // All basic blocks have a starting label
     private List<Instr> instrs;         // List of non-label instructions
-    private boolean isLive;
     private Instr[] instrsArray = null;    
 
     public BasicBlock(CFG c, Label l) {
         instrs = new ArrayList<Instr>();
         label = l;
-        isLive = true;
         cfg = c;
         id = c.getNextBBID();
-    }
-
-    private void migrateToCFG(CFG newCFG) {
-        newCFG.addBasicBlock(this);
-        this.cfg = newCFG;
-        this.id = newCFG.getNextBBID();
     }
 
     public int getID() {
@@ -111,6 +95,7 @@ public class BasicBlock implements ExplicitVertexID {
     }
 
     public BasicBlock cloneForInlinedMethod(InlinerInfo ii) {
+        IRScope hostScope = ii.getInlineHostScope();
         BasicBlock clonedBB = ii.getOrCreateRenamedBB(this);
         for (Instr i: getInstrs()) {
             Instr clonedInstr = i.cloneForInlinedScope(ii);
@@ -120,7 +105,7 @@ public class BasicBlock implements ExplicitVertexID {
                 if (clonedInstr instanceof CallBase) {
                     CallBase call = (CallBase)clonedInstr;
                     Operand block = call.getClosureArg(null);
-                    if (block instanceof WrappedIRClosure) ii.getInlineHostScope().addClosure(((WrappedIRClosure)block).getClosure());
+                    if (block instanceof WrappedIRClosure) hostScope.addClosure(((WrappedIRClosure)block).getClosure());
                 }
             }
         }
@@ -128,22 +113,16 @@ public class BasicBlock implements ExplicitVertexID {
         return clonedBB;
     }
 
-    public void migrateToHostScope(InlinerInfo ii) {
+    public BasicBlock cloneForInlinedClosure(InlinerInfo ii) {
         // Update cfg for this bb
         IRScope hostScope = ii.getInlineHostScope();
-        migrateToCFG(hostScope.getCFG());
-
-        // Clone
-        List clonedInstrs = new ArrayList<Instr>();
+        BasicBlock clonedBB = ii.getOrCreateRenamedBB(this);
 
         // Process instructions
-        for (ListIterator<Instr> it = ((ArrayList<Instr>)instrs).listIterator(); it.hasNext(); ) {
-            Instr i = it.next();
-
-            // clone
+        for (Instr i: getInstrs()) {
             Instr clonedInstr = i.cloneForInlinedClosure(ii);
             if (clonedInstr != null) {
-                clonedInstrs.add(clonedInstr);
+                clonedBB.addInstr(clonedInstr);
                 if (clonedInstr instanceof CallBase) {
                     CallBase call = (CallBase)clonedInstr;
                     Operand block = call.getClosureArg(null);
@@ -152,7 +131,7 @@ public class BasicBlock implements ExplicitVertexID {
             }
         }
 
-        this.instrs = clonedInstrs;
+        return clonedBB;
     }
 
     @Override

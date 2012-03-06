@@ -9,9 +9,12 @@ import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
+import org.jruby.MetaClass;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyClass;
@@ -21,6 +24,7 @@ import org.jruby.RubyMethod;
 import org.jruby.RubyModule;
 import org.jruby.RubyObject;
 import org.jruby.anno.JRubyMethod;
+import org.jruby.common.IRubyWarnings;
 import org.jruby.java.invokers.InstanceFieldGetter;
 import org.jruby.java.invokers.InstanceFieldSetter;
 import org.jruby.java.invokers.InstanceMethodInvoker;
@@ -143,6 +147,17 @@ public class JavaProxy extends RubyObject {
         } else {
             return Java.get_proxy_class(javaClass, RuntimeHelpers.invoke(context, javaClass, "array_class"));
         }
+    }
+
+    @JRubyMethod(name = "__persistent__=", meta = true)
+    public IRubyObject persistent(IRubyObject value) {
+        metaClass.getRealClass().setCacheProxy(value.isTrue());
+        return this;
+    }
+
+    @JRubyMethod(name = "__persistent__", meta = true)
+    public IRubyObject persistent() {
+        return getRuntime().newBoolean(metaClass.getRealClass().getCacheProxy());
     }
 
     @Override
@@ -431,14 +446,58 @@ public class JavaProxy extends RubyObject {
     @Override
     public Object toJava(Class type) {
         if (type.isAssignableFrom(getObject().getClass())) {
-            if (Java.OBJECT_PROXY_CACHE) getRuntime().getJavaSupport().getObjectProxyCache().put(getObject(), this);
+            if (Java.OBJECT_PROXY_CACHE || metaClass.getCacheProxy()) {
+                getRuntime().getJavaSupport().getObjectProxyCache().put(getObject(), this);
+            }
             return getObject();
         } else {
             return super.toJava(type);
+        }
+    }
+
+    @Override
+    public Object getVariable(int index) {
+        confirmCachedProxy(NONPERSISTENT_IVAR_MESSAGE);
+        return super.getVariable(index);
+    }
+
+    @Override
+    public void setVariable(int index, Object value) {
+        confirmCachedProxy(NONPERSISTENT_IVAR_MESSAGE);
+        super.setVariable(index, value);
+    }
+
+    /** rb_singleton_class
+     *
+     * Note: this method is specialized for RubyFixnum, RubySymbol,
+     * RubyNil and RubyBoolean
+     *
+     * Will either return the existing singleton class for this
+     * object, or create a new one and return that.
+     */
+    @Override
+    public RubyClass getSingletonClass() {
+        confirmCachedProxy(NONPERSISTENT_SINGLETON_MESSAGE);
+        return super.getSingletonClass();
+    }
+
+    private void confirmCachedProxy(String message) {
+        RubyClass realClass = metaClass.getRealClass();
+        if (!realClass.getCacheProxy()) {
+            if (Java.OBJECT_PROXY_CACHE) {
+                getRuntime().getWarnings().warnOnce(IRubyWarnings.ID.NON_PERSISTENT_JAVA_PROXY, MessageFormat.format(message, realClass));
+            } else {
+                getRuntime().getWarnings().warn(MessageFormat.format(message, realClass));
+                realClass.setCacheProxy(true);
+                getRuntime().getJavaSupport().getObjectProxyCache().put(getObject(), this);
+            }
         }
     }
     
     public Object unwrap() {
         return getObject();
     }
+
+    private static final String NONPERSISTENT_IVAR_MESSAGE = "instance vars on non-persistent Java type {0} (http://wiki.jruby.org/Persistence)";
+    private static final String NONPERSISTENT_SINGLETON_MESSAGE = "singleton on non-persistent Java type {0} (http://wiki.jruby.org/Persistence)";
 }

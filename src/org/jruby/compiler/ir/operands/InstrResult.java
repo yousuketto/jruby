@@ -49,12 +49,6 @@ public class InstrResult extends Operand {
         // This switch is present to maximize inlining opportunities
         try {
             switch (i.getOperation()) {
-                case ATTR_ASSIGN:
-                case CALL: {
-                    CallBase c = (CallBase)i;
-                    IRubyObject object = (IRubyObject)c.getReceiver().retrieve(context, self, currDynScope, temp);
-                    return c.getCallAdapter().call(context, self, object, currDynScope, temp);
-                }
                 case COPY: {
                     return ((CopyInstr)i).getSource().retrieve(context, self, currDynScope, temp);
                 }

@@ -27,18 +27,17 @@ public class ReceiveOptArgInstr extends ReceiveOptArgBase {
 
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
-        int n = ii.getArgsCount();
-        return new CopyInstr(ii.getRenamedVariable(result), minArgsLength <= n ? ii.getCallArg(argIndex) : UndefinedValue.UNDEFINED);
+        if (ii.canMapArgsStatically()) {
+            int n = ii.getArgsCount();
+            return new CopyInstr(ii.getRenamedVariable(result), minArgsLength <= n ? ii.getArg(argIndex) : UndefinedValue.UNDEFINED);
+        } else {
+            return new OptArgMultipleAsgnInstr(ii.getRenamedVariable(result), ii.getArgs(), argIndex, minArgsLength);
+        }
     }
 
     @Override
     public Instr cloneForBlockCloning(InlinerInfo ii) {
         return new ReceiveOptArgInstr(ii.getRenamedVariable(result), argIndex, minArgsLength);
-    }
-
-    @Override
-    public Instr cloneForInlinedClosure(InlinerInfo ii) {
-        return new OptArgMultipleAsgnInstr(ii.getRenamedVariable(result), ii.getYieldArg(), argIndex, minArgsLength);
     }
 
     public Object receiveOptArg(IRubyObject[] args) {

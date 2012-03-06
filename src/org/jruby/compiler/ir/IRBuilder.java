@@ -140,8 +140,6 @@ import org.jruby.compiler.ir.instructions.GetGlobalVariableInstr;
 import org.jruby.compiler.ir.instructions.InheritanceSearchConstInstr;
 import org.jruby.compiler.ir.instructions.InstanceOfInstr;
 import org.jruby.compiler.ir.instructions.Instr;
-import org.jruby.compiler.ir.instructions.JRubyImplCallInstr;
-import org.jruby.compiler.ir.instructions.JRubyImplCallInstr.JRubyImplementationMethod;
 import org.jruby.compiler.ir.instructions.JumpIndirectInstr;
 import org.jruby.compiler.ir.instructions.JumpInstr;
 import org.jruby.compiler.ir.instructions.LabelInstr;
@@ -155,14 +153,15 @@ import org.jruby.compiler.ir.instructions.PutClassVariableInstr;
 import org.jruby.compiler.ir.instructions.PutConstInstr;
 import org.jruby.compiler.ir.instructions.PutFieldInstr;
 import org.jruby.compiler.ir.instructions.PutGlobalVarInstr;
-import org.jruby.compiler.ir.instructions.ReceivePreReqdArgInstr;
 import org.jruby.compiler.ir.instructions.ReceiveClosureInstr;
 import org.jruby.compiler.ir.instructions.ReceiveExceptionInstr;
+import org.jruby.compiler.ir.instructions.ReceivePreReqdArgInstr;
 import org.jruby.compiler.ir.instructions.ReceiveSelfInstr;
 import org.jruby.compiler.ir.instructions.RecordEndBlockInstr;
 import org.jruby.compiler.ir.instructions.ReqdArgMultipleAsgnInstr;
 import org.jruby.compiler.ir.instructions.RescueEQQInstr;
 import org.jruby.compiler.ir.instructions.RestArgMultipleAsgnInstr;
+import org.jruby.compiler.ir.instructions.ResultInstr;
 import org.jruby.compiler.ir.instructions.ReturnInstr;
 import org.jruby.compiler.ir.instructions.SetReturnAddressInstr;
 import org.jruby.compiler.ir.instructions.SuperInstr;
@@ -171,8 +170,19 @@ import org.jruby.compiler.ir.instructions.UndefMethodInstr;
 import org.jruby.compiler.ir.instructions.YieldInstr;
 import org.jruby.compiler.ir.instructions.ZSuperInstr;
 import org.jruby.compiler.ir.instructions.defined.SetWithinDefinedInstr;
+import org.jruby.compiler.ir.instructions.jruby.BackrefIsMatchDataInstr;
+import org.jruby.compiler.ir.instructions.jruby.BlockGivenInstr;
 import org.jruby.compiler.ir.instructions.jruby.CheckArityInstr;
+import org.jruby.compiler.ir.instructions.jruby.ClassVarIsDefinedInstr;
+import org.jruby.compiler.ir.instructions.jruby.GetDefinedConstantOrMethodInstr;
+import org.jruby.compiler.ir.instructions.jruby.GetErrorInfoInstr;
+import org.jruby.compiler.ir.instructions.jruby.GlobalIsDefinedInstr;
+import org.jruby.compiler.ir.instructions.jruby.HasInstanceVarInstr;
+import org.jruby.compiler.ir.instructions.jruby.IsMethodBoundInstr;
+import org.jruby.compiler.ir.instructions.jruby.MethodDefinedInstr;
+import org.jruby.compiler.ir.instructions.jruby.MethodIsPublicInstr;
 import org.jruby.compiler.ir.instructions.jruby.RestoreErrorInfoInstr;
+import org.jruby.compiler.ir.instructions.jruby.SuperMethodBoundInstr;
 import org.jruby.compiler.ir.instructions.jruby.ThrowExceptionInstr;
 import org.jruby.compiler.ir.instructions.jruby.ToAryInstr;
 import org.jruby.compiler.ir.instructions.ruby18.ReceiveOptArgInstr;
@@ -197,6 +207,7 @@ import org.jruby.compiler.ir.operands.LiveScopeModule;
 import org.jruby.compiler.ir.operands.LocalVariable;
 import org.jruby.compiler.ir.operands.MethAddr;
 import org.jruby.compiler.ir.operands.NthRef;
+import org.jruby.compiler.ir.operands.ObjectClass;
 import org.jruby.compiler.ir.operands.Operand;
 import org.jruby.compiler.ir.operands.Range;
 import org.jruby.compiler.ir.operands.Regexp;
@@ -534,12 +545,6 @@ public class IRBuilder {
             n = ((NewlineNode)n).getNextNode();
 
         return n;
-    }
-
-    public Variable generateJRubyUtilityCall(IRScope m, JRubyImplementationMethod meth, boolean hasResult, Operand receiver, Operand[] args) {
-        Variable ret = hasResult ? m.getNewTemporaryVariable() : null;
-        m.addInstr(JRubyImplCallInstr.createJRubyImplementationMethod(ret, meth, receiver, args));
-        return ret;
     }
 
     public Operand build(Node node, IRScope s) {
@@ -1503,13 +1508,12 @@ public class IRBuilder {
         s.addInstr(new LabelInstr(defLabel));
         return tmpVar;
     }
-
-    protected Variable buildDefinitionCheck(IRScope s, JRubyImplementationMethod defnChecker, Operand receiver, String nameToCheck, String definedReturnValue) {
+    
+    protected Variable buildDefinitionCheck(IRScope s, ResultInstr definedInstr, String definedReturnValue) {
         Label undefLabel = s.getNewLabel();
-        Operand[] args   = nameToCheck == null ? NO_ARGS : new Operand[]{new StringLiteral(nameToCheck)};
-        Variable tmpVar  = generateJRubyUtilityCall(s, defnChecker, true, receiver, args);
-        s.addInstr(BEQInstr.create(tmpVar, manager.getFalse(), undefLabel));
-        return buildDefnCheckIfThenPaths(s, undefLabel, new StringLiteral(definedReturnValue));
+        s.addInstr((Instr) definedInstr);
+        s.addInstr(BEQInstr.create(definedInstr.getResult(), manager.getFalse(), undefLabel));
+        return buildDefnCheckIfThenPaths(s, undefLabel, new StringLiteral(definedReturnValue));        
     }
 
     public Operand buildGetArgumentDefinition(final Node node, IRScope s, String type) {
@@ -1593,13 +1597,13 @@ public class IRBuilder {
                 return tmpVar;
             }
             case GLOBALVARNODE:
-                return buildDefinitionCheck(s, JRubyImplementationMethod.RT_IS_GLOBAL_DEFINED, null, ((GlobalVarNode) node).getName(), "global-variable");
+                return buildDefinitionCheck(s, new GlobalIsDefinedInstr(s.getNewTemporaryVariable(), new StringLiteral(((GlobalVarNode) node).getName())), "global-variable");
             case INSTVARNODE:
-                return buildDefinitionCheck(s, JRubyImplementationMethod.SELF_HAS_INSTANCE_VARIABLE, getSelf(s), ((InstVarNode) node).getName(), "instance-variable");
+                return buildDefinitionCheck(s, new HasInstanceVarInstr(s.getNewTemporaryVariable(), getSelf(s), new StringLiteral(((InstVarNode) node).getName())), "instance-variable");
             case YIELDNODE:
-                return buildDefinitionCheck(s, JRubyImplementationMethod.BLOCK_GIVEN, null, null, "yield");
+                return buildDefinitionCheck(s, new BlockGivenInstr(s.getNewTemporaryVariable()), "yield");
             case BACKREFNODE:
-                return buildDefinitionCheck(s, JRubyImplementationMethod.BACKREF_IS_RUBY_MATCH_DATA, null, null, "$" + ((BackRefNode) node).getType());
+                return buildDefinitionCheck(s, new BackrefIsMatchDataInstr(s.getNewTemporaryVariable()), "$" + ((BackRefNode) node).getType());
             case NTHREFNODE: {
             // SSS FIXME: Is there a reason to do this all with low-level IR?
             // Can't this all be folded into a Java method that would be part
@@ -1619,7 +1623,7 @@ public class IRBuilder {
                 int n = ((NthRefNode) node).getMatchNumber();
                 Label undefLabel = s.getNewLabel();
                 Variable tmpVar = s.getNewTemporaryVariable();
-                s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.BACKREF_IS_RUBY_MATCH_DATA, null, NO_ARGS));
+                s.addInstr(new BackrefIsMatchDataInstr(tmpVar));
                 s.addInstr(BEQInstr.create(tmpVar, manager.getFalse(), undefLabel));
                 // SSS FIXME: 
                 // - Can/should I use BEQInstr(new NthRef(n), manager.getNil(), undefLabel)? instead of .nil? & compare with flag?
@@ -1642,22 +1646,17 @@ public class IRBuilder {
 
                 // store previous exception for restoration if we rescue something
                 Variable errInfo = s.getNewTemporaryVariable();
-                s.addInstr(new JRubyImplCallInstr(errInfo, JRubyImplementationMethod.TC_SAVE_ERR_INFO, null, NO_ARGS));
+                s.addInstr(new GetErrorInfoInstr(errInfo));
 
                 CodeBlock protectedCode = new CodeBlock() {
                     public Operand run(Object[] args) {
-                        IRScope  s      = (IRScope)args[0];
-                        Node     n      = (Node)args[1];
-                        String   name   = (String)args[2];
+                        IRScope s    = (IRScope)args[0];
+                        Node    n    = (Node)args[1];
+                        String  name = (String)args[2];
+                        Operand v    = (n instanceof Colon2Node) ? build(((Colon2Node)n).getLeftNode(), s) : new ObjectClass();
+
                         Variable tmpVar = s.getNewTemporaryVariable();
-                        Operand v;
-                        if (n instanceof Colon2Node) {
-                            v = build(((Colon2Node) n).getLeftNode(), s);
-                        } else {
-                            s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.RT_GET_OBJECT, null, NO_ARGS));
-                            v = tmpVar;
-                        }
-                        s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.RTH_GET_DEFINED_CONSTANT_OR_BOUND_METHOD, null, new Operand[]{v, new StringLiteral(name)}));
+                        s.addInstr(new GetDefinedConstantOrMethodInstr(tmpVar, v, new StringLiteral(name)));
                         return tmpVar;
                     }
                 };
@@ -1685,13 +1684,13 @@ public class IRBuilder {
                 Label undefLabel = s.getNewLabel();
                 Variable tmpVar = s.getNewTemporaryVariable();
                 StringLiteral mName = new StringLiteral(((FCallNode)node).getName());
-                s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.SELF_IS_METHOD_BOUND, getSelf(s), new Operand[]{mName}));
+                s.addInstr(new IsMethodBoundInstr(tmpVar, getSelf(s), mName));
                 s.addInstr(BEQInstr.create(tmpVar, manager.getFalse(), undefLabel));
                 Operand argsCheckDefn = buildGetArgumentDefinition(((FCallNode) node).getArgsNode(), s, "method");
                 return buildDefnCheckIfThenPaths(s, undefLabel, argsCheckDefn);
             }
             case VCALLNODE:
-                return buildDefinitionCheck(s, JRubyImplementationMethod.SELF_IS_METHOD_BOUND, getSelf(s), ((VCallNode) node).getName(), "method");
+                return buildDefinitionCheck(s, new IsMethodBoundInstr(s.getNewTemporaryVariable(), getSelf(s), new StringLiteral(((VCallNode) node).getName())), "method");
             case CALLNODE: {
             // SSS FIXME: Is there a reason to do this all with low-level IR?
             // Can't this all be folded into a Java method that would be part
@@ -1710,7 +1709,7 @@ public class IRBuilder {
                         String   methodName = iVisited.getName();
                         Variable tmpVar     = s.getNewTemporaryVariable();
                         Operand  receiver   = build(iVisited.getReceiverNode(), s);
-                        s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.METHOD_DEFINED, receiver, new Operand[]{new StringLiteral(methodName)}));
+                        s.addInstr(new MethodDefinedInstr(tmpVar, receiver, new StringLiteral(methodName)));
                         return buildDefnCheckIfThenPaths(s, (Label)args[2], tmpVar);
                     }
                 };
@@ -1735,7 +1734,7 @@ public class IRBuilder {
                  * ------------------------------------------------------------------------------ */
                 ClassVarNode iVisited = (ClassVarNode) node;
                 Variable cm = classVarDefinitionContainer(s, true);
-                return buildDefinitionCheck(s, JRubyImplementationMethod.CLASS_VAR_DEFINED, cm, iVisited.getName(), "class variable");
+                return buildDefinitionCheck(s, new ClassVarIsDefinedInstr(s.getNewTemporaryVariable(), cm, new StringLiteral(iVisited.getName())), "class variable");
             }
             case ATTRASSIGNNODE: {
                 Label  undefLabel = s.getNewLabel();
@@ -1766,9 +1765,9 @@ public class IRBuilder {
                         StringLiteral attrMethodName = new StringLiteral(iVisited.getName());
                         Variable tmpVar     = s.getNewTemporaryVariable();
                         Operand  receiver   = build(iVisited.getReceiverNode(), s);
-                        s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.METHOD_PUBLIC_ACCESSIBLE, receiver, new Operand[]{attrMethodName}));
+                        s.addInstr(new MethodIsPublicInstr(tmpVar, receiver, attrMethodName));
                         s.addInstr(BEQInstr.create(tmpVar, manager.getFalse(), undefLabel));
-                        s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.SELF_IS_METHOD_BOUND, getSelf(s), new Operand[]{attrMethodName}));
+                        s.addInstr(new IsMethodBoundInstr(tmpVar, getSelf(s), attrMethodName));
                         s.addInstr(BEQInstr.create(tmpVar, manager.getFalse(), undefLabel));
                         Operand argsCheckDefn = buildGetArgumentDefinition(((AttrAssignNode) node).getArgsNode(), s, "assignment");
                         return buildDefnCheckIfThenPaths(s, undefLabel, argsCheckDefn);
@@ -1784,11 +1783,11 @@ public class IRBuilder {
                 return protectCodeWithRescue(s, protectedCode, new Object[]{s, iVisited, undefLabel}, rescueBlock, null);
             }
             case ZSUPERNODE:
-                return buildDefinitionCheck(s, JRubyImplementationMethod.FRAME_SUPER_METHOD_BOUND, getSelf(s), null, "super");
+                return buildDefinitionCheck(s, new SuperMethodBoundInstr(s.getNewTemporaryVariable(), getSelf(s)), "super");
             case SUPERNODE: {
                 Label undefLabel = s.getNewLabel();
                 Variable tmpVar  = s.getNewTemporaryVariable();
-                s.addInstr(new JRubyImplCallInstr(tmpVar, JRubyImplementationMethod.FRAME_SUPER_METHOD_BOUND, getSelf(s), NO_ARGS));
+                s.addInstr(new SuperMethodBoundInstr(tmpVar, getSelf(s)));
                 s.addInstr(BEQInstr.create(tmpVar, manager.getFalse(), undefLabel));
                 Operand superDefnVal = buildGetArgumentDefinition(((SuperNode) node).getArgsNode(), s, "super");
                 return buildDefnCheckIfThenPaths(s, undefLabel, superDefnVal);

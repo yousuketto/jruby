@@ -9,12 +9,15 @@ import org.jruby.RubyModule;
 import org.jruby.compiler.ir.IRClosure;
 import org.jruby.compiler.ir.IRScope;
 import org.jruby.compiler.ir.Tuple;
+import org.jruby.compiler.ir.instructions.jruby.ToAryInstr;
 import org.jruby.compiler.ir.instructions.CallBase;
 import org.jruby.compiler.ir.instructions.JumpInstr;
 import org.jruby.compiler.ir.instructions.ModuleVersionGuardInstr;
 import org.jruby.compiler.ir.instructions.YieldInstr;
+import org.jruby.compiler.ir.operands.Array;
 import org.jruby.compiler.ir.operands.Label;
 import org.jruby.compiler.ir.operands.Operand;
+import org.jruby.compiler.ir.operands.Variable;
 import org.jruby.compiler.ir.operands.WrappedIRClosure;
 import org.jruby.compiler.ir.representations.CFG.EdgeType;
 import org.jruby.compiler.ir.util.Edge;
@@ -88,8 +91,9 @@ public class CFGInliner {
 
     public void inlineMethod(IRScope scope, RubyModule implClass, int classToken, BasicBlock callBB, CallBase call) {
         // Temporarily turn off inlining of recursive methods
-        if (cfg.getScope() == scope) return;
-
+        // Conservative turning off for inlining of a method in a closure nested within the same method
+        IRScope hostScope = cfg.getScope();
+        if (hostScope.getNearestMethod() == scope) return;
 
 /*
         System.out.println("host cfg   :" + cfg.toStringGraph());
@@ -100,7 +104,6 @@ public class CFGInliner {
 
         // Host method data init
         InlinerInfo ii = new InlinerInfo(call, cfg);
-        IRScope hostScope = cfg.getScope();
         Label splitBBLabel = hostScope.getNewLabel();
         BasicBlock splitBB;
 
@@ -112,7 +115,7 @@ public class CFGInliner {
         for (BasicBlock b: methodCFG.getBasicBlocks()) methodBBs.add(b);
 
         // Check if we are inlining a recursive method
-        if (cfg.getScope() == scope) {
+        if (hostScope.getNearestMethod() == scope) {
             // 1. clone self
             // SSS: FIXME: We need a clone-graph api method in cfg and graph
             CFG selfClone = cloneSelf(ii);
@@ -125,7 +128,6 @@ public class CFGInliner {
                     cfg.addEdge(b, e.getDestination().getData(), e.getType());
                 }
             }
-
         } else {
             // 2. clone callee and add it to the host cfg
             for (BasicBlock b : methodCFG.getBasicBlocks()) {
@@ -153,10 +155,15 @@ public class CFGInliner {
         cfg.removeAllOutgoingEdgesForBB(callBB);
 
         // 4a. Hook up entry edges
+        assert methodCFG.outDegree(mEntry) == 2: "Entry BB of inlinee method does not have outdegree 2: " + methodCFG.toStringGraph();
         for (Edge<BasicBlock> e : methodCFG.getOutgoingEdges(mEntry)) {
             BasicBlock destination = e.getDestination().getData();
             if (destination != mExit) {
-                cfg.addEdge(callBB, ii.getRenamedBB(destination), CFG.EdgeType.FALL_THROUGH);
+                BasicBlock dstBB = ii.getRenamedBB(destination);
+                if (!ii.canMapArgsStatically()) {
+                    dstBB.addInstr(new ToAryInstr((Variable)ii.getArgs(), new Array(call.getCallArgs()), cfg.getScope().getManager().getTrue()));
+                }
+                cfg.addEdge(callBB, dstBB, CFG.EdgeType.FALL_THROUGH);
             }
         }
 
@@ -164,18 +171,19 @@ public class CFGInliner {
         for (Edge<BasicBlock> e : methodCFG.getIncomingEdges(mExit)) {
             BasicBlock source = e.getSource().getData();
             if (source != mEntry) {
+                BasicBlock clonedSource = ii.getRenamedBB(source);
                 if (e.getType() == EdgeType.EXCEPTION) {
                     // e._src has an explicit throw that returns from the callee
                     // after inlining, if the caller instruction has a rescuer, then the
                     // throw has to be captured by the rescuer as well.
                     BasicBlock rescuerOfSplitBB = cfg.getRescuerBBFor(splitBB);
                     if (rescuerOfSplitBB != null) {
-                        cfg.addEdge(ii.getRenamedBB(source), rescuerOfSplitBB, EdgeType.EXCEPTION);
+                        cfg.addEdge(clonedSource, rescuerOfSplitBB, EdgeType.EXCEPTION);
                     } else {
-                        cfg.addEdge(ii.getRenamedBB(source), cfg.getExitBB(), EdgeType.EXIT);                        
+                        cfg.addEdge(clonedSource, cfg.getExitBB(), EdgeType.EXIT);                        
                     }
                 } else {
-                    cfg.addEdge(ii.getRenamedBB(source), splitBB, e.getType());
+                    cfg.addEdge(clonedSource, splitBB, e.getType());
                 }
             }
         }
@@ -275,11 +283,6 @@ public class CFGInliner {
     }
 
     private void inlineClosureAtYieldSite(InlinerInfo ii, IRClosure cl, BasicBlock yieldBB, YieldInstr yield) {
-        // SSS FIXME: Is this still true?
-        // Mark this closure as inlined so we dont run any destructive operations on it.
-        // since the closure in its original form will get destroyed by the inlining.
-        cl.markInlined();
-
         // 1. split yield site bb and move outbound edges from yield site bb to split bb.
         BasicBlock splitBB = yieldBB.splitAtInstruction(yield, cfg.getScope().getNewLabel(), false);
         cfg.addBasicBlock(splitBB);
@@ -294,46 +297,50 @@ public class CFGInliner {
         ii.setupYieldArgsAndYieldResult(yield, yieldBB, cl.getBlockBody().arity());
 
         // 2. Merge closure cfg into the current cfg
-        // SSS FIXME: Is it simpler to just clone everything?
-        //
-        // NOTE: No need to clone basic blocks in the closure because they are part of the caller's cfg
-        // and is being merged in at the yield site -- there is no need for the closure after the merge.
-        // But, we will clone individual instructions.
         CFG closureCFG = cl.getCFG();
         BasicBlock cEntry = closureCFG.getEntryBB();
         BasicBlock cExit = closureCFG.getExitBB();
         for (BasicBlock b : closureCFG.getBasicBlocks()) {
-            if (b != cEntry && b != cExit) b.migrateToHostScope(ii);
+            if (b != cEntry && b != cExit) {
+                cfg.addBasicBlock(b.cloneForInlinedClosure(ii));
+            }
         }
+
         for (BasicBlock b : closureCFG.getBasicBlocks()) {
             if (b != cEntry && b != cExit) {
+                BasicBlock bClone = ii.getRenamedBB(b);
                 for (Edge<BasicBlock> e : closureCFG.getOutgoingEdges(b)) {
-                    BasicBlock c = e.getDestination().getData();
-                    if (c != cExit) cfg.addEdge(b, c, e.getType());
+                    BasicBlock edst = e.getDestination().getData();
+                    if (edst != cExit) cfg.addEdge(bClone, ii.getRenamedBB(edst), e.getType());
                 }
             }
         }
         
+        // Hook up entry edges
         for (Edge<BasicBlock> e : closureCFG.getOutgoingEdges(cEntry)) {
             BasicBlock destination = e.getDestination().getData();
-            if (destination != cExit) cfg.addEdge(yieldBB, destination, e.getType());
+            if (destination != cExit) {
+                cfg.addEdge(yieldBB, ii.getRenamedBB(destination), CFG.EdgeType.FALL_THROUGH);
+            }
         }
         
+        // Hook up exit edges 
         for (Edge<BasicBlock> e : closureCFG.getIncomingEdges(cExit)) {
             BasicBlock source = e.getSource().getData();
             if (source != cEntry) {
+                BasicBlock clonedSource = ii.getRenamedBB(source);
                 if (e.getType() == EdgeType.EXCEPTION) {
                     // e._src has an explicit throw that returns from the closure.
                     // After inlining, if the yield instruction has a rescuer, then the
                     // throw has to be captured by the rescuer as well.
                     BasicBlock rescuerOfSplitBB = cfg.getRescuerBBFor(splitBB);
                     if (rescuerOfSplitBB != null) {
-                        cfg.addEdge(source, rescuerOfSplitBB, EdgeType.EXCEPTION);
+                        cfg.addEdge(clonedSource, rescuerOfSplitBB, EdgeType.EXCEPTION);
                     } else {
-                        cfg.addEdge(source, cfg.getExitBB(), EdgeType.EXIT);
+                        cfg.addEdge(clonedSource, cfg.getExitBB(), EdgeType.EXIT);
                     }
                 } else {
-                    cfg.addEdge(source, splitBB, e.getType());
+                    cfg.addEdge(clonedSource, splitBB, e.getType());
                 }
             }
         }
@@ -342,7 +349,7 @@ public class CFGInliner {
         // 5. No need to clone rescued regions -- just assimilate them
         List<ExceptionRegion> exceptionRegions = cfg.getOutermostExceptionRegions();
         for (ExceptionRegion r : closureCFG.getOutermostExceptionRegions()) {
-            exceptionRegions.add(r);
+            exceptionRegions.add(r.cloneForInlining(ii));
         }
 
         // 6. Update bb rescuer map
@@ -357,14 +364,14 @@ public class CFGInliner {
         // 6c. bbs in mcfg that aren't protected by an existing bb will be protected by yieldBBrescuer/yieldBBensurer
         for (BasicBlock cb : closureCFG.getBasicBlocks()) {
             if (cb != cEntry && cb != cExit) {
-                BasicBlock cbProtector = closureCFG.getRescuerBBFor(cb);
+                BasicBlock cbProtector = ii.getRenamedBB(closureCFG.getRescuerBBFor(cb));
                 if (cbProtector != null) {
                     cfg.setRescuerBB(cb, cbProtector);
                 } else if (yieldBBrescuer != null) {
                     cfg.setRescuerBB(cb, yieldBBrescuer);
                 }
 
-                BasicBlock cbEnsurer = closureCFG.getEnsurerBBFor(cb);
+                BasicBlock cbEnsurer = ii.getRenamedBB(closureCFG.getEnsurerBBFor(cb));
                 if (cbEnsurer != null) {
                     cfg.setEnsurerBB(cb, cbEnsurer);
                 } else if (yieldBBensurer != null) {

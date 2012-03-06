@@ -246,8 +246,7 @@ public class Interpreter {
                     if ((instr instanceof CallBase) && !((CallBase)instr).inliningBlocked()) {
                         // System.out.println("checking: " + instr);
                         CallBase call = (CallBase)instr;
-                        CallAdapter ca = call.getCallAdapter();
-                        CallSite cs = ca == null ? null: ca.getCallSite();
+                        CallSite cs = call.getCallSite();
                         // System.out.println("callsite: " + cs);
                         if (cs != null && (cs instanceof CachingCallSite)) {
                             CachingCallSite ccs = (CachingCallSite)cs;
@@ -510,18 +509,6 @@ public class Interpreter {
                         ipc++;
                         break;
                     }
-                    case ATTR_ASSIGN:
-                    case CALL: {
-                        CallBase c = (CallBase)lastInstr;
-                        IRubyObject object = (IRubyObject)c.getReceiver().retrieve(context, self, currDynScope, temp);
-                        Object callResult = c.getCallAdapter().call(context, self, object, currDynScope, temp);
-                        if (c instanceof ResultInstr) {
-                            result = callResult;
-                            resultVar = ((ResultInstr)c).getResult();
-                        }
-                        ipc++;
-                        break;
-                    }
                     case CLOSURE_RETURN:
                     case RETURN: {
                         rv = (IRubyObject)((ReturnBase)lastInstr).getReturnValue().retrieve(context, self, currDynScope, temp);
@@ -558,7 +545,7 @@ public class Interpreter {
                         if ((numArgs < ca.required) || ((ca.rest == -1) && (numArgs > (ca.required + ca.opt)))) {
                             Arity.raiseArgumentError(runtime, numArgs, ca.required, ca.required + ca.opt);
                         }
-                         ipc++;
+                        ipc++;
                         break;
                     }
                     default: {

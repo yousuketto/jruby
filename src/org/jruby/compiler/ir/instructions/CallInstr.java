@@ -1,6 +1,9 @@
 package org.jruby.compiler.ir.instructions;
 
 import org.jruby.compiler.ir.Operation;
+import org.jruby.compiler.ir.instructions.specialized.OneFixnumArgNoBlockCallInstr;
+import org.jruby.compiler.ir.instructions.specialized.OneOperandArgNoBlockCallInstr;
+import org.jruby.compiler.ir.instructions.specialized.ZeroOperandArgNoBlockCallInstr;
 import org.jruby.compiler.ir.operands.MethAddr;
 import org.jruby.compiler.ir.operands.Operand;
 import org.jruby.compiler.ir.operands.Variable;
@@ -34,6 +37,12 @@ public class CallInstr extends CallBase implements ResultInstr {
         
         this.result = result;
     }
+    
+    public CallInstr(CallInstr ordinary) {
+        this(ordinary.getOperation(), ordinary.getCallType(), ordinary.getResult(),
+                ordinary.getMethodAddr(), ordinary.getReceiver(), ordinary.getCallArgs(),
+                ordinary.getClosureArg(null));
+    }
 
     public Variable getResult() {
         return result;
@@ -42,6 +51,21 @@ public class CallInstr extends CallBase implements ResultInstr {
     public void updateResult(Variable v) {
         this.result = v;
     }
+    
+    @Override
+    public CallBase specializeForInterpretation() {
+        if (hasClosure() || containsSplat()) return this;
+        
+        switch (getCallArgs().length) {
+            case 0:
+                return new ZeroOperandArgNoBlockCallInstr(this);
+            case 1:
+                if (isAllFixnums()) return new OneFixnumArgNoBlockCallInstr(this);
+
+                return new OneOperandArgNoBlockCallInstr(this);
+        }
+        return this;
+    }    
 
     public Instr discardResult() {
         return new NoResultCallInstr(getOperation(), getCallType(), getMethodAddr(), getReceiver(), getCallArgs(), closure);
