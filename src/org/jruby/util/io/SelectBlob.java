@@ -221,7 +221,7 @@ public class SelectBlob {
 
     private void trySelectWrite(ThreadContext context, Map<Character,Integer> attachment, RubyIO ioObj) throws IOException {
         if (!(ioObj.getChannel() instanceof SelectableChannel)
-                || !registerSelect(context, getSelector(context, (SelectableChannel)ioObj.getChannel()), attachment, ioObj, SelectionKey.OP_WRITE)) {
+                || !registerSelect(context, getSelector(context, (SelectableChannel)ioObj.getChannel()), attachment, ioObj, SelectionKey.OP_WRITE | SelectionKey.OP_CONNECT)) {
             selectedReads++;
             if ((ioObj.getOpenFile().getMode() & OpenFile.WRITABLE) != 0) {
                 getUnselectableWrites()[(Integer)attachment.get('w')] = true;
@@ -252,18 +252,6 @@ public class SelectBlob {
                     if (timeout == 0) {
                         selector.selectNow();
                     } else {
-                        // not-great logic for JRUBY-5165; we should move finishConnect into RubySocket logic, I think
-                        for(SelectionKey sk:selector.keys()) {
-                            if((sk.interestOps() & SelectionKey.OP_WRITE) != 0) {
-                                if (!sk.isWritable() && sk.channel() instanceof SocketChannel) {
-                                    SocketChannel socketChannel = (SocketChannel)sk.channel();
-                                    if (socketChannel.isConnectionPending()) {
-                                        socketChannel.finishConnect();
-                                    }
-                                }
-                            }
-                        }
-
                         selector.select(timeout);
                     }
                 } else {
@@ -276,7 +264,7 @@ public class SelectBlob {
     }
 
     @SuppressWarnings("unchecked")
-    private void processSelectedKeys(Ruby runtime) {
+    private void processSelectedKeys(Ruby runtime) throws IOException {
         if (selector != null) {
             for (Iterator i = selector.selectedKeys().iterator(); i.hasNext();) {
                 SelectionKey key = (SelectionKey) i.next();
@@ -284,16 +272,24 @@ public class SelectBlob {
                 int writeIoIndex = 0;
                 try {
                     int interestAndReady = key.interestOps() & key.readyOps();
-                    if (readArray != null && (interestAndReady & (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT | SelectionKey.OP_CONNECT)) != 0) {
+                    if (readArray != null && (interestAndReady & (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT)) != 0) {
                         readIoIndex = ((Map<Character,Integer>)key.attachment()).get('r');
                         getReadResults().append(readArray.eltOk(readIoIndex));
                         if (pendingReads != null) {
                             pendingReads[readIoIndex] = false;
                         }
                     }
-                    if (writeArray != null && (interestAndReady & (SelectionKey.OP_WRITE)) != 0) {
+                    if (writeArray != null && (interestAndReady & (SelectionKey.OP_WRITE | SelectionKey.OP_CONNECT)) != 0) {
                         writeIoIndex = ((Map<Character,Integer>)key.attachment()).get('w');
                         getWriteResults().append(writeArray.eltOk(writeIoIndex));
+
+                        // not-great logic for JRUBY-5165; we should move finishConnect into RubySocket logic, I think
+                        if (key.channel() instanceof SocketChannel) {
+                            SocketChannel socketChannel = (SocketChannel)key.channel();
+                            if (socketChannel.isConnectionPending()) {
+                                socketChannel.finishConnect();
+                            }
+                        }
                     }
                 } catch (CancelledKeyException cke) {
                     // TODO: is this the right thing to do?

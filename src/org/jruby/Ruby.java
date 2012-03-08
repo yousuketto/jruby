@@ -1392,6 +1392,12 @@ public final class Ruby {
             } else {
                 LoadService.reflectedLoad(this, "fiber", "org.jruby.ext.fiber.ThreadFiberLibrary", getJRubyClassLoader(), false);
             }
+        } else {
+            if (RubyInstanceConfig.COROUTINE_FIBERS) {
+                addLazyBuiltin("jruby/fiber.jar", "jruby/fiber", "org.jruby.ext.fiber.CoroutineFiberLibrary");
+            } else {
+                addLazyBuiltin("jruby/fiber.jar", "jruby/fiber", "org.jruby.ext.fiber.ThreadFiberLibrary");
+            }
         }
         
         // Load the JRuby::Config module for accessing configuration settings from Ruby
@@ -1580,6 +1586,8 @@ public final class Ruby {
             };
             addBuiltinIfAllowed("continuation.rb", dummy);
             addBuiltinIfAllowed("io/nonblock.rb", dummy);
+        } else {
+            addLazyBuiltin("jruby/fiber_ext.rb", "jruby/fiber_ext", "org.jruby.ext.fiber.FiberExtLibrary");
         }
 
         if(RubyInstanceConfig.NATIVE_NET_PROTOCOL) {
@@ -3118,6 +3126,10 @@ public final class Ruby {
         return newRaiseException(getErrno().getClass("EINPROGRESS"), "Operation now in progress");
     }
 
+    public RaiseException newErrnoEINPROGRESSWritableError() {
+        return newLightweightErrnoException(getModule("JRuby").getClass("EINPROGRESSWritable"), "");
+    }
+
     public RaiseException newErrnoENOPROTOOPTError() {
         return newRaiseException(getErrno().getClass("ENOPROTOOPT"), "Protocol not available");
     }
@@ -3197,6 +3209,10 @@ public final class Ruby {
 
     public RaiseException newErrnoEINPROGRESSError(String message) {
         return newRaiseException(getErrno().getClass("EINPROGRESS"), message);
+    }
+
+    public RaiseException newErrnoEINPROGRESSWritableError(String message) {
+        return newLightweightErrnoException(getModule("JRuby").getClass("EINPROGRESSWritable"), message);
     }
 
     public RaiseException newErrnoEISCONNError(String message) {

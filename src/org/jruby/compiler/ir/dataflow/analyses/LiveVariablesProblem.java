@@ -1,12 +1,5 @@
 package org.jruby.compiler.ir.dataflow.analyses;
 
-import org.jruby.compiler.ir.dataflow.DataFlowProblem;
-import org.jruby.compiler.ir.dataflow.DataFlowVar;
-import org.jruby.compiler.ir.dataflow.FlowGraphNode;
-import org.jruby.compiler.ir.operands.Variable;
-import org.jruby.compiler.ir.operands.LocalVariable;
-import org.jruby.compiler.ir.representations.BasicBlock;
-
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
@@ -15,12 +8,27 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.jruby.compiler.ir.IRScope;
+import org.jruby.compiler.ir.dataflow.DataFlowProblem;
+import org.jruby.compiler.ir.dataflow.DataFlowVar;
+import org.jruby.compiler.ir.dataflow.FlowGraphNode;
+import org.jruby.compiler.ir.operands.LocalVariable;
+import org.jruby.compiler.ir.operands.Variable;
+import org.jruby.compiler.ir.representations.BasicBlock;
 
 public class LiveVariablesProblem extends DataFlowProblem {
-    public LiveVariablesProblem() {
-        super(DataFlowProblem.DF_Direction.BACKWARD);
+    public static final String NAME = "Live Variables Analysis";
+    private static final Set<LocalVariable> EMPTY_SET = new HashSet<LocalVariable>();
+    
+    public LiveVariablesProblem(IRScope scope) {
+        this(scope, EMPTY_SET);
     }
 
+    LiveVariablesProblem(IRScope scope, Set<LocalVariable> nonSelfLocalVars) {
+        super(DataFlowProblem.DF_Direction.BACKWARD);
+
+        setup(scope, nonSelfLocalVars);
+    }
+    
     public DataFlowVar getDFVar(Variable v) {
         return dfVarMap.get(v);
     }
@@ -59,14 +67,11 @@ public class LiveVariablesProblem extends DataFlowProblem {
         List<Variable> liveVars = new ArrayList<Variable>();
         BitSet liveIn = ((LiveVariableNode) getFlowGraphNode(getScope().cfg().getEntryBB())).getLiveOutBitSet();
 
-        // When accessed before LVP is run, this can be null. SSS FIXME: Initialize in bitset to non-null always?
-        if (liveIn != null) {
-            for (int i = 0; i < liveIn.size(); i++) {
-                if (liveIn.get(i) == true) {
-                    Variable v = getVariable(i);
-                    liveVars.add(v);
-                    // System.out.println("variable " + v + " is live on entry!");
-                }
+        for (int i = 0; i < liveIn.size(); i++) {
+            if (liveIn.get(i) == true) {
+                Variable v = getVariable(i);
+                liveVars.add(v);
+                // System.out.println("variable " + v + " is live on entry!");
             }
         }
         
@@ -82,16 +87,13 @@ public class LiveVariablesProblem extends DataFlowProblem {
      *
      * In the code snippet above, 'sum' is live on entry to and exit from the closure.
      **/
-    public void setup(IRScope scope, Collection<LocalVariable> allVars) {
+    public final void setup(IRScope scope, Collection<LocalVariable> allVars) {
         // System.out.println("\nCFG:\n" + scope.cfg().toStringGraph());
         // System.out.println("\nInstrs:\n" + scope.cfg().toStringInstrs());
-
         setup(scope);
 
-        if ((allVars != null) && !allVars.isEmpty()) {
-            for (Variable v : allVars) {
-                if (getDFVar(v) == null) addDFVar(v); 
-            }
+        for (Variable v : allVars) {
+            if (getDFVar(v) == null) addDFVar(v); 
         }
     }
 
@@ -128,7 +130,7 @@ public class LiveVariablesProblem extends DataFlowProblem {
     }
     
     public String getName() {
-        return "Live Variables Analysis";
+        return NAME;
     }    
 
     /* ----------- Private Interface ------------ */

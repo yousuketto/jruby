@@ -21,13 +21,19 @@ import org.jruby.compiler.ir.compiler_pass.CompilerPass;
 import org.jruby.compiler.ir.representations.BasicBlock;
 import org.jruby.compiler.ir.representations.CFG;
 
-public class LocalOptimizationPass implements CompilerPass {
+public class LocalOptimizationPass extends CompilerPass {
+    public static String[] NAMES = new String[] { "lo", "LO", "local_optimization" };
+    
+    public String getLabel() {
+        return "Local Optimizations";
+    }
+    
     // Should we run this pass on the current scope before running it on nested scopes?
     public boolean isPreOrder() {
         return false;
     }
 
-    public void run(IRScope s) {
+    public Object execute(IRScope s, Object... data) {
         // Run this pass on nested closures first!
         // This let us compute execute scope flags for a method based on what all nested closures do
         for (IRClosure c: s.getClosures()) {
@@ -45,6 +51,8 @@ public class LocalOptimizationPass implements CompilerPass {
         }
         // Only after running local opts, compute various execution scope flags
         s.computeScopeFlags();
+        
+        return null;
     }
 
     private static void optimizeTmpVars(IRScope s) {

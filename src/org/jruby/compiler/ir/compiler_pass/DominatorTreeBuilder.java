@@ -10,19 +10,26 @@ import org.jruby.compiler.ir.representations.CFG;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 
-public class DominatorTreeBuilder implements CompilerPass {
+public class DominatorTreeBuilder extends CompilerPass {
+    private static String[] NAMES = new String[] {"build_dominator", "dominator"};
     private static final Logger LOG = LoggerFactory.getLogger("DominatorTreeBuilder");
 
+    public String getLabel() {
+        return "Build Dominator Tree";
+    }
+    
     public boolean isPreOrder() {
         return false;
     }
 
-    public void run(IRScope scope) {
+    public Object execute(IRScope scope, Object... data) {
         try {
             scope.buildDominatorTree(this);
         } catch (Exception e) {
             LOG.debug("Caught exception building dom tree for {}", scope.cfg());
         }
+        
+        return null;
     }
     
     public void buildDominatorTree(CFG cfg, LinkedList<BasicBlock> postOrderList, int maxNodeId) {
