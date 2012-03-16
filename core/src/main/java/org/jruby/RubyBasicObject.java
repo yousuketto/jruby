@@ -538,7 +538,9 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      * class.
      */
     public RubyClass makeMetaClass(RubyClass superClass) {
+        MetaClass cachedClass = superClass.getCachedSingletonClass();
         MetaClass klass = new MetaClass(getRuntime(), superClass, this); // rb_class_boot
+        klass.invalidateLike(cachedClass);
         setMetaClass(klass);
 
         klass.setMetaClass(superClass.getRealClass().getMetaClass());

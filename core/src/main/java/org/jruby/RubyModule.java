@@ -55,6 +55,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
@@ -525,24 +526,6 @@ public class RubyModule extends RubyObject {
     }
 
     /**
-     * Create a wrapper to use for including the specified module into this one.
-     * 
-     * Ruby C equivalent = "include_class_new"
-     * 
-     * @return The module wrapper
-     */
-    @Deprecated
-    public IncludedModuleWrapper newIncludeClass(RubyClass superClazz) {
-        IncludedModuleWrapper includedModule = new IncludedModuleWrapper(getRuntime(), superClazz, this);
-
-        // include its parent (and in turn that module's parents)
-        if (getSuperClass() != null) {
-            includedModule.includeModule(getSuperClass());
-        }
-
-        return includedModule;
-    }
-    /**
      * Finds a class that is within the current module (or class).
      * 
      * @param name to be found in this module (or class)
@@ -584,9 +567,26 @@ public class RubyModule extends RubyObject {
         infectBy(module);
 
         doIncludeModule(module);
-        invalidateCoreClasses();
-        invalidateCacheDescendants();
+
+        // If this is a singleton that has no subclasses and no changes compared to parent,
+        // just mimic the new parent.
+        // The subclasses check is for metaclasses, which can have subclasses. Object-level
+        // singleton classes never have subclasses.
+        if (this.isSingleton() &&
+                ((RubyClass)this).subclasses(false).isEmpty() &&
+                generation == superClass.superClass.generation) {
+            invalidateLike(superClass);
+        } else {
+            invalidateCoreClasses();
+            invalidateCacheDescendants();
+        }
         invalidateConstantCacheForModuleInclusion(module);
+    }
+
+    public void defineMethod(String name, Callback method) {
+        Visibility visibility = name.equals("initialize") ?
+                PRIVATE : PUBLIC;
+        addMethod(name, new FullFunctionCallbackMethod(this, method, visibility));
     }
     
     public void defineAnnotatedMethod(Class clazz, String name) {
@@ -2396,12 +2396,26 @@ public class RubyModule extends RubyObject {
         // In the current logic, if we get here we know that module is not an
         // IncludedModuleWrapper, so there's no need to fish out the delegate. But just
         // in case the logic should change later, let's do it anyway
-        RubyClass wrapper = new IncludedModuleWrapper(getRuntime(), insertAbove.getSuperClass(), moduleToInclude.getNonIncludedClass());
+
+        // The caching here will reuse an existing wrapper for the same parent/module
+        // combination. This makes obj.extend nearly free, other than the initial
+        // cost of creating the singleton, and reduces the call site penalty for
+        // extended singletons.
+        IncludedModuleWrapper wrapper = moduleToInclude.cachedWrappers.get(insertAbove.getSuperClass());
+        if (wrapper == null) {
+            if (false) {
+                String name = "<top>";
+                if (insertAbove.getSuperClass() != null) name = insertAbove.getSuperClass().getBaseName();
+                System.out.println("creating new wrapper for " + moduleToInclude.getBaseName() + " below " + name);
+            }
+            wrapper = new IncludedModuleWrapper(getRuntime(), insertAbove.getSuperClass(), moduleToInclude.getNonIncludedClass());
+            moduleToInclude.cachedWrappers.put(insertAbove.getSuperClass(), wrapper);
+        }
         
         // if the insertion point is a class, update subclass lists
         if (insertAbove instanceof RubyClass) {
             RubyClass insertAboveClass = (RubyClass)insertAbove;
-            
+
             // if there's a non-null superclass, we're including into a normal class hierarchy;
             // update subclass relationships to avoid stale parent/child relationships
             if (insertAboveClass.getSuperClass() != null) {
@@ -2410,7 +2424,7 @@ public class RubyModule extends RubyObject {
             
             wrapper.addSubclass(insertAboveClass);
         }
-        
+
         insertAbove.setSuperClass(wrapper);
         insertAbove = insertAbove.getSuperClass();
         return insertAbove;
@@ -3915,6 +3929,17 @@ public class RubyModule extends RubyObject {
         getSingletonClass().defineFastMethod(name, method);
     }
     
+    /**
+     * Use generation and invalidator from the given module, to appear identical to
+     * it until physically modified.
+     *
+     * @param module the module from which to copy invalidation artifacts
+     */
+    public void invalidateLike(RubyModule module) {
+        generation = module.generation;
+        methodInvalidator.lookLike(module.methodInvalidator);
+    }
+    
     private volatile Map<String, Autoload> autoloads = Collections.EMPTY_MAP;
     private volatile Map<String, DynamicMethod> methods = Collections.EMPTY_MAP;
     protected Map<String, CacheEntry> cachedMethods = Collections.EMPTY_MAP;
@@ -3961,8 +3986,10 @@ public class RubyModule extends RubyObject {
     }
     
     // Invalidator used for method caches
-    protected final Invalidator methodInvalidator;
+    protected Invalidator methodInvalidator;
     
     /** Whether this class proxies a normal Java class */
     private boolean javaProxy = false;
+    
+    private WeakHashMap<RubyClass, IncludedModuleWrapper> cachedWrappers = new WeakHashMap<RubyClass, IncludedModuleWrapper>();
 }

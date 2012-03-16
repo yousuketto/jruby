@@ -60,25 +60,6 @@ public class IncludedModuleWrapper extends RubyClass {
         delegate.addIncludingHierarchy(this);
     }
 
-    /**
-     * Overridden newIncludeClass implementation to allow attaching future includes to the correct module
-     * (i.e. the one to which this is attached)
-     * 
-     * @see org.jruby.RubyModule#newIncludeClass(RubyClass)
-     */
-    @Override
-    @Deprecated
-    public IncludedModuleWrapper newIncludeClass(RubyClass superClass) {
-        IncludedModuleWrapper includedModule = new IncludedModuleWrapper(getRuntime(), superClass, getNonIncludedClass());
-        
-        // include its parent (and in turn that module's parents)
-        if (getSuperClass() != null) {
-            includedModule.includeModule(getSuperClass());
-        }
-        
-        return includedModule;
-    }
-
     @Override
     public boolean isModule() {
         return false;

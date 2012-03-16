@@ -22,5 +22,11 @@ public class GenerationInvalidator implements Invalidator {
     public Object getData() {
         return module.getGenerationObject();
     }
+
+    public void lookLike(Invalidator invalidator) {
+        if (invalidator instanceof GenerationInvalidator) {
+            // do nothing; gneration should have been copied elsewhere
+        }
+    }
     
 }

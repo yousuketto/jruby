@@ -35,4 +35,10 @@ public class GenerationAndSwitchPointInvalidator implements Invalidator {
     public Object getData() {
         return switchPointInvalidator.getData();
     }
+
+    public void lookLike(Invalidator invalidator) {
+        if (invalidator instanceof GenerationAndSwitchPointInvalidator) {
+            switchPointInvalidator.lookLike(((GenerationAndSwitchPointInvalidator)invalidator).switchPointInvalidator);
+        }
+    }
 }

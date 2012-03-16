@@ -66,4 +66,10 @@ public class SwitchPointInvalidator implements Invalidator {
         switchPoint = new SwitchPoint();
         return oldSwitchPoint;
     }
+
+    public void lookLike(Invalidator invalidator) {
+        if (invalidator instanceof SwitchPointInvalidator) {
+            switchPoint = ((SwitchPointInvalidator)invalidator).switchPoint;
+        }
+    }
 }

@@ -42,4 +42,5 @@ public interface Invalidator {
     public void invalidate();
     public void invalidateAll(List<Invalidator> invalidators);
     public Object getData();
+    public void lookLike(Invalidator invalidator);
 }

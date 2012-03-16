@@ -48,5 +48,11 @@ public class ObjectIdentityInvalidator implements Invalidator {
     public Object getData() {
         return generation;
     }
+
+    public void lookLike(Invalidator invalidator) {
+        if (invalidator instanceof ObjectIdentityInvalidator) {
+            generation = ((ObjectIdentityInvalidator)invalidator).generation;
+        }
+    }
     
 }
