@@ -47,6 +47,7 @@ import jnr.posix.POSIXFactory;
 import org.jcodings.Encoding;
 import org.joda.time.DateTimeZone;
 import org.jruby.RubyInstanceConfig.CompileMode;
+import org.jruby.RubyInstanceConfig.TargetBackend;
 import org.jruby.ast.Node;
 import org.jruby.ast.RootNode;
 import org.jruby.ast.executable.AbstractScript;
@@ -757,8 +758,8 @@ public final class Ruby {
         if (config.getTargetBackend() == TargetBackend.DALVIK) {
             System.out.println("Dalvik entry point");
         }
-        return tryCompile(node, cachedClassName, classLoader, inspector, dump);
         
+        return tryCompile(node, cachedClassName, classLoader, inspector, dump);
     }
     
     private Script tryCompile(Node node, String cachedClassName, JRubyClassLoader classLoader, ASTInspector inspector, boolean dump) {

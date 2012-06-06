@@ -129,8 +129,6 @@ public class RubyInstanceConfig {
         currentDirectory = parentConfig.getCurrentDirectory();
         compatVersion = parentConfig.compatVersion;
         compileMode = parentConfig.getCompileMode();
-        targetBackend = parentConfig.getTargetBackend();
-                
         jitLogging = parentConfig.jitLogging;
         jitDumping = parentConfig.jitDumping;
         jitLoggingVerbose = parentConfig.jitLoggingVerbose;
