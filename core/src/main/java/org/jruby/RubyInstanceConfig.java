@@ -129,6 +129,8 @@ public class RubyInstanceConfig {
         currentDirectory = parentConfig.getCurrentDirectory();
         compatVersion = parentConfig.compatVersion;
         compileMode = parentConfig.getCompileMode();
+        targetBackend = parentConfig.getTargetBackend();
+                
         jitLogging = parentConfig.jitLogging;
         jitDumping = parentConfig.jitDumping;
         jitLoggingVerbose = parentConfig.jitLoggingVerbose;
@@ -920,6 +922,14 @@ public class RubyInstanceConfig {
         return showBytecode;
     }
 
+    public TargetBackend getTargetBackend() {
+        return targetBackend;
+    }
+    
+    public void setTargetBackend(TargetBackend targetBackend) {
+        this.targetBackend = targetBackend;
+    }
+
     /**
      * @see Options.CLI_COPYRIGHT
      */
@@ -1426,6 +1436,7 @@ public class RubyInstanceConfig {
     private Verbosity verbosity = Options.CLI_WARNING_LEVEL.load();
     private boolean debug = Options.CLI_DEBUG.load();
     private boolean showVersion = Options.CLI_VERSION.load();
+    private TargetBackend targetBackend = TargetBackend.JVM;
     private boolean showBytecode = Options.CLI_BYTECODE.load();
     private boolean showCopyright = Options.CLI_COPYRIGHT.load();
     private boolean shouldRunInterpreter = true;
@@ -1495,6 +1506,10 @@ public class RubyInstanceConfig {
     public enum ProfilingMode {
 		OFF, API, FLAT, GRAPH, HTML, JSON
 	}
+    
+    public enum TargetBackend {
+        JVM, DALVIK
+    }
 
     public enum CompileMode {
         JIT, FORCE, FORCEIR, OFF, OFFIR;

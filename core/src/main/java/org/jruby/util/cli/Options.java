@@ -202,6 +202,7 @@ public class Options {
     }
 
     public static final Collection<Option> PROPERTIES = Collections.unmodifiableCollection(_loadedOptions);
+    public static final Option<String> TARGET_BACKEND = string(MISCELLANEOUS, "target.backend", new String[]{"jvm", "dalvik"}, "jvm,", "Set target backend. jvm = Java; dalvik = Dalvik.");
     
     private static Option<String> string(Category category, String name, String[] options, String defval, String description) {
         Option<String> option = Option.string("jruby", name, category, options, defval, description);

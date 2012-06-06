@@ -379,6 +379,10 @@ public class ArgumentProcessor {
                         config.setShowVersion(true);
                         config.setShouldRunInterpreter(false);
                         break FOR;
+                    } else if (argument.equals("--dalvik")) {
+                        config.setShowBytecode(true);
+                        config.setTargetBackend(RubyInstanceConfig.TargetBackend.DALVIK);
+                        break FOR;
                     } else if (argument.equals("--bytecode")) {
                         config.setShowBytecode(true);
                         break FOR;
