@@ -39,17 +39,49 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileDescriptor;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.net.BindException;
+import java.nio.channels.ClosedChannelException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.Stack;
+import java.util.Vector;
+import java.util.WeakHashMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
+
 import jnr.constants.Constant;
 import jnr.constants.ConstantSet;
 import jnr.constants.platform.Errno;
 import jnr.posix.POSIX;
 import jnr.posix.POSIXFactory;
+
 import org.jcodings.Encoding;
 import org.joda.time.DateTimeZone;
 import org.jruby.RubyInstanceConfig.CompileMode;
 import org.jruby.ast.Node;
 import org.jruby.ast.RootNode;
-import org.jruby.ast.executable.AbstractScript;
 import org.jruby.ast.executable.RuntimeCache;
 import org.jruby.ast.executable.Script;
 import org.jruby.common.IRubyWarnings.ID;
@@ -72,11 +104,9 @@ import org.jruby.internal.runtime.GlobalVariables;
 import org.jruby.internal.runtime.ThreadService;
 import org.jruby.internal.runtime.ValueAccessor;
 import org.jruby.internal.runtime.methods.DynamicMethod;
-import org.jruby.ir.IRBuilder;
+import org.jruby.ir.Compiler;
 import org.jruby.ir.IRManager;
-import org.jruby.ir.IRScope;
 import org.jruby.ir.interpreter.Interpreter;
-import org.jruby.ir.targets.JVMVisitor;
 import org.jruby.javasupport.JavaSupport;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
@@ -87,7 +117,6 @@ import org.jruby.management.ParserStats;
 import org.jruby.parser.IRStaticScopeFactory;
 import org.jruby.parser.Parser;
 import org.jruby.parser.ParserConfiguration;
-import org.jruby.parser.StaticScope;
 import org.jruby.parser.StaticScopeFactory;
 import org.jruby.platform.Platform;
 import org.jruby.runtime.Binding;
@@ -129,39 +158,6 @@ import org.jruby.util.io.SelectorPool;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 import org.jruby.util.unsafe.UnsafeFactory;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileDescriptor;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.lang.reflect.InvocationTargetException;
-import java.net.BindException;
-import java.nio.channels.ClosedChannelException;
-import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import java.util.Stack;
-import java.util.Vector;
-import java.util.WeakHashMap;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Pattern;
 
 /**
  * The Ruby object represents the top-level of a JRuby "instance" in a given VM.
@@ -695,34 +691,7 @@ public final class Ruby {
 
     private Script tryCompile(Node node, String cachedClassName, JRubyClassLoader classLoader, boolean dump) {
         if (config.getCompileMode() == CompileMode.FORCEIR) {
-            final IRScope scope = IRBuilder.createIRBuilder(getIRManager(), is1_9()).buildRoot((RootNode) node);
-            final Class compiled = JVMVisitor.compile(this, scope, classLoader);
-            final StaticScope staticScope = scope.getStaticScope();
-            staticScope.setModule(getTopSelf().getMetaClass());
-            return new AbstractScript() {
-                public IRubyObject __file__(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block) {
-                    try {
-                        return (IRubyObject)compiled.getMethod("__script__0", ThreadContext.class, StaticScope.class, IRubyObject.class, Block.class).invoke(null, getCurrentContext(), scope.getStaticScope(), getTopSelf(), block);
-                    } catch (InvocationTargetException ite) {
-                        if (ite.getCause() instanceof JumpException) {
-                            throw (JumpException)ite.getCause();
-                        } else {
-                            throw new RuntimeException(ite);
-                        }
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-
-                public IRubyObject load(ThreadContext context, IRubyObject self, boolean wrap) {
-                    try {
-                        RuntimeHelpers.preLoadCommon(context, staticScope, false);
-                        return __file__(context, self, IRubyObject.NULL_ARRAY, Block.NULL_BLOCK);
-                    } finally {
-                        RuntimeHelpers.postLoad(context);
-                    }
-                }
-            };
+            Compiler.getInstance().performTranslation(this, node, classLoader);
         }
         ASTInspector inspector = new ASTInspector();
         inspector.inspect(node);
@@ -800,7 +769,7 @@ public final class Ruby {
 
         try {
             if (getInstanceConfig().getCompileMode() == CompileMode.OFFIR) {
-                return Interpreter.interpret(this, rootNode, self);
+                return Interpreter.getInstance().performTranslation(this, rootNode, self);
             } else {
                 return ASTInterpreter.INTERPRET_ROOT(this, context, rootNode, getTopSelf(), Block.NULL_BLOCK);
             }

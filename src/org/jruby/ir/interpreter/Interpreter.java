@@ -13,6 +13,10 @@ import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyModule;
 import org.jruby.ast.Node;
 import org.jruby.ast.RootNode;
+import org.jruby.exceptions.RaiseException;
+import org.jruby.exceptions.Unrescuable;
+import org.jruby.internal.runtime.methods.DynamicMethod;
+import org.jruby.internal.runtime.methods.InterpretedIRMethod;
 import org.jruby.ir.Counter;
 import org.jruby.ir.IRBuilder;
 import org.jruby.ir.IRClosure;
@@ -20,6 +24,7 @@ import org.jruby.ir.IREvalScript;
 import org.jruby.ir.IRMethod;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScriptBody;
+import org.jruby.ir.IRTranslator;
 import org.jruby.ir.Operation;
 import org.jruby.ir.instructions.BEQInstr;
 import org.jruby.ir.instructions.BNEInstr;
@@ -27,15 +32,14 @@ import org.jruby.ir.instructions.BranchInstr;
 import org.jruby.ir.instructions.BreakInstr;
 import org.jruby.ir.instructions.CallBase;
 import org.jruby.ir.instructions.CheckArityInstr;
-import org.jruby.ir.instructions.calladapter.CallAdapter;
 import org.jruby.ir.instructions.CopyInstr;
 import org.jruby.ir.instructions.Instr;
 import org.jruby.ir.instructions.JumpIndirectInstr;
 import org.jruby.ir.instructions.JumpInstr;
 import org.jruby.ir.instructions.LineNumberInstr;
 import org.jruby.ir.instructions.ModuleVersionGuardInstr;
-import org.jruby.ir.instructions.ReceivePreReqdArgInstr;
 import org.jruby.ir.instructions.ReceiveOptArgBase;
+import org.jruby.ir.instructions.ReceivePreReqdArgInstr;
 import org.jruby.ir.instructions.ReceiveRestArgBase;
 import org.jruby.ir.instructions.ResultInstr;
 import org.jruby.ir.instructions.ReturnBase;
@@ -50,29 +54,24 @@ import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
 import org.jruby.ir.representations.BasicBlock;
-import org.jruby.exceptions.RaiseException;
-import org.jruby.exceptions.Unrescuable;
 import org.jruby.parser.IRStaticScope;
-import org.jruby.parser.StaticScope;
 import org.jruby.parser.IRStaticScopeFactory;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.Block.Type;
+import org.jruby.runtime.CallSite;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.RubyEvent;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.runtime.callsite.CacheEntry;
+import org.jruby.runtime.callsite.CachingCallSite;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 import org.jruby.util.unsafe.UnsafeFactory;
-import org.jruby.runtime.CallSite;
-import org.jruby.runtime.callsite.CachingCallSite;
-import org.jruby.runtime.callsite.CacheEntry;
-import org.jruby.internal.runtime.methods.InterpretedIRMethod;
-import org.jruby.internal.runtime.methods.DynamicMethod;
 
-public class Interpreter {
+public class Interpreter extends IRTranslator<IRubyObject, IRubyObject>{
     private static final Logger LOG = LoggerFactory.getLogger("Interpreter");
 
     private static int inlineCount = 0;
@@ -82,6 +81,19 @@ public class Interpreter {
     private static int globalThreadPollCount = 0;
     private static HashMap<IRScope, Counter> scopeThreadPollCounts = new HashMap<IRScope, Counter>();
 
+    // we do not need instances of Interpreter
+    // FIXME: Should we make it real singleton and get rid of static methods?
+    private Interpreter() {
+    }
+
+    private static class InterpreterHolder {
+        public static final Interpreter instance = new Interpreter();
+    }
+
+    public static Interpreter getInstance() {
+        return InterpreterHolder.instance;
+    }
+    
     public static boolean inProfileMode() {
         return RubyInstanceConfig.IR_PROFILE;
     }
@@ -140,11 +152,10 @@ public class Interpreter {
         }
     }
 
-    public static IRubyObject interpret(Ruby runtime, Node rootNode, IRubyObject self) {
-        if (runtime.is1_9()) IRBuilder.setRubyVersion("1.9");
-
-        IRScriptBody root = (IRScriptBody) IRBuilder.createIRBuilder(runtime.getIRManager(), runtime.is1_9()).buildRoot((RootNode) rootNode);
-
+    @Override
+    protected IRubyObject translationSpecificLogic(Ruby runtime, IRScope irScope,
+            IRubyObject self) {
+        IRScriptBody root = (IRScriptBody) irScope;
         // We get the live object ball rolling here.  This give a valid value for the top
         // of this lexical tree.  All new scope can then retrieve and set based on lexical parent.
         if (root.getStaticScope().getModule() == null) { // If an eval this may already be setup.
