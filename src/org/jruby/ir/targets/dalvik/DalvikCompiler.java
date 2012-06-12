@@ -3,12 +3,12 @@ package org.jruby.ir.targets.dalvik;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.jruby.ast.executable.AbstractScript;
-import static org.jruby.util.CodegenUtils.ci;
+import org.jruby.runtime.ThreadContext;
+import static org.jruby.util.CodegenUtils.*;
 import com.google.dexmaker.DexMaker;
+import com.google.dexmaker.MethodId;
 import com.google.dexmaker.TypeId;
 
 /**
@@ -27,6 +27,10 @@ public class DalvikCompiler {
         this.sourcename = sourcename;
     }
     
+    public byte[] getClassByteArray() {
+        return dexmaker.generate();
+    }
+    
     public void writeClass(String filename) throws IOException {
         FileOutputStream out = new FileOutputStream(filename);
 
@@ -37,22 +41,25 @@ public class DalvikCompiler {
         }
     }
     
-    public byte[] getClassByteArray() {
-        return dexmaker.generate();
+    public String getClassname() {
+        return classname;
     }
     
     public DexMaker getClassVisitor() {
         return dexmaker;
     }
-    
-    public String getClassname() {
-        return classname;
-    }
      
     public void startScript() {    
+        // declare class
         TypeId<?> classtype = TypeId.get("L" + getClassname() + ";");
         TypeId<?> supertype = TypeId.get(ci(AbstractScript.class));
         getClassVisitor().declare(classtype, getClassname(), Modifier.PUBLIC, supertype);
+        
+        // declare method
+        MethodId methodId = classtype.getMethod(TypeId.VOID, "setPosition", TypeId.get(ThreadContext.class), TypeId.INT);
+        DexMethodAdapter method = new DexMethodAdapter(classtype, getClassVisitor(), Modifier.PRIVATE | Modifier.STATIC, methodId);
+        method.voidreturn();
+        
         try {
             writeClass("jruby.dex");
         } catch (IOException ex) {
