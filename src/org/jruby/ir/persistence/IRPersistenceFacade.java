@@ -31,12 +31,22 @@ public class IRPersistenceFacade {
             RubyInstanceConfig config = runtime.getInstanceConfig();
             File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config);
             
-            String instructionsString = irScopeToPersist.toStringInstrs();
-            FileIO.INSTANCE.writeToFile(irFile, instructionsString);
+            StringBuilder instructions = new StringBuilder();
+            getIstructionsFromThisAndDescendantScopes(irScopeToPersist, instructions);
+            FileIO.INSTANCE.writeToFile(irFile, instructions.toString());
         } catch (Exception e) {
             throw new IRPersistenceException(e);
         }
 
+    }
+
+    private static void getIstructionsFromThisAndDescendantScopes(IRScope irScopeToPersist,
+            StringBuilder instructions) {
+        instructions.append(irScopeToPersist.toStringInstrs());
+        for(IRScope irScope : irScopeToPersist.getLexicalScopes()) {
+            instructions.append("\n");
+            getIstructionsFromThisAndDescendantScopes(irScope, instructions);            
+        }
     }
 
     public static IRScope read(Ruby runtime) throws IRPersistenceException {
