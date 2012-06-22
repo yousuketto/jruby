@@ -132,6 +132,91 @@ public class DexMethodAdapter {
         localVariables.remove(0);
     }
     
+    public void arrayload() {
+        aaload();
+    }
+    
+    public void arraystore() {
+        aastore();
+    }
+    
+    public void iarrayload() {
+        iaload();
+    }
+    
+    public void barrayload() {
+        baload();
+    }
+    
+    public void barraystore() {
+        bastore();
+    }
+    
+    public void aaload() {
+        arrayloader();
+    }
+    
+    public void aastore() {
+        arraystorer();
+    }
+    
+    public void iaload() {
+        arrayloader();
+    }
+    
+    public void iastore() {
+        arraystorer();
+    }
+    
+    public void laload() {
+        arrayloader();
+    }
+    
+    public void lastore() {
+        arraystorer();
+    }
+    
+    public void baload() {
+        arrayloader();
+    }
+    
+    public void bastore() {
+        arraystorer();
+    }
+    
+    public void saload() {
+        arrayloader();
+    }
+    
+    public void sastore() {
+        arraystorer();
+    }
+    
+    public void caload() {
+        arrayloader();
+    }
+    
+    public void castore() {
+        arraystorer();
+    }
+    
+    public void faload() {
+        arrayloader();
+    }
+    
+    public void fastore() {
+        arraystorer();
+    }
+    
+    public void daload() {
+        arrayloader();
+    }
+    
+    public void dastore() {
+        arraystorer();
+    }
+
+    
     public void ishr() {
         binaryOperations(BinaryOp.SHIFT_RIGHT);
     }
@@ -368,5 +453,32 @@ public class DexMethodAdapter {
         getMethodVisitor().loadConstant(local, value);
         stack.push(local);
         localVariables.remove(0);
+    }
+    
+    /**
+     * Pop arguments off the stack, assign target the value at local[index]
+     * then push target onto the stack
+     */
+    public void arrayloader() {
+        Local target = localVariables.get(0);
+        Local index = stack.pop();
+        Local local = stack.pop();
+        
+        getMethodVisitor().aget(target, local, index);
+        stack.push(target);
+        localVariables.remove(0);
+    }
+    
+    /**
+     * Pop arguments off the stack, set element at index in local to the value source
+     * then push local onto the stack
+     */
+    public void arraystorer() {
+       Local source = stack.pop();
+       Local index = stack.pop();
+       Local local = stack.pop();
+        
+       getMethodVisitor().aput(local, index, source);
+       stack.push(local); 
     }
 }
