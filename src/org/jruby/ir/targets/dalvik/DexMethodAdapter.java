@@ -89,6 +89,31 @@ public class DexMethodAdapter {
         if (bool) iconst_1(); else iconst_0();
     }
     
+    public void areturn() {
+        Local local = stack.pop();
+        getMethodVisitor().returnValue(local);
+    }
+
+    public void ireturn() {
+        Local local = stack.pop();
+        getMethodVisitor().returnValue(local);
+    }
+    
+    public void freturn() {
+        Local local = stack.pop();
+        getMethodVisitor().returnValue(local);
+    }
+    
+    public void lreturn() {
+        Local local = stack.pop();
+        getMethodVisitor().returnValue(local);
+    }
+    
+    public void dreturn() {
+        Local local = stack.pop();
+        getMethodVisitor().returnValue(local);
+    }
+    
     public void voidreturn() {
         getMethodVisitor().returnVoid();
     }
