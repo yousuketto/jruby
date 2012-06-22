@@ -19,9 +19,19 @@ public class DexMethodAdapter {
     private Stack<Local> stack = new Stack<Local>();
     private ArrayList<Local> localVariables;
     
+    // Variables to allow casting
+    private Local<Integer> intLocal;
+    private Local<Float> floatLocal;
+    private Local<Double> doubleLocal;
+    private Local<Short> shortLocal;
+    private Local<Long> longLocal;
+    private Local<Byte> byteLocal;
+    private Local<Character> charLocal;
+    
     public DexMethodAdapter(DexMaker dexmaker, int flags, MethodId method, ArrayList<TypeId> types) {
         setMethodVisitor(dexmaker.declare(method, flags));
         setLocalVariables(types);
+        setCastingVariables();
     }
     
     /**
@@ -35,6 +45,16 @@ public class DexMethodAdapter {
             Local local = code.newLocal(types.get(i));
             localVariables.add(local);
         }
+    }
+    
+    public void setCastingVariables() {
+        intLocal = code.newLocal(TypeId.INT);
+        floatLocal = code.newLocal(TypeId.FLOAT);
+        doubleLocal = code.newLocal(TypeId.DOUBLE);
+        shortLocal = code.newLocal(TypeId.SHORT);
+        longLocal = code.newLocal(TypeId.LONG);
+        byteLocal = code.newLocal(TypeId.BYTE);
+        charLocal = code.newLocal(TypeId.CHAR);
     }
     
     public Code getMethodVisitor() {
@@ -129,6 +149,66 @@ public class DexMethodAdapter {
         binaryOperations(BinaryOp.MULTIPLY);
     }
     
+    public void i2d() {
+        casting(doubleLocal);
+    }
+       
+    public void i2l() {
+        casting(longLocal);
+    }
+    
+    public void i2f() {
+        casting(floatLocal);
+    }
+    
+    public void i2s() {
+        casting(shortLocal);
+    }
+    
+    public void i2c() {
+        casting(charLocal);
+    }
+    
+    public void i2b() {
+        casting(byteLocal);
+    }
+    
+    public void l2d() {
+        casting(doubleLocal);
+    }
+    
+    public void l2i() {
+        casting(intLocal);
+    }
+    
+    public void l2f() {
+        casting(floatLocal);
+    }
+    
+    public void f2d() {
+        casting(doubleLocal);
+    }
+    
+    public void f2i() {
+        casting(intLocal);
+    }
+    
+    public void f2l() {
+        casting(longLocal);
+    }
+    
+    public void d2f() {
+        casting(floatLocal);
+    }
+    
+    public void d2i() {
+        casting(intLocal);
+    }
+    
+    public void d2l() {
+        casting(longLocal);
+    }
+    
     /**
      * Pop arguments off the stack, perform operation then push result onto the stack
      * |2|  (op)  -->  |1 op 2|
@@ -139,5 +219,12 @@ public class DexMethodAdapter {
         Local arg1 = stack.pop();
         getMethodVisitor().op(operation, arg1, arg1, arg2);
         stack.push(arg1);
+    }
+    
+    // Cast local's type to argument's type and push back onto the stack
+    public void casting(Local newtype) {
+        Local oldtype = stack.pop();
+        getMethodVisitor().cast(newtype, oldtype);
+        stack.push(newtype);
     }
 }
