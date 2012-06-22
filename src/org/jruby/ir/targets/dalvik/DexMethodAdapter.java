@@ -9,6 +9,7 @@ import com.google.dexmaker.DexMaker;
 import com.google.dexmaker.Local;
 import com.google.dexmaker.MethodId;
 import com.google.dexmaker.TypeId;
+import com.google.dexmaker.UnaryOp;
 
 /**
  *
@@ -219,12 +220,20 @@ public class DexMethodAdapter {
         binaryOperations(BinaryOp.REMAINDER);
     }
     
+    public void ineg() {
+        unaryOperations(UnaryOp.NEGATE);
+    }
+    
     public void ldiv() {
         binaryOperations(BinaryOp.DIVIDE);
     }
     
     public void lrem() {
         binaryOperations(BinaryOp.REMAINDER);
+    }
+    
+    public void lneg() {
+        unaryOperations(UnaryOp.NEGATE);
     }
     
     public void fdiv() {
@@ -235,12 +244,20 @@ public class DexMethodAdapter {
         binaryOperations(BinaryOp.REMAINDER);
     }
     
+    public void fneg() {
+        unaryOperations(UnaryOp.NEGATE);
+    }
+    
     public void ddiv() {
         binaryOperations(BinaryOp.DIVIDE);
     }
     
     public void drem() {
         binaryOperations(BinaryOp.REMAINDER);
+    }
+    
+    public void dneg() {
+        unaryOperations(UnaryOp.NEGATE);
     }
     
     public void imul() {
@@ -329,6 +346,13 @@ public class DexMethodAdapter {
         Local arg1 = stack.pop();
         getMethodVisitor().op(operation, arg1, arg1, arg2);
         stack.push(arg1);
+    }
+    
+    // Pop argument off the stack, perform operation then push result onto the stack
+    public void unaryOperations(UnaryOp operation) {
+        Local arg = stack.pop();
+        getMethodVisitor().op(operation, arg, arg);
+        stack.push(arg);
     }
     
     // Cast local's type to argument's type and push back onto the stack
