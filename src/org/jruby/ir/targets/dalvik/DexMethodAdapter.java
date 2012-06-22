@@ -65,8 +65,70 @@ public class DexMethodAdapter {
         this.code = code;
     }
     
+    public void ldc(Object arg0) {
+        Local local = localVariables.get(0);
+        getMethodVisitor().loadConstant(local, arg0);
+        stack.push(local);
+        localVariables.remove(0);
+    }
+    
+    public void bipush(int arg) {
+        pushValue(arg);
+    }
+    
+    public void sipush(int arg) {
+        pushValue(arg);
+    }
+        
+    public void pushInt(int value) {
+        pushValue(value);
+    }
+    
+    public void pushBoolean(boolean bool) {
+        if (bool) iconst_1(); else iconst_0();
+    }
+    
     public void voidreturn() {
         getMethodVisitor().returnVoid();
+    }
+    
+    public void iconst_m1() {
+        pushValue(-1);
+    }
+    
+    public void iconst_0() {
+        pushValue(0);
+    }
+    
+    public void iconst_1() {
+        pushValue(1);
+    }
+    
+    public void iconst_2() {
+        pushValue(2);
+    }
+    
+    public void iconst_3() {
+        pushValue(3);
+    }
+    
+    public void iconst_4() {
+        pushValue(4);
+    }
+    
+    public void iconst_5() {
+        pushValue(5);
+    }
+    
+    public void lconst_0() {
+        pushValue(0);
+    }
+    
+    public void aconst_null() {
+        Local local = localVariables.get(0);
+        getMethodVisitor().loadConstant(local, null);
+        stack.push(local);
+        localVariables.remove(0);
     }
     
     public void iadd() {
@@ -226,5 +288,13 @@ public class DexMethodAdapter {
         Local oldtype = stack.pop();
         getMethodVisitor().cast(newtype, oldtype);
         stack.push(newtype);
+    }
+    
+    // Take a local from the local list, load the value into it and push onto stack
+    public void pushValue(int value) {
+        Local local = localVariables.get(0);
+        getMethodVisitor().loadConstant(local, value);
+        stack.push(local);
+        localVariables.remove(0);
     }
 }
