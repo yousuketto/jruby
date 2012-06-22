@@ -66,6 +66,72 @@ public class DexMethodAdapter {
         this.code = code;
     }
     
+    /**
+     * Short-hand for specifying a set of aloads
+     *
+     * @param args list of aloads you want
+     */
+    public void aloadMany(int... args) {
+        for (int arg: args) {
+            aload(arg, Object.class);
+        }
+    }
+    
+    public void aload(int arg0, Class type) {
+        Local local = getMethodVisitor().getParameter(arg0, TypeId.get(type));
+        stack.push(local);
+    }
+    
+    public void iload(int arg0) {
+        Local local = getMethodVisitor().getParameter(arg0, TypeId.INT);
+        stack.push(local);
+    }
+    
+    public void lload(int arg0) {
+        Local local = getMethodVisitor().getParameter(arg0, TypeId.LONG);
+        stack.push(local);
+    }
+    
+    public void fload(int arg0) {
+        Local local = getMethodVisitor().getParameter(arg0, TypeId.FLOAT);
+        stack.push(local);
+    }
+    
+    public void dload(int arg0) {
+        Local local = getMethodVisitor().getParameter(arg0, TypeId.DOUBLE);
+        stack.push(local);
+    }
+    
+    public void astore(int arg0, Class type) {
+        Local local = stack.pop();
+        Local target = getMethodVisitor().getParameter(arg0, TypeId.get(type));
+        getMethodVisitor().move(target, local);
+    }
+    
+    public void istore(int arg0) {
+        Local local = stack.pop();
+        Local target = getMethodVisitor().getParameter(arg0, TypeId.INT);
+        getMethodVisitor().move(target, local);
+    }
+    
+    public void lstore(int arg0) {
+        Local local = stack.pop();
+        Local target = getMethodVisitor().getParameter(arg0, TypeId.LONG);
+        getMethodVisitor().move(target, local);
+    }
+    
+    public void fstore(int arg0) {
+        Local local = stack.pop();
+        Local target = getMethodVisitor().getParameter(arg0, TypeId.FLOAT);
+        getMethodVisitor().move(target, local);
+    }
+    
+    public void dstore(int arg0) {
+        Local local = stack.pop();
+        Local target = getMethodVisitor().getParameter(arg0, TypeId.DOUBLE);
+        getMethodVisitor().move(target, local);
+    }
+    
     public void ldc(Object arg0) {
         Local local = localVariables.get(0);
         getMethodVisitor().loadConstant(local, arg0);
