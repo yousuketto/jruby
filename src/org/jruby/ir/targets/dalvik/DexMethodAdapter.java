@@ -1,11 +1,11 @@
 package org.jruby.ir.targets.dalvik;
 
 import java.util.Stack;
+import java.util.ArrayList;
 
 import com.google.dexmaker.BinaryOp;
 import com.google.dexmaker.Code;
 import com.google.dexmaker.DexMaker;
-import com.google.dexmaker.Label;
 import com.google.dexmaker.Local;
 import com.google.dexmaker.MethodId;
 import com.google.dexmaker.TypeId;
@@ -15,19 +15,26 @@ import com.google.dexmaker.TypeId;
  * @author lynnewallace
  */
 public class DexMethodAdapter {
-    
     private Code code;
-    private DexMaker dexmaker;
-    private Label start;
-    private Label end;
-    private Stack stack;
+    private Stack<Local> stack = new Stack<Local>();
+    private ArrayList<Local> localVariables;
     
-    public DexMethodAdapter(TypeId<?> classtype, DexMaker dexmaker, int flags, MethodId method) {
+    public DexMethodAdapter(DexMaker dexmaker, int flags, MethodId method, ArrayList<TypeId> types) {
         setMethodVisitor(dexmaker.declare(method, flags));
-        this.dexmaker = dexmaker;
-        this.start = new Label();
-        this.end = new Label();
-        this.stack = new Stack();
+        setLocalVariables(types);
+    }
+    
+    /**
+     * Local variables need to be set before other operations can take place (dexmaker issue)
+     * So we take a list of all the variable types to be used in the order they will happen
+     * and initialize and place them in a local variable list to be used throughout.
+     */
+    public void setLocalVariables(ArrayList<TypeId> types) {
+        localVariables = new ArrayList<Local>(); 
+        for(int i=0; i<types.size(); i++) {
+            Local local = code.newLocal(types.get(i));
+            localVariables.add(local);
+        }
     }
     
     public Code getMethodVisitor() {
@@ -38,127 +45,99 @@ public class DexMethodAdapter {
         this.code = code;
     }
     
-    public void start() {
-        getMethodVisitor().mark(start);
-    }
-    
-    public void end() {
-        getMethodVisitor().mark(end);
-    }
-    
     public void voidreturn() {
         getMethodVisitor().returnVoid();
     }
     
     public void iadd() {
-        integerArithmetic(BinaryOp.ADD);
+        binaryOperations(BinaryOp.ADD);
     }
     
     public void ladd() {
-        longArithmetic(BinaryOp.ADD);
+        binaryOperations(BinaryOp.ADD);
     }
     
     public void fadd() {
-        floatArithmetic(BinaryOp.ADD);
+        binaryOperations(BinaryOp.ADD);
     }
     
     public void dadd() {
-        doubleArithmetic(BinaryOp.ADD);
+        binaryOperations(BinaryOp.ADD);
     }
     
     public void isub() {
-        integerArithmetic(BinaryOp.SUBTRACT);
+        binaryOperations(BinaryOp.SUBTRACT);
     }
     
     public void lsub() {
-        longArithmetic(BinaryOp.SUBTRACT);
+        binaryOperations(BinaryOp.SUBTRACT);
     }
     
     public void fsub() {
-        floatArithmetic(BinaryOp.SUBTRACT);
+        binaryOperations(BinaryOp.SUBTRACT);
     }
     
     public void dsub() {
-        doubleArithmetic(BinaryOp.SUBTRACT);
+        binaryOperations(BinaryOp.SUBTRACT);
     }
     
     public void idiv() {
-        integerArithmetic(BinaryOp.DIVIDE);
+        binaryOperations(BinaryOp.DIVIDE);
     }
     
     public void irem() {
-        integerArithmetic(BinaryOp.REMAINDER);
+        binaryOperations(BinaryOp.REMAINDER);
     }
     
     public void ldiv() {
-        longArithmetic(BinaryOp.DIVIDE);
+        binaryOperations(BinaryOp.DIVIDE);
     }
     
     public void lrem() {
-        longArithmetic(BinaryOp.REMAINDER);
+        binaryOperations(BinaryOp.REMAINDER);
     }
     
     public void fdiv() {
-        floatArithmetic(BinaryOp.DIVIDE);
+        binaryOperations(BinaryOp.DIVIDE);
     }
     
     public void frem() {
-        floatArithmetic(BinaryOp.REMAINDER);
+        binaryOperations(BinaryOp.REMAINDER);
     }
     
     public void ddiv() {
-        doubleArithmetic(BinaryOp.DIVIDE);
+        binaryOperations(BinaryOp.DIVIDE);
     }
     
     public void drem() {
-        doubleArithmetic(BinaryOp.REMAINDER);
+        binaryOperations(BinaryOp.REMAINDER);
     }
     
-     public void imul() {
-        integerArithmetic(BinaryOp.MULTIPLY);
+    public void imul() {
+        binaryOperations(BinaryOp.MULTIPLY);
     }
     
     public void lmul() {
-        longArithmetic(BinaryOp.MULTIPLY);
+        binaryOperations(BinaryOp.MULTIPLY);
     }
     
     public void fmul() {
-        floatArithmetic(BinaryOp.MULTIPLY);
+        binaryOperations(BinaryOp.MULTIPLY);
     }
     
     public void dmul() {
-        doubleArithmetic(BinaryOp.MULTIPLY);
-    }
-        
-    public void integerArithmetic(BinaryOp operation) {
-        Local<Integer> local = code.newLocal(TypeId.INT);
-        Local<Integer> arg1 = (Local<Integer>) stack.pop();
-        Local<Integer> arg2 = (Local<Integer>) stack.pop();
-        getMethodVisitor().op(operation, local, arg1, arg2);
-        stack.push(local);
+        binaryOperations(BinaryOp.MULTIPLY);
     }
     
-    public void longArithmetic(BinaryOp operation) {
-        Local<Long> local = code.newLocal(TypeId.LONG);
-        Local<Long> arg1 = (Local<Long>) stack.pop();
-        Local<Long> arg2 = (Local<Long>) stack.pop();
-        getMethodVisitor().op(operation, local, arg1, arg2);
-        stack.push(local);
-    }
-    
-    public void floatArithmetic(BinaryOp operation) {
-        Local<Float> local = code.newLocal(TypeId.FLOAT);
-        Local<Float> arg1 = (Local<Float>) stack.pop();
-        Local<Float> arg2 = (Local<Float>) stack.pop();
-        getMethodVisitor().op(operation, local, arg1, arg2);
-        stack.push(local);
-    }
-    
-    public void doubleArithmetic(BinaryOp operation) {
-        Local<Double> local = code.newLocal(TypeId.DOUBLE);
-        Local<Double> arg1 = (Local<Double>) stack.pop();
-        Local<Double> arg2 = (Local<Double>) stack.pop();
-        getMethodVisitor().op(operation, local, arg1, arg2);
-        stack.push(local);
+    /**
+     * Pop arguments off the stack, perform operation then push result onto the stack
+     * |2|  (op)  -->  |1 op 2|
+     * |1|
+     */
+    public void binaryOperations(BinaryOp operation) {
+        Local arg2 = stack.pop();
+        Local arg1 = stack.pop();
+        getMethodVisitor().op(operation, arg1, arg1, arg2);
+        stack.push(arg1);
     }
 }
