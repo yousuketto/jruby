@@ -131,6 +131,54 @@ public class DexMethodAdapter {
         localVariables.remove(0);
     }
     
+    public void ishr() {
+        binaryOperations(BinaryOp.SHIFT_RIGHT);
+    }
+     
+    public void ishl() {
+        binaryOperations(BinaryOp.SHIFT_LEFT);
+    }
+    
+    public void iushr() {
+        binaryOperations(BinaryOp.UNSIGNED_SHIFT_RIGHT);
+    }
+    
+    public void lshr() {
+        binaryOperations(BinaryOp.SHIFT_RIGHT);
+    }
+    
+    public void lshl() {
+        binaryOperations(BinaryOp.SHIFT_LEFT);
+    }
+    
+    public void lushr() {
+        binaryOperations(BinaryOp.UNSIGNED_SHIFT_RIGHT);
+    }
+    
+    public void iand() {
+        binaryOperations(BinaryOp.AND);
+    }
+    
+    public void ior() {
+        binaryOperations(BinaryOp.OR);
+    }
+    
+    public void ixor() {
+        binaryOperations(BinaryOp.XOR);
+    }
+    
+    public void land() {
+        binaryOperations(BinaryOp.AND);
+    }
+    
+    public void lor() {
+        binaryOperations(BinaryOp.OR);
+    }
+    
+    public void lxor() {
+        binaryOperations(BinaryOp.XOR);
+    }
+    
     public void iadd() {
         binaryOperations(BinaryOp.ADD);
     }
