@@ -1,8 +1,10 @@
 %package "org.jruby.ir.persistence";
 
+%import "org.jruby.ir.instructions.Instr";
 %import "org.jruby.ir.operands.Array";
 %import "org.jruby.ir.operands.CompoundString";
 %import "org.jruby.ir.operands.Operand";
+%import "org.jruby.ir.operands.Variable";
 %import "org.jruby.ir.persistence.IROperandFactory";
 
 %import "org.jruby.util.KCode";
@@ -12,6 +14,8 @@
 
 %terminals STRING_LITERAL, SYMBOL_LITERAL;
 %terminals EOLN;
+%terminals ALIAS, BLOCK_GIVEN;
+%terminals EQ;
 %terminals LBRACK, RBRACK;
 %terminals DOT, SEMICOLON, COMMA, LBRACE, RBRACE, LPAREN, RPAREN, GT, LT;
 %terminals ARRAY_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER;
@@ -26,12 +30,56 @@
 %terminals KCODE_NIL, KCODE_NONE, KCODE_UTF8, KCODE_SJIS, KCODE_EUC;
 %terminals IDENTIFIER;
 
-%typeof STRING_LITERAL, IDENTIFIER, SYMBOL_LITERAL, BIGNUM_LITERAL, FIXNUM_LITERAL, FLOAT_LITERAL = "String";
+%typeof STRING_LITERAL, IDENTIFIER, SYMBOL_LITERAL, BIGNUM_LITERAL, FIXNUM_LITERAL, FLOAT_LITERAL, branch_name = "String";
 %typeof ARRAY = "Array";
 %typeof operand, literal = "Operand";
+%typeof variable = "Variable";
 %typeof compound_string  = "CompoundString";
 %typeof kcode = "KCode";
 %typeof regexp_options = "RegexpOptions";
+%typeof instruction = "Instr";
+
+instructions
+    =   instruction EOLN
+    |   instructions instruction EOLN
+    ;
+    
+instruction
+    =   alias
+    |   branch
+    |   result
+    ;
+    
+alias
+    =   ALIAS LPAREN variable.receiver COMMA operand.newName COMMA operand.oldName RPAREN
+                                        {: return new Symbol( IRInstructionFactory.INSTANCE.createAlias(receiver, newName, oldName) ); :}
+    ;
+
+branch
+    =   branch_name.name LPAREN operand.arg1 COMMA (operand.arg2 COMMA)? label.target
+                                        {: return new Symbol( IRInstructionFactory.INSTANCE.createBranch(name, arg1, arg2, target) ); :}
+    ;    
+    
+branch_name    
+    =   "beq" 
+    |   "b_false"
+    |   "bne"
+    |   "b_nil"
+    |   "b_true"
+    |   "b_undef"
+    ;
+    
+b_eq
+    =       
+  
+result
+    =   block_given
+    ;
+    
+block_given
+    =   variable.result EQ BLOCK_GIVEN
+                                        {: return new Symbol( IRInstructionFactory.INSTANCE.createBlockGiven(result) ); :}
+    ;
 
 operand
     =   literal
@@ -66,7 +114,7 @@ literal
 	;
 	
 string_literal
-    =   STRING_LITERAL.s                {: return new Symbol( IROperandFactory.INSTANCE.createStringLiteral(s)); :}
+    =   STRING_LITERAL.s                {: return new Symbol( IROperandFactory.INSTANCE.createStringLiteral(s) ); :}
     ;
 	
 immutable_literal
