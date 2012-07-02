@@ -7,6 +7,7 @@
 %import "org.jruby.ir.operands.Variable";
 %import "org.jruby.ir.persistence.IROperandFactory";
 
+%import "org.jruby.runtime.CallType";
 %import "org.jruby.util.KCode";
 %import "org.jruby.util.RegexpOptions";
 
@@ -14,10 +15,11 @@
 
 %terminals STRING_LITERAL, SYMBOL_LITERAL;
 %terminals EOLN;
-%terminals ALIAS, BLOCK_GIVEN;
+%terminals ALIAS, BLOCK_GIVEN, CALL;
 %terminals EQ;
 %terminals LBRACK, RBRACK;
 %terminals DOT, SEMICOLON, COMMA, LBRACE, RBRACE, LPAREN, RPAREN, GT, LT;
+%terminals BACKREF;
 %terminals ARRAY_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER;
 %terminals ASTERISK, COLON, DOLLAR, HASH, PERCENT;
 %terminals SVALUE_MARKER;
@@ -27,15 +29,16 @@
 %terminals RANGE_MARKER, EXCLUSIVE, INCLUSIVE;
 %terminals UNKNOWN_SUPER_TARGET, OBJECT_CLASS, SELF, STANDARD_ERROR, UNDEFINED_VALUE, UNEXECUTABLE_NIL;
 %terminals NIL, TRUE, FALSE;
-%terminals KCODE_NIL, KCODE_NONE, KCODE_UTF8, KCODE_SJIS, KCODE_EUC;
+%terminals KCODE;
 %terminals IDENTIFIER;
 
-%typeof STRING_LITERAL, IDENTIFIER, SYMBOL_LITERAL, BIGNUM_LITERAL, FIXNUM_LITERAL, FLOAT_LITERAL, branch_name = "String";
-%typeof ARRAY = "Array";
+%typeof STRING_LITERAL, IDENTIFIER, SYMBOL_LITERAL, FIXNUM_LITERAL, FLOAT_LITERAL, branch_name, KCODE, CALL_TYPE = "String";
+%typeof array_operand = "Array";
 %typeof operand, literal = "Operand";
 %typeof variable = "Variable";
 %typeof compound_string  = "CompoundString";
 %typeof kcode = "KCode";
+%typeof call_type = "CallType";
 %typeof regexp_options = "RegexpOptions";
 %typeof instruction = "Instr";
 
@@ -47,6 +50,7 @@ instructions
 instruction
     =   alias
     |   branch
+    |   call_base
     |   result
     ;
     
@@ -68,9 +72,22 @@ branch_name
     |   "b_true"
     |   "b_undef"
     ;
+
+// toString changed     
+call_base
+    =   call
+    |   no_result_call
+    ;
+
+// toString changed
+call     
+    =   variable.result EQ CALL LBRACK call_type.callType RBRACK LPAREN meth_addr.methAddr COMMA operand.receiver COMMA array.args (COMMA operand.closure)? RPAREN
+                                        {: return new Symbol( IRInstructionFactory.INSTANCE.createCall(callType, result, methAddr, receiver, args, closure) ); :}
+    ;
     
-b_eq
-    =       
+call_type
+    =   CALL_TYPE.val                   {: return new Symbol( IRInstructionFactory.INSTANCE.createCallType(val) ); :}
+    ;
   
 result
     =   block_given
@@ -83,7 +100,7 @@ block_given
 
 operand
     =   literal
-    |   array
+    |   array_operand
     |   as_string
 // attribute           -  no toString, strange operand in general
 // backtick_string     -  no toString
@@ -118,7 +135,7 @@ string_literal
     ;
 	
 immutable_literal
-    =   BIGNUM_LITERAL.b BIGNUM_MARKER  {: return new Symbol( IROperandFactory.INSTANCE.createBignum(b) ); :}
+    =   FIXNUM_LITERAL.b BIGNUM_MARKER  {: return new Symbol( IROperandFactory.INSTANCE.createBignum(b) ); :}
     |   FIXNUM_LITERAL.n FIXNUM_MARKER  {: return new Symbol( IROperandFactory.INSTANCE.createFixnum(n) ); :}
 	|	FLOAT_LITERAL.f FLOAT_MARKER    {: return new Symbol( IROperandFactory.INSTANCE.createFloat(f) ); :}
 	|	NIL                             {: return new Symbol( IROperandFactory.INSTANCE.createNil() ); :}
@@ -127,8 +144,12 @@ immutable_literal
 	|   FALSE                           {: return new Symbol( IROperandFactory.INSTANCE.createFalseLiteral() ); :}
 	;
 
+array_operand
+    =   ARRAY_MARKER array
+    ;
+    
 array
-    =   ARRAY_MARKER LBRACK array_elements? RBRACK
+    =   LBRACK array_elements? RBRACK
     ;
     
 array_elements
@@ -218,15 +239,11 @@ regexp
 
 // not finished
 regexp_options
-    =   REGEXP_OPTIONS_MARKER LPAREN KCODE_MARKER kcode COMMA? ENC_NODE? COMMA? EXPECTED? COMMA? FIXED? COMMA? IGNORECASE? COMMA? JAVA? COMMA? KCODE_DEFAULT? COMMA? LITERAL? COMMA? MULTILINE? COMMA? ONCE? RPAREN
+    =   REGEXP_OPTIONS_MARKER LPAREN KCODE_MARKER kcode (COMMA ENC_NODE)? (COMMA EXPECTED)? (COMMA FIXED)? (COMMA IGNORECASE)? (COMMA JAVA)? (COMMA KCODE_DEFAULT)? (COMMA LITERAL)? (COMMA MULTILINE)? (COMMA ONCE)? RPAREN
     ;
     
 kcode
-    =   KCODE_NIL                       {: return new Symbol( KCode.NIL ); :}
-    |   KCODE_NONE                      {: return new Symbol( KCode.NONE ); :}
-    |   KCODE_UTF8                      {: return new Symbol( KCode.UTF8 ); :}
-    |   KCODE_SJIS                      {: return new Symbol( KCode.SJIS ); :}
-    |   KCODE_EUC                       {: return new Symbol( KCode.EUC ); :}
+    =   KCODE.val                       {: return new Symbol( IROperandFactory.INSTANCE.createKCode(val) ); :}
     ;
 
 // string, not IDENTIFIER
