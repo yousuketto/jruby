@@ -1,5 +1,6 @@
 package org.jruby.ir.operands;
 
+import org.jruby.ir.persistence.util.StringPreparator;
 import org.jruby.ir.transformations.inlining.InlinerInfo;
 
 import java.util.List;
