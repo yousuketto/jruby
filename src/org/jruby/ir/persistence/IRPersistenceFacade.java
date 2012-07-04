@@ -42,9 +42,9 @@ public class IRPersistenceFacade {
 
     private static void getIstructionsFromThisAndDescendantScopes(IRScope irScopeToPersist,
             StringBuilder instructions) {
-        instructions.append(irScopeToPersist.toStringInstrs());
+        instructions.append(irScopeToPersist.toPersistableString());
+        instructions.append("\n\n");
         for(IRScope irScope : irScopeToPersist.getLexicalScopes()) {
-            instructions.append("\n");
             getIstructionsFromThisAndDescendantScopes(irScope, instructions);            
         }
     }
