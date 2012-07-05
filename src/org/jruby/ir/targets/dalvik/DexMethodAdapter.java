@@ -5,7 +5,9 @@ import java.util.ArrayList;
 
 import com.google.dexmaker.BinaryOp;
 import com.google.dexmaker.Code;
+import com.google.dexmaker.Comparison;
 import com.google.dexmaker.DexMaker;
+import com.google.dexmaker.Label;
 import com.google.dexmaker.Local;
 import com.google.dexmaker.MethodId;
 import com.google.dexmaker.TypeId;
@@ -223,6 +225,10 @@ public class DexMethodAdapter {
         localVariables.remove(0);
     }
     
+    public void label(Label label) {
+        getMethodVisitor().mark(label);
+    }
+    
     public void arrayload() {
         aaload();
     }
@@ -306,7 +312,78 @@ public class DexMethodAdapter {
     public void dastore() {
         arraystorer();
     }
+    
+    public void fcmpl() {
+        Local arg2 = stack.pop();
+        Local arg1 = stack.pop();
+        getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, -1);
+        stack.push(intLocal);
+    }
+    
+    public void fcmpg() {
+        Local arg2 = stack.pop();
+        Local arg1 = stack.pop();
+        getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, 1);
+        stack.push(intLocal);
+    }
+    
+    public void dcmpl() {
+        Local arg2 = stack.pop();
+        Local arg1 = stack.pop();
+        getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, -1);
+        stack.push(intLocal);
+    }
+    
+    public void dcmpg() {
+        Local arg2 = stack.pop();
+        Local arg1 = stack.pop();
+        getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, 1);
+        stack.push(intLocal);
+    }
+    
+    public void ifeq(Label arg0) {
+        comparisonzero(Comparison.EQ, arg0);
+    }
 
+    public void iffalse(Label arg0) {
+        ifeq(arg0);
+    }
+    
+    public void ifne(Label arg0) {
+        comparisonzero(Comparison.NE, arg0);
+    }
+
+    public void iftrue(Label arg0) {
+        ifne(arg0);
+    }
+    
+    public void if_acmpne(Label arg0) {
+        comparison(Comparison.NE, arg0);
+    }
+    
+    public void if_acmpeq(Label arg0) {
+        comparison(Comparison.EQ, arg0);
+    }
+    
+    public void if_icmple(Label arg0) {
+        comparison(Comparison.LE, arg0);
+    }
+    
+    public void if_icmpgt(Label arg0) {
+        comparison(Comparison.GT, arg0);
+    }
+    
+    public void if_icmplt(Label arg0) {
+        comparison(Comparison.LT, arg0);
+    }
+    
+    public void if_icmpne(Label arg0) {
+        comparison(Comparison.NE, arg0);
+    }
+    
+    public void if_icmpeq(Label arg0) {
+        comparison(Comparison.EQ, arg0);
+    }
     
     public void ishr() {
         binaryOperations(BinaryOp.SHIFT_RIGHT);
@@ -330,6 +407,13 @@ public class DexMethodAdapter {
     
     public void lushr() {
         binaryOperations(BinaryOp.UNSIGNED_SHIFT_RIGHT);
+    }
+    
+    public void lcmp() {
+        Local arg2 = stack.pop();
+        Local arg1 = stack.pop();
+        getMethodVisitor().compareLongs(intLocal, arg1, arg2);
+        stack.push(intLocal);
     }
     
     public void iand() {
@@ -571,5 +655,17 @@ public class DexMethodAdapter {
         
        getMethodVisitor().aput(local, index, source);
        stack.push(local); 
+    }
+    
+    public void comparison(Comparison comp, Label arg0) {
+        Local arg2 = stack.pop();
+        Local arg1 = stack.pop();
+        getMethodVisitor().compare(comp, arg0, arg1, arg2);
+    }
+    
+    public void comparisonzero(Comparison comp, Label arg0) {
+        Local arg1 = stack.pop();
+        code.loadConstant(intLocal, 0);
+        getMethodVisitor().compare(comp, arg0, arg1, intLocal);
     }
 }
