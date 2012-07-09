@@ -19,22 +19,32 @@ import org.jruby.ir.persistence.IRPersistenceFacade;
 public abstract class IRTranslator<R, S> {
 
     public R performTranslation(Ruby runtime, Node node, S specificObject) {
+        R result = null;
+        try {
 
-        IRScope producedIRScope = null;
-        if (isIRPersistenceRequired()) {
-            producedIRScope = produceIrScope(runtime, node, true);
-            try {
+            IRScope producedIRScope = null;
+            if (isIRPersistenceRequired()) {
+                producedIRScope = produceIrScope(runtime, node, true);
                 IRPersistenceFacade.persist(producedIRScope, runtime);
-            } catch (IRPersistenceException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-            return null;
-        } else {
-            producedIRScope = produceIrScope(runtime, node, false);
-        }
+            } else if (isIRReadingRequired()) {
+                IRScope[] scopes;
 
-        R result = translationSpecificLogic(runtime, producedIRScope, specificObject);
+                scopes = IRPersistenceFacade.read(runtime);
+
+                for (IRScope irScope : scopes) {
+                    IRPersistenceFacade.persist(irScope, "result");
+                    result = translationSpecificLogic(runtime, irScope, specificObject);
+                }
+                return result;
+            } else {
+                producedIRScope = produceIrScope(runtime, node, false);
+                result = translationSpecificLogic(runtime, producedIRScope, specificObject);
+            }
+
+        } catch (IRPersistenceException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         return result;
     }
 
@@ -43,6 +53,10 @@ public abstract class IRTranslator<R, S> {
 
     private static boolean isIRPersistenceRequired() {
         return RubyInstanceConfig.IR_PERSISTENCE;
+    }
+
+    private static boolean isIRReadingRequired() {
+        return RubyInstanceConfig.IR_READING;
     }
 
     private IRScope produceIrScope(Ruby runtime, Node node, boolean isDryRun) {
