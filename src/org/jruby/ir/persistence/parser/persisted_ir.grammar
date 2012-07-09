@@ -1,19 +1,21 @@
-%package "org.jruby.ir.persistence";
+%package "org.jruby.ir.persistence.parser";
 
+%import "org.jcodings.Encoding";
+
+%import "org.jruby.ir.IRScope";
+%import "org.jruby.ir.IRScopeType";
 %import "org.jruby.ir.Operation";
 
 %import "org.jruby.ir.instructions.Instr";
-%import "org.jruby.ir.operands.Array";
 %import "org.jruby.ir.operands.CompoundString";
 %import "org.jruby.ir.operands.Label";
 %import "org.jruby.ir.operands.Operand";
 %import "org.jruby.ir.operands.Variable";
 %import "org.jruby.ir.operands.KeyValuePair";
 
-%import "org.jruby.ir.persistence.IROperandFactory";
-%import "org.jruby.ir.persistence.IRScopeBuilder";
+%import "org.jruby.parser.IRStaticScope";
+%import "org.jruby.parser.IRStaticScopeType";
 
-%import "org.jruby.runtime.CallType";
 %import "org.jruby.util.KCode";
 %import "org.jruby.util.RegexpOptions";
 
@@ -22,9 +24,10 @@
 %terminals STRING_LITERAL, SYMBOL_LITERAL, ID, STRING, FIXNUM, FLOAT;
 %terminals EOLN;
 %terminals EQ;
-%terminals DOT, SEMICOLON, COMMA, LBRACE, RBRACE, LPAREN, RPAREN, GT, LT, LBRACK, RBRACK;
-%terminals ARRAY_MARKER, ARGS_PUSH_MARKER, ARGS_CAT_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER, IREXCEPTION_MARKER, SVALUE_MARKER;
-%terminals SCOPE_START_MARKER, SCOPE_MARKER, MODULE_MARKER;
+%terminals DOT, COMMA, LBRACE, RBRACE, LPAREN, RPAREN, GT, LT, LBRACK, RBRACK;
+%terminals ARRAY_MARKER, ARGS_PUSH_MARKER, ARGS_CAT_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER, IREXCEPTION_MARKER, SVALUE_MARKER, RANGE_MARKER;
+%terminals SCOPE, LEXICAL_PARENT_MARKER, STATIC_SCOPE;
+%terminals SCOPE_MARKER, MODULE_MARKER;
 %terminals ASTERISK, GTE, BACKTICK, COLON, DOLLAR, HASH, PERCENT;
 
 // Regexp terminals
@@ -34,29 +37,70 @@
 %terminals EXCLUSIVE, INCLUSIVE;
 
 // Special types of operands
-%terminals UNKNOWN_SUPER_TARGET, OBJECT_CLASS, SELF, STANDARD_ERROR, UNDEFINED_VALUE, UNEXECUTABLE_NIL;
+%terminals UNKNOWN_SUPER_TARGET, OBJECT_CLASS, SELF, BLOCK, STANDARD_ERROR, UNDEFINED_VALUE, UNEXECUTABLE_NIL;
 %terminals NIL, TRUE, FALSE;
 
-%typeof STRING_LITERAL, STRING, ID, SYMBOL_LITERAL, FIXNUM, FLOAT, branch_name, regexp_opt_option = "String";
-%typeof array_operand = "Array";
-%typeof operand = "Operand";
+%typeof STRING_LITERAL, STRING, ID, SYMBOL_LITERAL, FIXNUM, FLOAT, BLOCK, regexp_opt_option = "String";
+%typeof instructions = "Instr[]";
+%typeof array = "Operand[]";
+%typeof rvalue, operand = "Operand";
 %typeof variable = "Variable";
 %typeof compound_string  = "CompoundString";
-%typeof kcode = "KCode";
-%typeof call_type = "CallType";
 %typeof regexp_options = "RegexpOptions";
-%typeof instruction = "Instr";
+%typeof instruction = "Object";
 %typeof key_value_pair = "KeyValuePair";
 %typeof label = "Label";
 %typeof param = "Object";
 %typeof operation = "Operation";
+%typeof encoding = "Encoding";
 
-%goal scope
+%typeof scope, scope_info, lexical_parent = "IRScope";
+%typeof scope_type = "IRScopeType";
+
+%typeof static_scope = "IRStaticScope";
+%typeof static_scope_type = "IRStaticScopeType";
+
+%goal scopes;
+
+scopes
+    =    scope
+         scopes scope
+    ;
 
 scope
-    =    SCOPE_START_MARKER LT STRING.name GT 
+    =    scope_info.scope EOLN
          instructions.instrs EOLN
-                                        {: return new Symbol( IRScopeFactory.INSTANCE.createScope(name, instrs) ); :}
+                                        {: return new Symbol( IRScopeFactory.INSTANCE.addToScope(scope, instrs) ); :}
+    ;
+    
+scope_info
+    =    SCOPE LPAREN scope_type.type COMMA FIXNUM.line RPAREN COLON LT STRING.name GT EOLN
+         lexical_parent.parent?
+         static_scope.ss
+                                        {: return new Symbol( IRScopeFactory.INSTANCE.createScope(type, parent, name, line, ss) ); :}
+    ;
+    
+scope_type
+    =    ID.type                        {: return new Symbol( IRScopeFactory.INSTANCE.createScopeType(type) ); :}
+    ;
+
+lexical_parent
+    =    LEXICAL_PARENT_MARKER LT STRING.name GT EOLN
+                                        {: return new Symbol( IRScopeFactory.INSTANCE.findLexicalParent(name) ); :}
+    ;
+
+static_scope   
+    =    STATIC_SCOPE LPAREN static_scope_type.type RPAREN COLON LBRACK variables.vars? RBRACK
+                                        {: return new Symbol( IRScopeFactory.INSTANCE.buildStaticScope(type, vars) ); :}
+    ;
+    
+static_scope_type
+    =    ID.type                        {: return new Symbol( IRScopeFactory.INSTANCE.createStaticScopeType(type) ); :}
+    ;
+    
+variables
+    =    ID
+    |    variables COMMA ID
     ;
 
 instructions
@@ -71,20 +115,21 @@ instruction
     ;
     
 label_instr
-    =    label.label COLON              {: return new Symbol( IRInstructionFactory.INSTANCE.createLabel(label) ); :}
+    =    ID.label COLON                 {: return new Symbol( IRInstructionFactory.INSTANCE.createLabel(label) ); :}
     ;
 
 simple_instr
     // only tread poll so far
     =    operation.id                   {: return new Symbol( IRInstructionFactory.INSTANCE.createTreadPoll() ); :}
     // only jump so far
-    |    operation label.target         {: return new Symbol( IRInstructionFactory.INSTANCE.createJump(target) ); :}
+    |    operation.id label.target      {: return new Symbol( IRInstructionFactory.INSTANCE.createJump(target) ); :}
     |    operation.id LPAREN param_list.list RPAREN
                                         {: return new Symbol( IRInstructionFactory.INSTANCE.createInstrWithParams(id, list) ); :}
     ;
     
 operation
-    =    ID.name                        {: return new Symbol( IRInstructionFactory.INSTANCE.createOpertion(name) ); :}
+    =    ID.name                        {: return new Symbol( IRInstructionFactory.INSTANCE.createOperation(name) ); :}
+    ;
     
 param_list
     =    param
@@ -98,19 +143,18 @@ param
     ;
      
 result_instr
-    =    variable.var EQ operand.op     {: return new Symbol( IRInstructionFactory.INSTANCE.createReturnInstrWithOperand(var, op) ); :}
+    =    variable.var EQ rvalue.rv      {: return new Symbol( IRInstructionFactory.INSTANCE.createCopy(var, rv) ); :}
     |    variable.var EQ operation.instr
                                         {: return new Symbol( IRInstructionFactory.INSTANCE.createReturnInstrWithNoParams(var, instr) ); :}
-    |    variable EQ operation.instr LPAREN param_list.list RPAREN 
+    |    variable.var EQ operation.instr LPAREN param_list.list RPAREN 
                                         {: return new Symbol( IRInstructionFactory.INSTANCE.createReturnInstrWithParams(var, instr, list) ); :}
     // only PutGlobalVarInstr so far
     |    operation.instr LPAREN operand.o1 RPAREN EQ operand.o2
                                         {: return new Symbol( IRInstructionFactory.INSTANCE.createPutGlobalVar(o1, o2) ); :}
     ;
 
-operand
+rvalue
     =   array_operand
-    |   array  // hack! it is here only for CallInstr
     |   as_string
     |   backtick_string
     |   compound_array
@@ -120,7 +164,6 @@ operand
     |   hash
     |   immutable_literal
     |   ir_exception
-    |   label
     |   method_handle
     |   object_class
     |   range
@@ -133,11 +176,16 @@ operand
     |   svalue
     |   undefined_value
     |   variable
-    |   wrapped_ir_closure
+//   |   wrapped_ir_closure
+    ;
+
+operand
+    =   rvalue
+    |   label
     ;
     
 array_operand
-    =   ARRAY_MARKER array.a            {: return new Symbol( IROperandFactory.INSTANCE.createArray(a.value) ); :}
+    =   ARRAY_MARKER array.a            {: return new Symbol( IROperandFactory.INSTANCE.createArray(a) ); :}
     ;
     
 array
@@ -150,7 +198,7 @@ array_elements
     ;
     
 as_string
-    =   DOLLAR LBRACE operand.o RBRACE  {: return new Symbol( IROperandFactory.INSTANCE.createAsString(o) ); :}
+    =   HASH LBRACE operand.o RBRACE  {: return new Symbol( IROperandFactory.INSTANCE.createAsString(o) ); :}
     ;
     
 backtick_string
@@ -163,10 +211,19 @@ compound_array
     |   ARGS_CAT_MARKER LBRACK operand.a1 COMMA operand.a2 RBRACK
                                         {: return new Symbol( IROperandFactory.INSTANCE.createArgsCat(a1, a2) ); :}
     ;
-  
+    
+compound_string
+    =   COMPOUND_STRING_MARKER encoding.encoding array.pieces
+                                        {: return new Symbol( IROperandFactory.INSTANCE.createCompoundString(encoding, pieces) ); :}
+    ;
+    
+encoding
+    =   ID.encoding                     {: return new Symbol( IROperandFactory.INSTANCE.createEncoding(encoding) ); :}
+    ;
+      
 current_scope
     =   SCOPE_MARKER LT STRING.name GT
-                                        {: return new Symbol( IROperandFactory.INSTANCE.createCurrentScope(scope, name) ); :}
+                                        {: return new Symbol( IROperandFactory.INSTANCE.createCurrentScope(name) ); :}
     ;
     
 dynamic_symbol
@@ -182,6 +239,7 @@ hash
 key_value_pairs
     =    key_value_pair
     |    key_value_pairs COMMA key_value_pair
+    ;
     
 key_value_pair
     =    operand.key GTE operand.value    
@@ -204,6 +262,7 @@ ir_exception
        
 label
     =   ID.label                        {: return new Symbol( IROperandFactory.INSTANCE.createLabel(label) ); :}
+    ;
 
 method_handle
     =   LT operand.receiver DOT operand.methodName GT
@@ -236,7 +295,7 @@ reference
     ;
     
 backref
-    =   DOLLAR SYMBOL_LITERAL.char      {: return new Symbol( IROperandFactory.INSTANCE.createBackref(char) ); :}
+    =   DOLLAR SYMBOL_LITERAL.ch        {: return new Symbol( IROperandFactory.INSTANCE.createBackref(ch) ); :}
     ;
     
 global_variable
@@ -245,6 +304,7 @@ global_variable
     
 meth_addr
     =   SYMBOL_LITERAL.name             {: return new Symbol( IROperandFactory.INSTANCE.createMethAddr(name) ); :}
+    |   UNKNOWN_SUPER_TARGET            {: return new Symbol( IROperandFactory.INSTANCE.createUnknownSuperTarget() ); :}
     ;
     
 nth_ref
@@ -259,6 +319,10 @@ regexp
     =   REGEXP_MARKER BAR operand.operand BAR regexp_options.options
                                         {: return new Symbol( IROperandFactory.INSTANCE.createRegexp(operand, options) ); :}	
     ;
+    
+scope_module
+    =   MODULE_MARKER LT STRING.name GT {: return new Symbol( IROperandFactory.INSTANCE.createScopeModule(name) ); :}
+    ;
 
 regexp_options
     =   REGEXP_OPTIONS_MARKER LPAREN KCODE_MARKER ID.kcode regexp_opt_options.opt? RPAREN
@@ -272,10 +336,6 @@ regexp_opt_options
     
 regexp_opt_option
     =  COMMA ID.opt
-    ;
-
-scope_module
-    =   MODULE_MARKER LT STRING.name GT {: return new Symbol( IROperandFactory.INSTANCE.createScopeModule(name) ); :}
     ;
 
 splat
@@ -306,14 +366,17 @@ variable
     
 local_variable
     =   SELF                            {: return new Symbol( IROperandFactory.INSTANCE.createSelf() ); :}
-    |   LT ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.offset  RPAREN GT // not implemented!    
-                                        {: return new Symbol( IROperandFactory.INSTANCE.createClosureLocalVariable(scope, id, scopeDepth, offset) ); :}
-    |   ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.offset  RPAREN 
-                                        {: return new Symbol( IROperandFactory.INSTANCE.createLocalVariable(id, scopeDepth, offset) ); :}
+    |   BLOCK.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location  RPAREN
+                                        {: return new Symbol( IROperandFactory.INSTANCE.createLocalVariable(id, scopeDepth, location) ); :}
+    |   LT ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location  RPAREN GT // not implemented!    
+                                        {: return new Symbol( IROperandFactory.INSTANCE.createClosureLocalVariable(id, scopeDepth, location) ); :}
+    |   ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location RPAREN 
+                                        {: return new Symbol( IROperandFactory.INSTANCE.createLocalVariable(id, scopeDepth, location) ); :}
     ;
 
 temporary_variable
-    =   PERCENT ID.id                   {: return IROperandFactory.INSTANCE.createTemproraryVariable(id); :}
+    =   PERCENT ID.id
+                                        {: return new Symbol( IROperandFactory.INSTANCE.createTemporaryVariable(id) ); :}
 //    |    temporary_closure_variable
     ;
 

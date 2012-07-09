@@ -1,9 +1,9 @@
-package org.jruby.ir.persistence;
+package org.jruby.ir.persistence.lexer;
 
 import beaver.Symbol;
 import beaver.Scanner;
 
-import example.ExampleParser.Terminals;
+import org.jruby.ir.persistence.parser.PersistedIRParser.Terminals;
 
 /**
 * Scanner for persisted IR
@@ -12,6 +12,7 @@ import example.ExampleParser.Terminals;
 
 %class PersistedIRScanner
 %extends Scanner
+%public
 
 %function nextToken
 %type Symbol
@@ -72,18 +73,18 @@ SymbolCharacter = [^\']
 
 InsideChevrons = [^<>] 
 
-%state STRING, SYMBOL, INSIDE_CHEVRONS
+%state STRING, SYMBOL, SCOPE, INSIDE_CHEVRONS
 
 %%
 
 <YYINITIAL> {
-    /* string literal */
+    /* String literal */
     \"                                           { yybegin(STRING); }
     
-    /* symbol literal */
+    /* Symbol literal */
     \'                                           { yybegin(SYMBOL); }                                                        
     
-    /* whitespace */
+    
     {WhiteSpace}                                 { /* ignore */ }
     
     {LineTerminator}                             { return token(Terminals.EOLN); }
@@ -94,8 +95,12 @@ InsideChevrons = [^<>]
     
     "="                                          { return token(Terminals.EQ); }
     
-    /* scope markers */
-    "Scope:"                                     { yybegin(INSIDE_CHEVRONS); return token(Terminals.SCOPE_START_MARKER); }
+    /* Scope header markers */
+    "Scope"                                      { yybegin(SCOPE); return token(Terminals.SCOPE); }
+    /* Scope parent */
+    "LexicalParent:"                             { yybegin(INSIDE_CHEVRONS); return token(Terminals.LEXICAL_PARENT_MARKER); }
+    /* IRStaticScope */
+    "IRStaticScope"                              { return token(Terminals.STATIC_SCOPE); }
 
     /* operand markers */
     "Array:"                                     { return token(Terminals.ARRAY_MARKER); }
@@ -108,17 +113,21 @@ InsideChevrons = [^<>]
     "Float:"                                     { return token(Terminals.FLOAT_MARKER); } 
     "LocalJumpError:"                            { return token(Terminals.IREXCEPTION_MARKER); }
     "RE:"                                        { return token(Terminals.REGEXP_MARKER); }    
-    "RegexpOptions"                              { yybegin(REGEXP_OPTIONS); return token(Terminals.REGEXP_OPTIONS_MARKER); }
+    "RegexpOptions"                              { return token(Terminals.REGEXP_OPTIONS_MARKER); }
     "module"                                     { yybegin(INSIDE_CHEVRONS); return token(Terminals.MODULE_MARKER); }
-    "SValue"                                     { return token(Terminals.SVALUE_MARKER); }
+    "SValue:"                                    { return token(Terminals.SVALUE_MARKER); }
+    "Range:"                                     { return token(Terminals.RANGE_MARKER); }
     
     /* special cases */
     "-unknown-super-target-"                     { return token(Terminals.UNKNOWN_SUPER_TARGET); } 
     "<Class:Object>"                             { return token(Terminals.OBJECT_CLASS); }
-    "%self"                                      { return token(Terminals.SELF); }
     "StandardError"                              { return token(Terminals.STANDARD_ERROR); }
     "%undefined"                                 { return token(Terminals.UNDEFINED_VALUE); }
     "nil(unexecutable)"                          { return token(Terminals.UNEXECUTABLE_NIL); }
+    
+    /* local variable special cases*/
+    "%block"                                     { return token(Terminals.BLOCK); }
+    "%self"                                      { return token(Terminals.SELF); }
     
     /* nil literal */
     "nil"                                        { return token(Terminals.NIL); }
@@ -127,11 +136,13 @@ InsideChevrons = [^<>]
     "true"                                       { return token(Terminals.TRUE); }
     "false"                                      { return token(Terminals.FALSE); }
     
+    "kcode:"                                     { return token(Terminals.KCODE_MARKER); }
+    
+    {Identifier}                                 { return token(Terminals.ID); }
+    
     /* range type markers */
     ".."                                         { return token(Terminals.EXCLUSIVE); }
     "..."                                        { return token(Terminals.INCLUSIVE); }
-    
-    "kcode:"                                     { return token(Terminals.KCODE_MARKER); }
     
     /* separators */
     "|"                                          { return token(Terminals.BAR); }
@@ -143,7 +154,6 @@ InsideChevrons = [^<>]
     "}"                                          { return token(Terminals.RBRACE); }
     "<"                                          { return token(Terminals.LT); }
     ">"                                          { return token(Terminals.GT); }
-    ";"                                          { return token(Terminals.SEMICOLON); }
     ","                                          { return token(Terminals.COMMA); }
     "."                                          { return token(Terminals.DOT); }
     
@@ -154,7 +164,7 @@ InsideChevrons = [^<>]
     ":"                                          { return token(Terminals.COLON); }
     "$"                                          { return token(Terminals.DOLLAR); }
     "#"                                          { return token(Terminals.HASH); }
-    "%"                                          { return token(Terminals.PERCENT);
+    "%"                                          { return token(Terminals.PERCENT); }
 }
 
 <STRING> {
@@ -168,6 +178,16 @@ InsideChevrons = [^<>]
     \'                                           { return finishStringAs(Terminals.SYMBOL_LITERAL); }
 
     {SymbolCharacter}+                           { appendToString(); }
+}
+
+<SCOPE> {
+    {WhiteSpace}                                 { /* ignore */ }
+    "("                                          { return token(Terminals.LPAREN); }
+    {Identifier}                                 { return token(Terminals.ID); }
+    ","                                          { return token(Terminals.COMMA); }
+    {FixnumLiteral}                              { return token(Terminals.FIXNUM); }
+    ")"                                          { return token(Terminals.RPAREN); }
+    ":"                                          { yybegin(INSIDE_CHEVRONS); return token(Terminals.COLON); }    
 }
 
 /* in case if scope or module contain whitespaces */

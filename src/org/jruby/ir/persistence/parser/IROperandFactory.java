@@ -1,9 +1,48 @@
-package org.jruby.ir.persistence;
+package org.jruby.ir.persistence.parser;
 
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
 
+import org.jcodings.Encoding;
+import org.jcodings.specific.ASCIIEncoding;
+import org.jcodings.specific.BIG5Encoding;
+import org.jcodings.specific.Big5HKSCSEncoding;
+import org.jcodings.specific.Big5UAOEncoding;
+import org.jcodings.specific.CP1251Encoding;
+import org.jcodings.specific.CP949Encoding;
+import org.jcodings.specific.EUCJPEncoding;
+import org.jcodings.specific.EUCTWEncoding;
+import org.jcodings.specific.EmacsMuleEncoding;
+import org.jcodings.specific.GB18030Encoding;
+import org.jcodings.specific.GBKEncoding;
+import org.jcodings.specific.ISO8859_10Encoding;
+import org.jcodings.specific.ISO8859_11Encoding;
+import org.jcodings.specific.ISO8859_13Encoding;
+import org.jcodings.specific.ISO8859_14Encoding;
+import org.jcodings.specific.ISO8859_15Encoding;
+import org.jcodings.specific.ISO8859_16Encoding;
+import org.jcodings.specific.ISO8859_1Encoding;
+import org.jcodings.specific.ISO8859_2Encoding;
+import org.jcodings.specific.ISO8859_3Encoding;
+import org.jcodings.specific.ISO8859_4Encoding;
+import org.jcodings.specific.ISO8859_5Encoding;
+import org.jcodings.specific.ISO8859_6Encoding;
+import org.jcodings.specific.ISO8859_7Encoding;
+import org.jcodings.specific.ISO8859_8Encoding;
+import org.jcodings.specific.ISO8859_9Encoding;
+import org.jcodings.specific.KOI8Encoding;
+import org.jcodings.specific.KOI8REncoding;
+import org.jcodings.specific.KOI8UEncoding;
+import org.jcodings.specific.NonStrictEUCJPEncoding;
+import org.jcodings.specific.NonStrictUTF8Encoding;
+import org.jcodings.specific.SJISEncoding;
+import org.jcodings.specific.USASCIIEncoding;
+import org.jcodings.specific.UTF16BEEncoding;
+import org.jcodings.specific.UTF16LEEncoding;
+import org.jcodings.specific.UTF32BEEncoding;
+import org.jcodings.specific.UTF32LEEncoding;
+import org.jcodings.specific.UTF8Encoding;
 import org.jruby.RubyLocalJumpError.Reason;
 import org.jruby.ir.IRClosure;
 import org.jruby.ir.IRScope;
@@ -41,6 +80,7 @@ import org.jruby.ir.operands.Splat;
 import org.jruby.ir.operands.StandardError;
 import org.jruby.ir.operands.StringLiteral;
 import org.jruby.ir.operands.Symbol;
+import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.UnexecutableNil;
 import org.jruby.ir.operands.WrappedIRClosure;
@@ -70,7 +110,7 @@ public enum IROperandFactory {
         return new BacktickString(Arrays.asList(pieces));
     }
 
-    /** $bignumString:bignum */
+    /** Bignum:$bignumString */
     public Bignum createBignum(String bignumString) {
         BigInteger value = new BigInteger(bignumString);
         return new Bignum(value);
@@ -109,13 +149,101 @@ public enum IROperandFactory {
     }
 
     /** CompoundString:$pieces */
-    public CompoundString createCompoundString(List<Operand> pieces) {
-        return new CompoundString(pieces);
+    public CompoundString createCompoundString(Encoding encoding, Operand[] pieces) {
+        return new CompoundString(Arrays.asList(pieces), encoding);
+    }
+    
+    public Encoding createEncoding(String name) {
+        if(name == null) {
+            return null;
+        } else if (ASCIIEncoding.INSTANCE.toString().equals(name)) {
+            return ASCIIEncoding.INSTANCE;
+        } else if (USASCIIEncoding.INSTANCE.toString().equals(name)) {
+            return USASCIIEncoding.INSTANCE;
+        } else if (UTF8Encoding.INSTANCE.equals(name)) {
+            return UTF8Encoding.INSTANCE;
+        } else if(BIG5Encoding.INSTANCE.toString().equals(name)) {
+            return BIG5Encoding.INSTANCE;
+        } else if (Big5HKSCSEncoding.INSTANCE.toString().equals(name)) {
+            return Big5HKSCSEncoding.INSTANCE;
+        } else if (Big5UAOEncoding.INSTANCE.toString().equals(name)) {
+            return Big5UAOEncoding.INSTANCE;
+        } else if (NonStrictEUCJPEncoding.INSTANCE.toString().equals(name)) {
+            return NonStrictEUCJPEncoding.INSTANCE;
+        } else if (SJISEncoding.INSTANCE.toString().equals(name)) {
+            return SJISEncoding.INSTANCE;
+        } else if (CP949Encoding.INSTANCE.toString().equals(name)) {
+            return CP949Encoding.INSTANCE;
+        } else if (GBKEncoding.INSTANCE.toString().equals(name)) {
+            return GBKEncoding.INSTANCE;
+        } else if (EmacsMuleEncoding.INSTANCE.toString().equals(name)) {
+            return EmacsMuleEncoding.INSTANCE;
+        } else if (EUCJPEncoding.INSTANCE.toString().equals(name)) {
+            return EUCJPEncoding.INSTANCE;
+        } else if (EUCTWEncoding.INSTANCE.toString().equals(name)) {
+            return EUCTWEncoding.INSTANCE;
+        } else if (GB18030Encoding.INSTANCE.toString().equals(name)) {
+            return GB18030Encoding.INSTANCE;
+        } else if (NonStrictUTF8Encoding.INSTANCE.toString().equals(name)) {
+            return NonStrictUTF8Encoding.INSTANCE;
+        } else if (UTF32BEEncoding.INSTANCE.toString().equals(name)) {
+            return UTF32BEEncoding.INSTANCE;
+        } else if (UTF32LEEncoding.INSTANCE.toString().equals(name)) {
+            return UTF32LEEncoding.INSTANCE;
+        } else if (UTF16BEEncoding.INSTANCE.toString().equals(name)) {
+            return UTF16BEEncoding.INSTANCE;
+        } else if (UTF16LEEncoding.INSTANCE.toString().equals(name)) {
+            return UTF16LEEncoding.INSTANCE;
+        } else if (CP1251Encoding.INSTANCE.toString().equals(name)) {
+            return CP1251Encoding.INSTANCE;
+        } else if (UTF32BEEncoding.INSTANCE.toString().equals(name)) {
+            return UTF32BEEncoding.INSTANCE;
+        } else if (ISO8859_10Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_10Encoding.INSTANCE;
+        } else if (ISO8859_11Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_11Encoding.INSTANCE;
+        } else if (ISO8859_13Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_13Encoding.INSTANCE;
+        } else if (ISO8859_14Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_14Encoding.INSTANCE;
+        } else if (ISO8859_15Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_15Encoding.INSTANCE;
+        } else if (ISO8859_16Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_16Encoding.INSTANCE;
+        } else if (ISO8859_1Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_1Encoding.INSTANCE;
+        } else if (ISO8859_2Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_2Encoding.INSTANCE;
+        } else if (ISO8859_3Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_3Encoding.INSTANCE;
+        } else if (ISO8859_4Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_4Encoding.INSTANCE;
+        } else if (ISO8859_5Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_5Encoding.INSTANCE;
+        } else if (ISO8859_6Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_6Encoding.INSTANCE;
+        } else if (ISO8859_7Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_7Encoding.INSTANCE;
+        } else if (ISO8859_8Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_8Encoding.INSTANCE;
+        } else if (ISO8859_9Encoding.INSTANCE.toString().equals(name)) {
+            return ISO8859_9Encoding.INSTANCE;
+        } else if (KOI8Encoding.INSTANCE.toString().equals(name)) {
+            return KOI8Encoding.INSTANCE;
+        } else if (KOI8REncoding.INSTANCE.toString().equals(name)) {
+            return KOI8REncoding.INSTANCE;
+        } else if (KOI8UEncoding.INSTANCE.toString().equals(name)) {
+            return KOI8UEncoding.INSTANCE;
+        } else {
+            return UTF8Encoding.INSTANCE;
+        }
     }
 
     /** scope<$name> */
-    public CurrentScope createCurrentScope(IRScope scope, String name) {
-        return new CurrentScope(scope);
+    public CurrentScope createCurrentScope(String name) {
+        // FIXME: its stubbed by current scope right now
+        IRScope currentScope = IRParsingContext.INSTANCE.getCurrentScope();
+        return new CurrentScope(currentScope);
     }
 
     /** :CompoundString$pieces */
@@ -177,12 +305,26 @@ public enum IROperandFactory {
             String locationString) {
         int scopeDepth = Integer.parseInt(scopeDepthString);
         int location = Integer.parseInt(locationString);
+        
         return new LocalVariable(name, scopeDepth, location);
+    }
+    
+    /** <$name($scopeDepthString:$locationString)> */
+    public ClosureLocalVariable createClosureLocalVariable(String name, String scopeDepthString,
+            String locationString) {
+        int scopeDepth = Integer.parseInt(scopeDepthString);
+        int location = Integer.parseInt(locationString);
+        // FIXME: closure is null so far
+        return new ClosureLocalVariable(null, name, scopeDepth, location);
     }
 
     /** $name */
     public MethAddr createMethAddr(String name) {
         return new MethAddr(name);
+    }
+    
+    public MethAddr createUnknownSuperTarget() {
+        return MethAddr.UNKNOWN_SUPER_TARGET;
     }
 
     /** <$receiver.$methodName> */
@@ -268,8 +410,10 @@ public enum IROperandFactory {
     }
 
     /** module<$name> */
-    public ScopeModule createScopeModule(IRScope scope, String name) {
-        return new ScopeModule(scope);
+    public ScopeModule createScopeModule(String name) {
+        // FIXME: its stubbed by current scope right now
+        IRScope currentScope = IRParsingContext.INSTANCE.getCurrentScope();
+        return new ScopeModule(currentScope);
     }
 
     /** %self */
@@ -310,6 +454,12 @@ public enum IROperandFactory {
     /** nil(unexecutable) */
     public UnexecutableNil createUnexecutableNil() {
         return UnexecutableNil.U_NIL;
+    }
+    
+    public TemporaryVariable createTemporaryVariable(String name) {
+        IRScope currentScope = IRParsingContext.INSTANCE.getCurrentScope();
+        
+        return currentScope.getNewTemporaryVariable("%" + name);
     }
 
     public WrappedIRClosure createWrappedIRClosure(IRClosure scope) {
