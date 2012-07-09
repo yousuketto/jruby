@@ -1,15 +1,14 @@
 package org.jruby.ir.operands;
 
-import org.jruby.ir.IRVisitor;
+import java.util.List;
+
 import org.jruby.ir.IRScope;
-import org.jruby.ir.persistence.util.StringPreparator;
+import org.jruby.ir.IRVisitor;
 import org.jruby.ir.transformations.inlining.InlinerInfo;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
-
-import java.util.List;
 
 /**
  * Wrap a scope for the purpose of finding live module which happens to be associated with it.

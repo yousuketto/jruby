@@ -347,6 +347,7 @@
       <zipfileset src="${build.lib.dir}/jline-${jline.version}.jar"/>
       <zipfileset src="${build.lib.dir}/jcodings.jar"/>
       <zipfileset src="${build.lib.dir}/joni.jar"/>
+      <zipfileset src="${build.lib.dir}/beaver-rt.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-netdb.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-posix.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-x86asm.jar"/>
@@ -460,6 +461,7 @@
       <zipfileset src="${build.lib.dir}/jline-${jline.version}.jar"/>
       <zipfileset src="${build.lib.dir}/jcodings.jar"/>
       <zipfileset src="${build.lib.dir}/joni.jar"/>
+      <zipfileset src="${build.lib.dir}/beaver-rt.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-netdb.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-posix.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-x86asm.jar"/>
@@ -625,6 +627,7 @@
       <zipfileset src="${build.lib.dir}/jline-${jline.version}.jar"/>
       <zipfileset src="${build.lib.dir}/jcodings.jar"/>
       <zipfileset src="${build.lib.dir}/joni.jar"/>
+      <zipfileset src="${build.lib.dir}/beaver-rt.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-netdb.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-posix.jar"/>
       <zipfileset src="${build.lib.dir}/jnr-x86asm.jar"/>
