@@ -349,13 +349,8 @@ public enum IROperandFactory {
     }
 
     /** Range:($begin...$end) */
-    public Range createInclusiveRange(Operand begin, Operand end) {
-        return new Range(begin, end, false);
-    }
-
-    /** Range:($begin..$end) */
-    public Range createExclusiveRange(Operand begin, Operand end) {
-        return new Range(begin, end, true);
+    public Range createRange(Operand begin, Operand end, boolean isExclusive) {
+        return new Range(begin, end, isExclusive);
     }
 
     /** RE:|$regexp|$options */

@@ -25,7 +25,7 @@
 %terminals EOLN;
 %terminals EQ;
 %terminals DOT, COMMA, LBRACE, RBRACE, LPAREN, RPAREN, GT, LT, LBRACK, RBRACK;
-%terminals ARRAY_MARKER, ARGS_PUSH_MARKER, ARGS_CAT_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER, IREXCEPTION_MARKER, SVALUE_MARKER, RANGE_MARKER;
+%terminals ARRAY_MARKER, ARGS_PUSH_MARKER, ARGS_CAT_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER, IREXCEPTION_MARKER, SVALUE_MARKER;
 %terminals SCOPE, LEXICAL_PARENT_MARKER, STATIC_SCOPE;
 %terminals SCOPE_MARKER, MODULE_MARKER;
 %terminals ASTERISK, GTE, BACKTICK, COLON, DOLLAR, HASH, PERCENT;
@@ -41,6 +41,7 @@
 %terminals NIL, TRUE, FALSE;
 
 %typeof STRING_LITERAL, STRING, ID, SYMBOL_LITERAL, FIXNUM, FLOAT, BLOCK, regexp_opt_option = "String";
+%typeof range_type = "boolean";
 %typeof instructions = "Instr[]";
 %typeof array = "Operand[]";
 %typeof rvalue, operand = "Operand";
@@ -274,16 +275,13 @@ object_class
     ;
  
 range
-    =   exclusive_range
-    |   inclusive_range
+    =   LPAREN operand.b range_type.isExclusive operand.e RPAREN
+                                        {: return new Symbol( IROperandFactory.INSTANCE.createRange(b, e, isExclusive) ); :}
     ;
    
-exclusive_range
-    =   operand.b EXCLUSIVE operand.e   {: return new Symbol( IROperandFactory.INSTANCE.createExclusiveRange(b, e) ); :}
-    ;
-   
-inclusive_range
-    =   operand.b INCLUSIVE operand.e   {: return new Symbol( IROperandFactory.INSTANCE.createInclusiveRange(b, e) ); :}
+range_type
+    =   EXCLUSIVE                       {: return new Symbol( true ); :}
+    |   INCLUSIVE                       {: return new Symbol( false ); :}
     ;
     
 reference
@@ -366,9 +364,9 @@ variable
     
 local_variable
     =   SELF                            {: return new Symbol( IROperandFactory.INSTANCE.createSelf() ); :}
-    |   BLOCK.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location  RPAREN
+    |   BLOCK.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location RPAREN
                                         {: return new Symbol( IROperandFactory.INSTANCE.createLocalVariable(id, scopeDepth, location) ); :}
-    |   LT ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location  RPAREN GT // not implemented!    
+    |   LT ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location RPAREN GT // not implemented!    
                                         {: return new Symbol( IROperandFactory.INSTANCE.createClosureLocalVariable(id, scopeDepth, location) ); :}
     |   ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location RPAREN 
                                         {: return new Symbol( IROperandFactory.INSTANCE.createLocalVariable(id, scopeDepth, location) ); :}
