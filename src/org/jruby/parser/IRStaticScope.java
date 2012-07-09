@@ -11,32 +11,32 @@ import org.jruby.ir.IRScope;
 import org.jruby.lexer.yacc.ISourcePosition;
 
 public class IRStaticScope extends StaticScope {
+    private static final long serialVersionUID = 3423852552352498148L;
+
     private static final String[] NO_NAMES = new String[0];
 
-    boolean isBlock;         // Is this a block scope?
-    boolean isEval;          // Is this an eval scope?
-    boolean isBlockOrEval;
-    boolean isArgumentScope; // Is this block and argument scope of a define_method (for the purposes of zsuper).
+    private IRStaticScopeType type;
+    private boolean isBlockOrEval;
+    private boolean isArgumentScope; // Is this block and argument scope of a define_method (for the purposes of zsuper).
+    
+    private IRScope irScope; // Method/Closure that this static scope corresponds to
 
-    IRScope irScope; // Method/Closure that this static scope corresponds to
-
-    protected IRStaticScope(StaticScope enclosingScope, boolean isBlock, boolean isEval) {
-        this(enclosingScope, NO_NAMES, isBlock, isEval);
+    protected IRStaticScope(IRStaticScopeType type, StaticScope enclosingScope) {
+        this(type, enclosingScope, NO_NAMES);
     }
 
-    protected IRStaticScope(StaticScope enclosingScope, String[] names, boolean isBlock, boolean isEval) {
+    protected IRStaticScope(IRStaticScopeType type, StaticScope enclosingScope, String[] names) {
         super(enclosingScope, names);
-        this.isBlock = isBlock;
-        this.isEval = isEval;
-        this.isBlockOrEval = isBlock || isEval;
-        this.isArgumentScope = !isBlockOrEval;
+        this.type = type;
         this.irScope = null;
-
+        this.isBlockOrEval = (type != IRStaticScopeType.LOCAL);
+        this.isArgumentScope = !isBlockOrEval;
+        
         if (!isBlockOrEval) setBackrefLastlineScope(true);
     }
 
     public StaticScope getLocalScope() {
-        return (isEval || !isBlock) ? this : enclosingScope.getLocalScope();
+        return (type != IRStaticScopeType.BLOCK) ? this : enclosingScope.getLocalScope();
     }
 
     public int isDefined(String name, int depth) {
@@ -70,7 +70,7 @@ public class IRStaticScope extends StaticScope {
      * @see org.jruby.parser.StaticScope#getAllNamesInScope()
      */
     public String[] getAllNamesInScope() {
-        String[] names = getVariables();
+        String[] names = getVariables();        
         if (isBlockOrEval) {
             String[] ourVariables = names;
             String[] variables = enclosingScope.getAllNamesInScope();
@@ -115,7 +115,7 @@ public class IRStaticScope extends StaticScope {
 
     public Node declare(ISourcePosition position, String name, int depth) {
         int slot = exists(name);
-
+        
         if (slot >= 0) {
             return isBlockOrEval ? new DVarNode(position, ((depth << 16) | slot), name) : new LocalVarNode(position, ((depth << 16) | slot), name);
         }
@@ -125,7 +125,7 @@ public class IRStaticScope extends StaticScope {
     
     @Override
     public String toString() {
-        return "IRStaticScope" + (isBlockOrEval ? "(BLOCK): " : "(LOCAL): ") + super.toString();
+        return "IRStaticScope(" + type + "):" + super.toString();
     }
 
     public IRScope getIRScope() {
