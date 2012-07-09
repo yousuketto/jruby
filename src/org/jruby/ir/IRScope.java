@@ -20,12 +20,10 @@ import org.jruby.ir.instructions.ReceiveSelfInstr;
 import org.jruby.ir.instructions.ResultInstr;
 import org.jruby.ir.instructions.Specializeable;
 import org.jruby.ir.instructions.ThreadPollInstr;
-import org.jruby.ir.operands.CurrentScope;
 import org.jruby.ir.operands.GlobalVariable;
 import org.jruby.ir.operands.Label;
 import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.Operand;
-import org.jruby.ir.operands.ScopeModule;
 import org.jruby.ir.operands.Self;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.Variable;
@@ -782,11 +780,11 @@ public abstract class IRScope {
         }
     }
 
-    public abstract String getScopeName();
+    public abstract IRScopeType getScopeType();
 
     @Override
     public String toString() {
-        return getScopeName() + " " + getName() + "[" + getFileName() + ":" + getLineNumber() + "]";
+        return getScopeType() + " " + getName() + "[" + getFileName() + ":" + getLineNumber() + "]";
     }    
 
     public String toStringInstrs() {
@@ -814,14 +812,16 @@ public abstract class IRScope {
     public String toPersistableString() {
         StringBuilder b = new StringBuilder();
 
-        b.append("Scope:<");
-        b.append(name);
-        b.append(">");
-        for (Instr instr : instrList) {
-            b.append("\n");
-            b.append(instr);
+        b.append("Scope(").append(getScopeType()).append(", ").append(lineNumber);
+        b.append("):<").append(name).append(">");
+        if (lexicalParent != null) {
+            b.append("\n").append("LexicalParent:<").append(lexicalParent.getName()).append(">");
         }
-        
+        b.append("\n").append(staticScope);
+        for (Instr instr : instrList) {
+            b.append("\n").append(instr);
+        }
+
         return b.toString();
     }
 
@@ -1254,3 +1254,4 @@ public abstract class IRScope {
         return false;
     }
 }
+

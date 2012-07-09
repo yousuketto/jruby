@@ -136,8 +136,9 @@ public class IRClosure extends IRScope {
         return getNewLabel("CL" + closureId + "_LBL");
     }
 
-    public String getScopeName() {
-        return "Closure";
+    @Override
+    public IRScopeType getScopeType() {
+        return IRScopeType.CLOSURE;
     }
 
     @Override

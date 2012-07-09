@@ -30,8 +30,8 @@ public class IRModuleBody extends IRScope {
         version = CodeVersion.getClassVersionToken();
     }
 
-    public String getScopeName() {
-        return "ModuleBody";
+    public IRScopeType getScopeType() {
+        return IRScopeType.MODULE_BODY;
     }
 
     public CodeVersion getVersion() {
