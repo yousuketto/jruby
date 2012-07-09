@@ -63,7 +63,7 @@ public class SearchConstInstr extends Instr implements ResultInstr {
 
     @Override
     public String toString() { 
-        return super.toString() + "(" + constName + ", " + startingScope + ", no-private-consts=" + noPrivateConsts + ")";
+        return super.toString() + "(" + constName + ", " + startingScope + ", " + noPrivateConsts + ")";
     }
 
     private Object cache(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Ruby runtime) {

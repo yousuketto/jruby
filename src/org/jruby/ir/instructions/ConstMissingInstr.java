@@ -14,6 +14,7 @@ import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
+import java.util.Arrays;
 import java.util.Map;
 
 public class ConstMissingInstr extends CallInstr implements ResultInstr {
@@ -50,7 +51,8 @@ public class ConstMissingInstr extends CallInstr implements ResultInstr {
 
     @Override
     public String toString() { 
-        return super.toString() + "(" + receiver + "," + missingConst  + ")";
+        return getOperation()  + "(" + getMethodAddr() + ", " + receiver +
+                ", " + Arrays.toString(getCallArgs()) + "," + missingConst  + ")";
     }
 
     @Override
