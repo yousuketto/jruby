@@ -1,5 +1,7 @@
 package org.jruby.ir.instructions;
 
+import java.util.Map;
+
 import org.jruby.RubyModule;
 import org.jruby.ir.IRVisitor;
 import org.jruby.ir.Operation;
@@ -13,9 +15,6 @@ import org.jruby.runtime.CallType;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
-
-import java.util.Arrays;
-import java.util.Map;
 
 public class ConstMissingInstr extends CallInstr implements ResultInstr {
     private String missingConst;
@@ -51,8 +50,7 @@ public class ConstMissingInstr extends CallInstr implements ResultInstr {
 
     @Override
     public String toString() { 
-        return getOperation()  + "(" + getMethodAddr() + ", " + receiver +
-                ", " + Arrays.toString(getCallArgs()) + "," + missingConst  + ")";
+        return result + " = " + getOperation()  + "(" + receiver + ", " + missingConst  + ")";
     }
 
     @Override
