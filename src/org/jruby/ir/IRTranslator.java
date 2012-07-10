@@ -8,6 +8,8 @@ import org.jruby.ast.Node;
 import org.jruby.ast.RootNode;
 import org.jruby.ir.persistence.IRPersistenceException;
 import org.jruby.ir.persistence.IRPersistenceFacade;
+import org.perf4j.LoggingStopWatch;
+import org.perf4j.StopWatch;
 
 /**
  * Abstract class that contains general logic for both IR Compiler and IR
@@ -26,13 +28,17 @@ public abstract class IRTranslator<R, S> {
 
             IRScope producedIRScope = null;
             if (isIRPersistenceRequired()) {
+                StopWatch interpretWatch = new LoggingStopWatch("interpreting");
                 producedIRScope = produceIrScope(runtime, node, true);
+                interpretWatch.stop();
                 IRPersistenceFacade.persist(producedIRScope, runtime);
             } else if (isIRReadingRequired()) {
 
+                StopWatch readWatch = new LoggingStopWatch("reading");
                 List<IRScope> scopes = IRPersistenceFacade.read(runtime);
+                readWatch.stop();
                 for (IRScope irScope : scopes) {
-                    System.out.println(irScope.toPersistableString()+"\n");
+                    //System.out.println(irScope.toPersistableString()+"\n");
                 }
                 return result;
             } else {
