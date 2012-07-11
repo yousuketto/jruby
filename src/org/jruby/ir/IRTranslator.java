@@ -28,13 +28,13 @@ public abstract class IRTranslator<R, S> {
 
             IRScope producedIRScope = null;
             if (isIRPersistenceRequired()) {
-                StopWatch interpretWatch = new LoggingStopWatch("interpreting");
+                StopWatch interpretWatch = new LoggingStopWatch("AST -> IR");
                 producedIRScope = produceIrScope(runtime, node, true);
                 interpretWatch.stop();
                 IRPersistenceFacade.persist(producedIRScope, runtime);
             } else if (isIRReadingRequired()) {
 
-                StopWatch readWatch = new LoggingStopWatch("reading");
+                StopWatch readWatch = new LoggingStopWatch(".ir -> IR");
                 List<IRScope> scopes = IRPersistenceFacade.read(runtime);
                 readWatch.stop();
                 for (IRScope irScope : scopes) {

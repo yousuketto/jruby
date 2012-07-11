@@ -158,6 +158,8 @@ import org.jruby.util.io.SelectorPool;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 import org.jruby.util.unsafe.UnsafeFactory;
+import org.perf4j.LoggingStopWatch;
+import org.perf4j.StopWatch;
 
 /**
  * The Ruby object represents the top-level of a JRuby "instance" in a given VM.
@@ -484,7 +486,7 @@ public final class Ruby {
         String oldFile = context.getFile();
         int oldLine = context.getLine();
         try {
-            context.setFileAndLine(scriptNode.getPosition());
+            if(scriptNode != null) context.setFileAndLine(scriptNode.getPosition());
 
             if (config.isAssumePrinting() || config.isAssumeLoop()) {
                 runWithGetsLoop(scriptNode, config.isAssumePrinting(), config.isProcessLineEnds(),
@@ -2401,15 +2403,30 @@ public final class Ruby {
     }
 
     public Node parseFile(InputStream in, String file, DynamicScope scope, int lineNumber) {
-        if (parserStats != null) parserStats.addLoadParse();
-        return parser.parse(file, in, scope, new ParserConfiguration(this,
-                lineNumber, false, false, true, config));
+        if(!RubyInstanceConfig.IR_READING) {
+            if (parserStats != null) parserStats.addLoadParse();
+            StopWatch astWatch = new LoggingStopWatch("rb -> AST");
+            Node result = parser.parse(file, in, scope, new ParserConfiguration(this,
+                    lineNumber, false, false, true, config));
+            astWatch.stop();
+            return result;
+        } else {
+            return null;
+        }
+        
     }
 
     public Node parseFileFromMain(InputStream in, String file, DynamicScope scope) {
-        if (parserStats != null) parserStats.addLoadParse();
-        return parser.parse(file, in, scope, new ParserConfiguration(this,
-                0, false, false, true, true, config));
+        if(!RubyInstanceConfig.IR_READING) {
+            if (parserStats != null) parserStats.addLoadParse();
+            StopWatch astWatch = new LoggingStopWatch("rb -> AST");
+            Node result= parser.parse(file, in, scope, new ParserConfiguration(this,
+                    0, false, false, true, true, config));
+            astWatch.stop();
+            return result;
+        } else {
+            return null;
+        }
     }
     
     public Node parseFile(InputStream in, String file, DynamicScope scope) {
@@ -2417,17 +2434,33 @@ public final class Ruby {
     }
 
     public Node parseInline(InputStream in, String file, DynamicScope scope) {
-        if (parserStats != null) parserStats.addEvalParse();
-        ParserConfiguration parserConfig =
-                new ParserConfiguration(this, 0, false, true, false, config);
-        if (is1_9) parserConfig.setDefaultEncoding(getEncodingService().getLocaleEncoding());
-        return parser.parse(file, in, scope, parserConfig);
+        if (!RubyInstanceConfig.IR_READING) {
+            if (parserStats != null)
+                parserStats.addEvalParse();
+            ParserConfiguration parserConfig = new ParserConfiguration(this, 0, false, true, false,
+                    config);
+            if (is1_9)
+                parserConfig.setDefaultEncoding(getEncodingService().getLocaleEncoding());
+            StopWatch astWatch = new LoggingStopWatch("rb -> AST");
+            Node result = parser.parse(file, in, scope, parserConfig);
+            astWatch.stop();
+            return result;
+        } else {
+            return null;
+        }
     }
 
     public Node parseEval(String content, String file, DynamicScope scope, int lineNumber) {
-        if (parserStats != null) parserStats.addEvalParse();
-        return parser.parse(file, content.getBytes(), scope, new ParserConfiguration(this,
-                lineNumber, false, false, false, false, config));
+        if(!RubyInstanceConfig.IR_READING) {
+            if (parserStats != null) parserStats.addEvalParse();
+            StopWatch astWatch = new LoggingStopWatch("rb -> AST");
+            Node result = parser.parse(file, content.getBytes(), scope, new ParserConfiguration(this,
+                    lineNumber, false, false, false, false, config));
+            astWatch.stop();
+            return result;
+        } else {
+            return null;
+        }
     }
 
     @Deprecated
@@ -2438,16 +2471,31 @@ public final class Ruby {
     }
     
     public Node parseEval(ByteList content, String file, DynamicScope scope, int lineNumber) {
-        if (parserStats != null) parserStats.addEvalParse();
-        return parser.parse(file, content, scope, new ParserConfiguration(this,
-                lineNumber, false, false, false, config));
+        if(!RubyInstanceConfig.IR_READING) {
+            if (parserStats != null) parserStats.addEvalParse();
+            StopWatch astWatch = new LoggingStopWatch("rb -> AST");
+            Node result = parser.parse(file, content, scope, new ParserConfiguration(this,
+                   lineNumber, false, false, false, config));
+            astWatch.stop();
+            return result;
+        } else {
+            return null;
+        }
     }
-
+    
     public Node parse(ByteList content, String file, DynamicScope scope, int lineNumber, 
             boolean extraPositionInformation) {
-        if (parserStats != null) parserStats.addJRubyModuleParse();
-        return parser.parse(file, content, scope, new ParserConfiguration(this,
+        if(!RubyInstanceConfig.IR_READING) {
+            if (parserStats != null) parserStats.addJRubyModuleParse();
+            StopWatch astWatch = new LoggingStopWatch("rb -> AST");
+            Node result = parser.parse(file, content, scope, new ParserConfiguration(this,
                 lineNumber, extraPositionInformation, false, true, config));
+            astWatch.stop();
+            return result;
+        } else {
+            return null;
+        }
+        
     }
 
 
@@ -2563,7 +2611,6 @@ public final class Ruby {
 
             ThreadContext.pushBacktrace(context, "(root)", file, 0);
             context.preNodeEval(objectClass, self, scriptName);
-
             Node node = parseFile(in, scriptName, null);
             if (wrap) {
                 // toss an anonymous module into the search path
