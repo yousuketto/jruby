@@ -11,21 +11,16 @@ public enum IRFileExpert {
     private static final String IR_FOLDER = "ir";
     private static final String EXTENSION_SEPARATOR = ".";
 
-    public File getIRFileInIntendedPlace(RubyInstanceConfig config) {
+    public File getIRFileInIntendedPlace(RubyInstanceConfig config, String fileName) {
         // Place ir files inside ir folder under current directory
         File parentDir = new File(config.getCurrentDirectory());
-        String rbFileName = config.displayedFileName();
 
-        return getIrFile(parentDir, rbFileName);
+        return getIrFile(parentDir, fileName);
     }
 
     public boolean isIrFileName(String name) {
         // FIXME: primitive check by extension
         return name.endsWith(IR_FILE_EXTENSION);
-    }
-    
-    public boolean isIrFileForRbFileFound(RubyInstanceConfig config) {
-        return getIRFileInIntendedPlace(config).exists();
     }
 
     private File getIrFile(File parentDir, String fileName) {

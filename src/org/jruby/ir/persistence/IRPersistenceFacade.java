@@ -19,32 +19,12 @@ import org.jruby.ir.persistence.util.IRFileExpert;
 // This class currently contains code that will be decoupled later on
 public class IRPersistenceFacade {
 
-    public static boolean isPersistedIrExecution(Ruby runtime) {
-        RubyInstanceConfig config = runtime.getInstanceConfig();
-        String fileName = config.displayedFileName();
-        boolean isIrFileName = IRFileExpert.INSTANCE.isIrFileName(fileName);
-        return isIrFileName || IRFileExpert.INSTANCE.isIrFileForRbFileFound(config);
-    }
-
     public static void persist(IRScope irScopeToPersist, Ruby runtime)
             throws IRPersistenceException {
         try {
             RubyInstanceConfig config = runtime.getInstanceConfig();
-            File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config);
-
-            StringBuilder instructions = new StringBuilder();
-            getIstructionsFromThisAndDescendantScopes(irScopeToPersist, instructions);
-            FileIO.INSTANCE.writeToFile(irFile, instructions.toString());
-        } catch (Exception e) {
-            throw new IRPersistenceException(e);
-        }
-
-    }
-    
-    public static void persist(IRScope irScopeToPersist, String fileName)
-            throws IRPersistenceException {
-        try {
-            File irFile = new File(fileName);
+            String rbFileName = IRReadingContext.INSTANCE.getFileName();
+            File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config, rbFileName);
 
             StringBuilder instructions = new StringBuilder();
             getIstructionsFromThisAndDescendantScopes(irScopeToPersist, instructions);
@@ -68,7 +48,8 @@ public class IRPersistenceFacade {
     public static List<IRScope> read(Ruby runtime) throws IRPersistenceException {
         IRParsingContext.INSTANCE.setRuntime(runtime);
         RubyInstanceConfig config = runtime.getInstanceConfig();
-        File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config);
+        String irFileName = IRReadingContext.INSTANCE.getFileName();
+        File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config, irFileName);
         try {
             String fileContent = FileIO.INSTANCE.readFile(irFile);
             InputStream is = null;

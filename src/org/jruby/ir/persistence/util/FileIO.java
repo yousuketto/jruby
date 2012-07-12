@@ -31,13 +31,13 @@ public enum FileIO {
     }
 
     public void writeToFile(File file, String containment) throws IOException {
-        FileOutputStream fileOutputStream = new FileOutputStream(file, true);
+        FileOutputStream fileOutputStream = new FileOutputStream(file);
         writeToFileCommon(containment, fileOutputStream);
     }
 
     public void writeToFile(String fileName, String containment) throws IOException {
         File file = new File(fileName);
-        FileOutputStream fileOutputStream = new FileOutputStream(file, true);
+        FileOutputStream fileOutputStream = new FileOutputStream(file);
         writeToFileCommon(containment, fileOutputStream);
     }
 
