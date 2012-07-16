@@ -5,7 +5,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
+import java.util.Collection;
 
 import org.jruby.Ruby;
 import org.jruby.RubyInstanceConfig;
@@ -26,26 +26,36 @@ public class IRPersistenceFacade {
             String rbFileName = IRReadingContext.INSTANCE.getFileName();
             File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config, rbFileName);
 
-            StringBuilder instructions = new StringBuilder();
-            getIstructionsFromThisAndDescendantScopes(irScopeToPersist, instructions);
-            FileIO.INSTANCE.writeToFile(irFile, instructions.toString());
+            StringBuilder builder = new StringBuilder();
+            getScopeInfoFromThisAndDescendantScopes(irScopeToPersist, builder);
+            builder.append("\n");
+            getIstructionsFromThisAndDescendantScopes(irScopeToPersist, builder);
+            FileIO.INSTANCE.writeToFile(irFile, builder.toString());
         } catch (Exception e) {
             throw new IRPersistenceException(e);
         }
 
     }
 
-    private static void getIstructionsFromThisAndDescendantScopes(IRScope irScopeToPersist,
-            StringBuilder instructions) {
-        instructions.append(irScopeToPersist.toPersistableString());
-        instructions.append("\n\n");
+    private static void getScopeInfoFromThisAndDescendantScopes(IRScope irScopeToPersist,
+            StringBuilder builder) {
+        builder.append(irScopeToPersist.persistableGeneralInfo());
         for (IRScope irScope : irScopeToPersist.getLexicalScopes()) {
-            getIstructionsFromThisAndDescendantScopes(irScope, instructions);
+            getScopeInfoFromThisAndDescendantScopes(irScope, builder);
+        }
+    }
+
+    private static void getIstructionsFromThisAndDescendantScopes(IRScope irScopeToPersist,
+            StringBuilder builder) {
+        builder.append(irScopeToPersist.persistableInstrsInfo()).append("\n");
+        for (IRScope irScope : irScopeToPersist.getLexicalScopes()) {
+            getIstructionsFromThisAndDescendantScopes(irScope, builder);
         }
     }
 
     @SuppressWarnings("unchecked")
-    public static List<IRScope> read(Ruby runtime) throws IRPersistenceException {
+    public static Collection<IRScope> read(Ruby runtime) throws IRPersistenceException {
+        IRParsingContext.INSTANCE.newFileStarted();
         IRParsingContext.INSTANCE.setRuntime(runtime);
         RubyInstanceConfig config = runtime.getInstanceConfig();
         String irFileName = IRReadingContext.INSTANCE.getFileName();
@@ -56,7 +66,7 @@ public class IRPersistenceFacade {
             try {
                 is = new ByteArrayInputStream(fileContent.getBytes(FileIO.CHARSET));
                 PersistedIRScanner input = new PersistedIRScanner(is);
-                return (List<IRScope>) new PersistedIRParser().parse(input);
+                return (Collection<IRScope>) new PersistedIRParser().parse(input);
             } finally {
                 if (is != null) {
                     is.close();

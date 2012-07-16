@@ -1,9 +1,6 @@
 package org.jruby.ir;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
+import java.util.Collection;
 
 import org.jruby.Ruby;
 import org.jruby.RubyInstanceConfig;
@@ -37,12 +34,15 @@ public abstract class IRTranslator<R, S> {
                 IRPersistenceFacade.persist(producedIRScope, runtime);
             } else if (isIRReadingRequired()) {
                 StopWatch readWatch = new LoggingStopWatch(".ir -> IR");    
-                List<IRScope> allScopes = IRPersistenceFacade.read(runtime);
+                Collection<IRScope> allScopes = IRPersistenceFacade.read(runtime);
                 readWatch.stop();
                 
-                for(IRScope currentScope : allScopes) {
-                    //System.out.print(currentScope.toPersistableString() + "\n");
-                }
+//                for(IRScope currentScope : allScopes) {
+//                    System.out.print(currentScope.persistableGeneralInfo());
+//                }                
+//                for(IRScope currentScope : allScopes) {
+//                    System.out.print(currentScope.persistableInstrsInfo() + "\n");
+//                }
             } else {
                 producedIRScope = produceIrScope(runtime, node, false);
                 result = translationSpecificLogic(runtime, producedIRScope, specificObject);
