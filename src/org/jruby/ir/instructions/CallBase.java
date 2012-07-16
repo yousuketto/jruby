@@ -285,9 +285,13 @@ public abstract class CallBase extends Instr implements Specializeable {
 
     @Override
     public String toString() {
-        return "" + getOperation()  + "(" + callType + ", " + getMethodAddr() + ", " + receiver +
+        return super.toString()  + "(" + (needToPersistCallType() ? callType + ", " : "") + methAddr + ", " + receiver +
                 ", " + Arrays.toString(getCallArgs()) +
                 (closure == null ? "" : ", &" + closure) + ")";
+    }
+    
+    protected boolean needToPersistCallType() {
+        return true;
     }
 
     protected static boolean containsSplat(Operand[] arguments) {
