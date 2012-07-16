@@ -401,8 +401,7 @@ public abstract class StaticScope implements Serializable {
     }
 
     @Override
-    public String toString() {
-        // FIXME: Do we need to persist cref as well?            
+    public String toString() {           
         return Arrays.toString(variableNames);
     }
 }
