@@ -98,7 +98,7 @@ public abstract class CallBase extends Instr implements Specializeable {
     private static CallSite getCallSiteFor(CallType callType, MethAddr methAddr) {
         assert callType != null: "Calltype should never be null";
         
-        String name = methAddr.toString();
+        String name = methAddr.getName();
         
         switch (callType) {
             case NORMAL: return MethodIndex.getCallSite(name);
@@ -285,12 +285,19 @@ public abstract class CallBase extends Instr implements Specializeable {
 
     @Override
     public String toString() {
-        return super.toString()  + "(" + (needToPersistCallType() ? callType + ", " : "") + methAddr + ", " + receiver +
-                ", " + Arrays.toString(getCallArgs()) +
-                (closure == null ? "" : ", &" + closure) + ")";
+        return super.toString()  + "(" + (needToPersistCallType() ? callType + ", " : "") + (needToPersistMethAddr() ?methAddr + ", " : "") + receiver +
+                ", " + (needToPersistCallArgs() ? Arrays.toString(getCallArgs()) + ", " : "") + closure + ")";
     }
     
     protected boolean needToPersistCallType() {
+        return true;
+    }
+    
+    protected boolean needToPersistMethAddr() {
+        return true;
+    }
+    
+    protected boolean needToPersistCallArgs() {
         return true;
     }
 
