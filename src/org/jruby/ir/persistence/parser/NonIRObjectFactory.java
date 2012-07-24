@@ -1,5 +1,6 @@
 package org.jruby.ir.persistence.parser;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -179,7 +180,7 @@ public enum NonIRObjectFactory {
         KCode kCode = KCode.valueOf(kcodeString);
 
         if (options != null) {
-            List<String> optionList = Arrays.asList(options);
+            List<String> optionList = new ArrayList<String>(Arrays.asList(options));
 
             boolean isKCodeDefault = false;
             if (optionList.contains("kcodeDefault")) {

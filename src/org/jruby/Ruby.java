@@ -108,6 +108,7 @@ import org.jruby.ir.Compiler;
 import org.jruby.ir.IRManager;
 import org.jruby.ir.interpreter.Interpreter;
 import org.jruby.ir.persistence.IRReadingContext;
+import org.jruby.ir.persistence.util.IRFileExpert;
 import org.jruby.javasupport.JavaSupport;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
@@ -478,13 +479,15 @@ public final class Ruby {
         }
         
         Node scriptNode = null;
-        if(!RubyInstanceConfig.IR_READING) {
+        if(!RubyInstanceConfig.IR_READING || !IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config, filename).isFile()) {
             StopWatch astWatch = new LoggingStopWatch("rb -> AST");
             scriptNode = parseFromMain(inputStream, filename);
             astWatch.stop();
-        } 
-
-        if(RubyInstanceConfig.IR_PERSISTENCE || RubyInstanceConfig.IR_READING){
+            
+           // if(RubyInstanceConfig.IR_PERSISTENCE){
+                IRReadingContext.INSTANCE.setFileName(filename);
+           // }
+        } else {
             IRReadingContext.INSTANCE.setFileName(filename);
         }
         
@@ -2577,7 +2580,8 @@ public final class Ruby {
             ThreadContext.pushBacktrace(context, "(root)", file, 0);
             context.preNodeEval(objectClass, self, scriptName);
             Node node = null;
-            if(!RubyInstanceConfig.IR_READING) {
+            
+            if(!RubyInstanceConfig.IR_READING || !IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config, scriptName).isFile()) {
                 StopWatch astWatch = new LoggingStopWatch("rb -> AST");
                 node = parseFile(in, scriptName, null);
                 astWatch.stop();
@@ -2585,9 +2589,11 @@ public final class Ruby {
                     // toss an anonymous module into the search path
                     ((RootNode)node).getStaticScope().setModule(RubyModule.newModule(this));
                 }
-            } 
-            
-            if(RubyInstanceConfig.IR_PERSISTENCE || RubyInstanceConfig.IR_READING){
+                
+                //if(RubyInstanceConfig.IR_PERSISTENCE){
+                    IRReadingContext.INSTANCE.setFileName(scriptName);
+                //}
+            } else {
                 IRReadingContext.INSTANCE.setFileName(scriptName);
             }
             

@@ -68,7 +68,7 @@ FLit3 = [0-9]+
 Exponent = [eE][+-]?[0-9]+
 
 /* String */
-StringCharacter = [^\"\\\"]
+StringCharacter = [^\"]
 SymbolCharacter = [^\']
 
 InsideChevrons = [^<>] 
@@ -103,10 +103,10 @@ InsideChevrons = [^<>]
     "IRStaticScope"                              { return token(Terminals.STATIC_SCOPE); }
 
     /* operand markers */
+    "ArgsCat:"                                   { return token(Terminals.ARGS_CAT_MARKER); }
+    "ArgsPush:"                                  { return token(Terminals.ARGS_PUSH_MARKER); }
     "Array:"                                     { return token(Terminals.ARRAY_MARKER); }
     "Bignum:"                                    { return token(Terminals.BIGNUM_MARKER); }
-    "ArgsPush:"                                  { return token(Terminals.ARGS_PUSH_MARKER); }
-    "ArgsCat:"                                   { return token(Terminals.ARGS_CAT_MARKER); }
     "CompoundString:"                            { return token(Terminals.COMPOUND_STRING_MARKER); }
     "scope"                                      { yybegin(INSIDE_CHEVRONS); return token(Terminals.SCOPE_MARKER); }
     "Fixnum:"                                    { return token(Terminals.FIXNUM_MARKER); }
@@ -116,6 +116,7 @@ InsideChevrons = [^<>]
     "RegexpOptions"                              { return token(Terminals.REGEXP_OPTIONS_MARKER); }
     "module"                                     { yybegin(INSIDE_CHEVRONS); return token(Terminals.MODULE_MARKER); }
     "SValue:"                                    { return token(Terminals.SVALUE_MARKER); }
+    "WrappedIRClosure:"                          { return token(Terminals.WRAPPED_IR_CLOSURE_MARKER); }
     
     /* special cases */
     "-unknown-super-target-"                     { return token(Terminals.UNKNOWN_SUPER_TARGET); } 
@@ -136,6 +137,8 @@ InsideChevrons = [^<>]
     "false"                                      { return token(Terminals.FALSE); }
     
     "kcode:"                                     { return token(Terminals.KCODE_MARKER); }
+    
+    "null"                                       { return token(Terminals.NULL); }
     
     {Identifier}                                 { return token(Terminals.ID); }
     
@@ -168,7 +171,7 @@ InsideChevrons = [^<>]
 
 <STRING> {
     \"                                           { return finishStringAs(Terminals.STRING_LITERAL); }
-    "\\\""                                       { string.append("\""); }
+    \\\"                                         { string.append("\""); }
 
     {StringCharacter}+                           { appendToString(); }
 }

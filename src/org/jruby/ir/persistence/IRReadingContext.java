@@ -3,14 +3,14 @@ package org.jruby.ir.persistence;
 public enum IRReadingContext {
     INSTANCE;
     
-    private String fileName;
+    private ThreadLocal<String> fileNameLocal = new ThreadLocal<String>();
 
     public void setFileName(String fileName) {
-        this.fileName = fileName;
+        fileNameLocal.set(fileName);
     }
     
     public String getFileName() {
-        return fileName;
+        return fileNameLocal.get();
     }
 
 }
