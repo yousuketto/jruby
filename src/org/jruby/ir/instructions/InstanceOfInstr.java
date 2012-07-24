@@ -53,7 +53,7 @@ public class InstanceOfInstr extends Instr implements ResultInstr {
 
     @Override 
     public String toString() {
-        return (isDead() ? "[DEAD]" : "") + (result + " = ") + getOperation() + "(" + object + ", " + className + ")";
+        return super.toString() + "(" + object + ", " + className + ")";
     }
 
     @Override
