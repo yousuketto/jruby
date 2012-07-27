@@ -62,7 +62,7 @@ FixnumLiteral = 0 | [+-]?[1-9][0-9]*
 FloatLiteral = [+-]?({FLit1}|{FLit2}|{FLit3}) {Exponent}?
 
 /* Float elements */
-FLit1 = [0-9]+ \. [0-9]*
+FLit1 = [0-9]+ \. [0-9]+
 FLit2 = \. [0-9]+
 FLit3 = [0-9]+
 Exponent = [eE][+-]?[0-9]+
@@ -72,6 +72,12 @@ StringCharacter = [^\"]
 SymbolCharacter = [^\']
 
 InsideChevrons = [^<>] 
+
+SimpleLabel = ((CL|EV)[0-9]+_)?LBL_[0-9]+
+
+ComplexLabel = ({ClosureLabelBeginning}|{LoopLabelBeginning})_[0-9]+
+ClosureLabelBeginning = _(FOR_LOOP|CLOSURE|EVAL)_(START|END)
+LoopLabelBeginning = _(LOOP|ITER)_(BEGIN|END)
 
 %state STRING, SYMBOL, SCOPE, INSIDE_CHEVRONS
 
@@ -101,6 +107,7 @@ InsideChevrons = [^<>]
     "LexicalParent:"                             { yybegin(INSIDE_CHEVRONS); return token(Terminals.LEXICAL_PARENT_MARKER); }
     /* IRStaticScope */
     "IRStaticScope"                              { return token(Terminals.STATIC_SCOPE); }
+    "SpecificInfo:"                              { return token(Terminals.SPECIFIC_INFO_MARKER); }
 
     /* operand markers */
     "ArgsCat:"                                   { return token(Terminals.ARGS_CAT_MARKER); }
@@ -140,11 +147,16 @@ InsideChevrons = [^<>]
     
     "null"                                       { return token(Terminals.NULL); }
     
+    /* labels */
+    "_GLOBAL_ENSURE_BLOCK"                       { return token(Terminals.ENSURE_BLOCK_LABEL); }
+    {SimpleLabel}                                { return token(Terminals.LABEL); }
+    {ComplexLabel}                               { return token(Terminals.COMPLEX_LABEL); }
+    
     {Identifier}                                 { return token(Terminals.ID); }
     
     /* range type markers */
-    ".."                                         { return token(Terminals.EXCLUSIVE); }
     "..."                                        { return token(Terminals.INCLUSIVE); }
+    ".."                                         { return token(Terminals.EXCLUSIVE); }
     
     /* separators */
     "|"                                          { return token(Terminals.BAR); }
