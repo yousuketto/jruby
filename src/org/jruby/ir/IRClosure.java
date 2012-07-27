@@ -44,6 +44,8 @@ public class IRClosure extends IRScope {
 
     /** The parameter names, for Proc#parameters */
     private String[] parameterList;
+    private Arity arity;
+    private int argumentType;
 
     /** Used by cloning code */
     private IRClosure(IRClosure c, IRScope lexicalParent) {
@@ -52,8 +54,12 @@ public class IRClosure extends IRScope {
         setName("_CLOSURE_CLONE_" + closureId);
         this.startLabel = getNewLabel(getName() + "_START");
         this.endLabel = getNewLabel(getName() + "_END");
-        this.body = (c.body instanceof InterpretedIRBlockBody19) ? new InterpretedIRBlockBody19(this, c.body.arity(), c.body.getArgumentType())
-                                                                 : new InterpretedIRBlockBody(this, c.body.arity(), c.body.getArgumentType());
+        this.isForLoopBody = c.isForLoopBody;
+        this.argumentType = c.argumentType;
+        this.arity = c.arity;
+        
+        this.body = (c.body instanceof InterpretedIRBlockBody19) ? new InterpretedIRBlockBody19(this, arity, argumentType)
+                                                                 : new InterpretedIRBlockBody(this, arity, argumentType);
     }
 
     public IRClosure(IRManager manager, IRScope lexicalParent, boolean isForLoopBody,
@@ -61,6 +67,8 @@ public class IRClosure extends IRScope {
         this(manager, lexicalParent, lexicalParent.getFileName(), lineNumber, staticScope, isForLoopBody ? "_FOR_LOOP_" : "_CLOSURE_");
         this.isForLoopBody = isForLoopBody;
         this.blockArgs = new ArrayList<Operand>();
+        this.argumentType = argumentType;
+        this.arity = arity;
         
         if (getManager().isDryRun()) {
             this.body = null;
@@ -69,15 +77,11 @@ public class IRClosure extends IRScope {
                               : new InterpretedIRBlockBody(this, arity, argumentType);
             if ((staticScope != null) && !isForLoopBody) ((IRStaticScope)staticScope).setIRScope(this);
         }
-
-        // set nesting depth -- after isForLoopBody value is set
-        int n = 0;
-        IRScope s = this;
-        while (s instanceof IRClosure) {
-            if (!s.isForLoopBody()) n++;
-            s = s.getLexicalParent();
+        
+        // increase nesting depth if needed after isForLoopBody value is set
+        if(!isForLoopBody) {
+            this.nestingDepth++;
         }
-        this.nestingDepth = n;
     }
 
     // Used by IREvalScript
@@ -94,7 +98,7 @@ public class IRClosure extends IRScope {
 
         // set nesting depth
         int n = 0;
-        IRScope s = this;
+        IRScope s = this.getLexicalParent();
         while (s instanceof IRClosure) {
             if (!s.isForLoopBody()) n++;
             s = s.getLexicalParent();
@@ -268,5 +272,12 @@ public class IRClosure extends IRScope {
         clonedClosure.setCFG(getCFG().cloneForCloningClosure(clonedClosure, ii));
 
         return clonedClosure;
+    }
+    
+    @Override
+    public String getPersistableGeneralInfo() {
+        
+        return super.getPersistableGeneralInfo() +
+        "SpecificInfo:(" + isForLoopBody + ", " + arity.getValue() + ", " +argumentType + ")" + "\n";
     }
 }

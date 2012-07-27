@@ -21,7 +21,7 @@ public class ReturnInstr extends ReturnBase {
 
     @Override
     public String toString() { 
-        return getOperation() + "(" + returnValue + (methodToReturnFrom == null ? "" : ", <" + methodToReturnFrom.getName() + ">") + ")";
+        return getOperation() + "(" + returnValue + (methodToReturnFrom == null ? "" : ", " + methodToReturnFrom.getName()) + ")";
     }
 
     @Override
