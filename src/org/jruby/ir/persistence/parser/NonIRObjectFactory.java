@@ -47,6 +47,8 @@ import org.jruby.RubyLocalJumpError.Reason;
 import org.jruby.ir.IRScopeType;
 import org.jruby.ir.Operation;
 import org.jruby.ir.operands.IRException;
+import org.jruby.lexer.yacc.ISourcePosition;
+import org.jruby.lexer.yacc.SimpleSourcePosition;
 import org.jruby.parser.IRStaticScopeType;
 import org.jruby.util.KCode;
 import org.jruby.util.RegexpOptions;
@@ -62,8 +64,20 @@ public enum NonIRObjectFactory {
         return IRScopeType.valueOf(type);        
     }
     
+    public ISourcePosition createSourcePosition(String fileName, int line) {
+        return new SimpleSourcePosition(fileName, line);
+    }
+    
     public IRStaticScopeType createStaticScopeType(String type) {
         return IRStaticScopeType.valueOf(type);        
+    }
+    
+    public boolean createBoolean(String booleanStringValue) {
+        return Boolean.parseBoolean(booleanStringValue);
+    }
+    
+    public Integer createInteger(String value) {
+        return Integer.valueOf(value);
     }
     
     public IRException createIRException(String type) {

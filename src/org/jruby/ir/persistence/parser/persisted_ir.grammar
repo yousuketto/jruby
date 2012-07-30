@@ -23,11 +23,11 @@
 
 %class "PersistedIRParser";
 
-%terminals STRING_LITERAL, SYMBOL_LITERAL, ID, STRING, FIXNUM, FLOAT;
+%terminals BOOLEAN, STRING_LITERAL, SYMBOL_LITERAL, ID, STRING, FIXNUM, FLOAT, NIL;
 %terminals EOLN;
 %terminals EQ;
 %terminals DOT, COMMA, LBRACE, RBRACE, LPAREN, RPAREN, GT, LT, LBRACK, RBRACK;
-%terminals ARRAY_MARKER, ARGS_PUSH_MARKER, ARGS_CAT_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER, IREXCEPTION_MARKER, SVALUE_MARKER, WRAPPED_IR_CLOSURE_MARKER;
+%terminals ARRAY_MARKER, ARGS_PUSH_MARKER, ARGS_CAT_MARKER, BOOLEAN_MARKER, BIGNUM_MARKER, COMPOUND_STRING_MARKER, FIXNUM_MARKER, FLOAT_MARKER, IREXCEPTION_MARKER, SVALUE_MARKER, WRAPPED_IR_CLOSURE_MARKER;
 %terminals SCOPE, LEXICAL_PARENT_MARKER, STATIC_SCOPE, SPECIFIC_INFO_MARKER;
 %terminals SCOPE_MARKER, MODULE_MARKER;
 %terminals ASTERISK, GTE, BACKTICK, COLON, DOLLAR, HASH, PERCENT;
@@ -42,10 +42,9 @@
 
 // Special types of operands
 %terminals UNKNOWN_SUPER_TARGET, OBJECT_CLASS, SELF, BLOCK, STANDARD_ERROR, UNDEFINED_VALUE, UNEXECUTABLE_NIL;
-%terminals NIL, TRUE, FALSE;
 %terminals NULL;
 
-%typeof STRING_LITERAL, STRING, ID, SYMBOL_LITERAL, FIXNUM, FLOAT, BLOCK, COMPLEX_LABEL, LABEL, regexp_opt_option, specific_info_element = "String";
+%typeof STRING_LITERAL, STRING, ID, SYMBOL_LITERAL, FIXNUM, FLOAT, BOOLEAN, BLOCK, COMPLEX_LABEL, LABEL, regexp_opt_option, specific_info_element = "String";
 %typeof range_type = "Boolean";
 %typeof specific_info, specific_info_elements = "ArrayList<String>";
 %typeof param_list = "ArrayList<Object>";
@@ -130,8 +129,7 @@ specific_info_elements
     
 specific_info_element
     =    FIXNUM
-    |    TRUE
-    |    FALSE
+    |    BOOLEAN
     ;
     
 variables
@@ -217,7 +215,8 @@ param_list
     
 param
     =    operand
-    |    FIXNUM.val                     {: return new Symbol( Integer.valueOf(val) ); :}
+    |    FIXNUM.val                     {: return logic.createInteger(val); :}
+    |    BOOLEAN.bool                   {: return logic.createBoolean(bool); :}
     |    array
     |    ID
     |    NULL
@@ -323,8 +322,7 @@ immutable_literal
 	|	FLOAT_MARKER FLOAT.f            {: return logic.createFloat(f); :}
 	|	NIL                             {: return logic.createNil(); :}
 	|	UNEXECUTABLE_NIL                {: return logic.createUnexecutableNil(); :}
-	|   TRUE                            {: return logic.createTrueLiteral(); :}
-	|   FALSE                           {: return logic.createFalseLiteral(); :}
+	|   BOOLEAN_MARKER BOOLEAN.bool     {: return logic.createBooleanLiteral(bool); :}
 	;
 
 ir_exception
@@ -438,8 +436,6 @@ local_variable
     =   SELF                            {: return logic.createSelf(); :}
     |   BLOCK.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location RPAREN
                                         {: return logic.createLocalVariable(id, scopeDepth, location); :}
-    |   LT ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location RPAREN GT // not implemented!    
-                                        {: return logic.createClosureLocalVariable(id, scopeDepth, location); :}
     |   ID.id LPAREN FIXNUM.scopeDepth COLON FIXNUM.location RPAREN 
                                         {: return logic.createLocalVariable(id, scopeDepth, location); :}
     ;
@@ -450,6 +446,6 @@ temporary_variable
     ;
 
 wrapped_ir_closure
-    =    WRAPPED_IR_CLOSURE_MARKER ID.name
+    =    WRAPPED_IR_CLOSURE_MARKER LT STRING.name GT
                                         {: return logic.createWrapperIRClosure(name); :}
     ;

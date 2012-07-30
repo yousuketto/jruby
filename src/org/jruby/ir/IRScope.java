@@ -430,7 +430,7 @@ public abstract class IRScope {
         return name;
     }
 
-    public void setName(String name) { // This is for IRClosure ;(
+    public void setName(String name) { // This is for IRClosure and IRMethod ;(
         this.name = name;
     }
 

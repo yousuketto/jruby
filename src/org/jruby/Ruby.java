@@ -483,11 +483,8 @@ public final class Ruby {
             StopWatch astWatch = new LoggingStopWatch("rb -> AST");
             scriptNode = parseFromMain(inputStream, filename);
             astWatch.stop();
-            
-           // if(RubyInstanceConfig.IR_PERSISTENCE){
-                IRReadingContext.INSTANCE.setFileName(filename);
-           // }
-        } else {
+        }        
+        if(RubyInstanceConfig.IR_READING || RubyInstanceConfig.IR_PERSISTENCE) {
             IRReadingContext.INSTANCE.setFileName(filename);
         }
         
@@ -2579,21 +2576,17 @@ public final class Ruby {
 
             ThreadContext.pushBacktrace(context, "(root)", file, 0);
             context.preNodeEval(objectClass, self, scriptName);
-            Node node = null;
+            Node node = null;            
             
-            if(!RubyInstanceConfig.IR_READING || !IRFileExpert.INSTANCE.getIRFileInIntendedPlace(config, scriptName).isFile()) {
-                StopWatch astWatch = new LoggingStopWatch("rb -> AST");
-                node = parseFile(in, scriptName, null);
-                astWatch.stop();
-                if (wrap) {
-                    // toss an anonymous module into the search path
-                    ((RootNode)node).getStaticScope().setModule(RubyModule.newModule(this));
-                }
-                
-                //if(RubyInstanceConfig.IR_PERSISTENCE){
-                    IRReadingContext.INSTANCE.setFileName(scriptName);
-                //}
-            } else {
+            StopWatch astWatch = new LoggingStopWatch("rb -> AST");
+            node = parseFile(in, scriptName, null);
+            astWatch.stop();
+            if (wrap) {
+                // toss an anonymous module into the search path
+                ((RootNode) node).getStaticScope().setModule(RubyModule.newModule(this));
+            }
+            
+            if(RubyInstanceConfig.IR_READING || RubyInstanceConfig.IR_PERSISTENCE) {
                 IRReadingContext.INSTANCE.setFileName(scriptName);
             }
             

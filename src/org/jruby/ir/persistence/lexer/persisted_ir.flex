@@ -53,8 +53,11 @@ import org.jruby.ir.persistence.parser.PersistedIRParser.Terminals;
 LineTerminator = \r|\n|\r\n
 WhiteSpace = [ \t\f]
 
-/* identifiers */
-Identifier = [a-zA-Z_][:jletterdigit:]*[!?]?
+/* Identifiers */
+Identifier = [a-zA-Z_]([:jletterdigit:]|-)*[!?]?
+
+/* Boolean */
+BooleanLiteral = (true|false)
 
 /* Numbers */
 FixnumLiteral = 0 | [+-]?[1-9][0-9]*
@@ -113,6 +116,7 @@ LoopLabelBeginning = _(LOOP|ITER)_(BEGIN|END)
     "ArgsCat:"                                   { return token(Terminals.ARGS_CAT_MARKER); }
     "ArgsPush:"                                  { return token(Terminals.ARGS_PUSH_MARKER); }
     "Array:"                                     { return token(Terminals.ARRAY_MARKER); }
+    "Boolean:"                                   { return token(Terminals.BOOLEAN_MARKER); }
     "Bignum:"                                    { return token(Terminals.BIGNUM_MARKER); }
     "CompoundString:"                            { return token(Terminals.COMPOUND_STRING_MARKER); }
     "scope"                                      { yybegin(INSIDE_CHEVRONS); return token(Terminals.SCOPE_MARKER); }
@@ -123,7 +127,7 @@ LoopLabelBeginning = _(LOOP|ITER)_(BEGIN|END)
     "RegexpOptions"                              { return token(Terminals.REGEXP_OPTIONS_MARKER); }
     "module"                                     { yybegin(INSIDE_CHEVRONS); return token(Terminals.MODULE_MARKER); }
     "SValue:"                                    { return token(Terminals.SVALUE_MARKER); }
-    "WrappedIRClosure:"                          { return token(Terminals.WRAPPED_IR_CLOSURE_MARKER); }
+    "WrappedIRClosure:"                          { yybegin(INSIDE_CHEVRONS); return token(Terminals.WRAPPED_IR_CLOSURE_MARKER); }
     
     /* special cases */
     "-unknown-super-target-"                     { return token(Terminals.UNKNOWN_SUPER_TARGET); } 
@@ -139,9 +143,7 @@ LoopLabelBeginning = _(LOOP|ITER)_(BEGIN|END)
     /* nil literal */
     "nil"                                        { return token(Terminals.NIL); }
     
-    /* boolean literals */
-    "true"                                       { return token(Terminals.TRUE); }
-    "false"                                      { return token(Terminals.FALSE); }
+    {BooleanLiteral}                             { return token(Terminals.BOOLEAN); }
     
     "kcode:"                                     { return token(Terminals.KCODE_MARKER); }
     

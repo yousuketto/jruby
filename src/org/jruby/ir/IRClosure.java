@@ -280,4 +280,11 @@ public class IRClosure extends IRScope {
         return super.getPersistableGeneralInfo() +
         "SpecificInfo:(" + isForLoopBody + ", " + arity.getValue() + ", " +argumentType + ")" + "\n";
     }
+    
+    @Override
+    public void setName(String name) {
+        // We can distinguish closures only with parent scope name 
+        String fullName = getLexicalParent().getName() + name;
+        super.setName(fullName);
+    }
 }
