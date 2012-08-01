@@ -57,7 +57,7 @@ public class DalvikCompiler {
         
         // declare method
         MethodId methodId = classtype.getMethod(TypeId.VOID, "setPosition", TypeId.get(ThreadContext.class), TypeId.INT);
-        DexMethodAdapter method = new DexMethodAdapter(classtype, getClassVisitor(), Modifier.PRIVATE | Modifier.STATIC, methodId);
+        DexMethodAdapter method = new DexMethodAdapter(getClassVisitor(), Modifier.PRIVATE | Modifier.STATIC, methodId, null);
         method.voidreturn();
         
         try {

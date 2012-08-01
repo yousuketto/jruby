@@ -3,15 +3,8 @@ package org.jruby.ir.targets.dalvik;
 import java.util.Stack;
 import java.util.ArrayList;
 
-import com.google.dexmaker.BinaryOp;
-import com.google.dexmaker.Code;
-import com.google.dexmaker.Comparison;
-import com.google.dexmaker.DexMaker;
-import com.google.dexmaker.Label;
-import com.google.dexmaker.Local;
-import com.google.dexmaker.MethodId;
-import com.google.dexmaker.TypeId;
-import com.google.dexmaker.UnaryOp;
+import com.google.dexmaker.*;
+import java.io.PrintStream;
 
 /**
  *
@@ -72,10 +65,11 @@ public class DexMethodAdapter {
      * Short-hand for specifying a set of aloads
      *
      * @param args list of aloads you want
+     * @param classes list of classes for the aloads
      */
-    public void aloadMany(int... args) {
-        for (int arg: args) {
-            aload(arg, Object.class);
+    public void aloadMany(int[] args, Class[] classes) {
+        for (int i = 0; i < args.length; i++) {
+            aload(args[i], classes[i]);
         }
     }
     
@@ -157,6 +151,55 @@ public class DexMethodAdapter {
         if (bool) iconst_1(); else iconst_0();
     }
     
+    public void invokestatic(TypeId arg1, TypeId arg2, String arg3, TypeId... arg4) {
+        MethodId method = arg1.getMethod(arg2, arg3, arg4);
+        Local target = localVariables.get(0);
+        
+        Local[] params = new Local[arg4.length];
+        for (int i = arg4.length - 1; i == 0; i--) {
+            params[i] = stack.pop();
+        }
+        
+        getMethodVisitor().invokeStatic(method, target, params);      
+        localVariables.remove(0);
+    }
+    
+    public void invokevirtual(TypeId arg1, TypeId arg2, String arg3, TypeId... arg4) {
+        MethodId method = arg1.getMethod(arg2, arg3, arg4);
+        Local target;
+        
+        Local[] params = new Local[arg4.length];
+        for (int i = arg4.length - 1; i == 0; i--) {
+            params[i] = stack.pop();
+        }
+        
+        Local instance = stack.pop();
+        
+        if (arg2 == TypeId.VOID) {
+           target = null; 
+        } else {
+            target = localVariables.get(0);
+            localVariables.remove(0);
+        }
+        
+        getMethodVisitor().invokeVirtual(method, target, instance, params); 
+        
+    }
+    
+    public void aprintln() {
+        dup();
+        getstatic(TypeId.get(System.class), TypeId.get(PrintStream.class), "out");
+        swap();
+        invokevirtual(TypeId.get(PrintStream.class), TypeId.VOID, "println", TypeId.OBJECT);
+    }
+    
+    public void iprintln() {
+        dup();
+        getstatic(TypeId.get(System.class), TypeId.get(PrintStream.class), "out");
+        swap();
+        invokevirtual(TypeId.get(PrintStream.class), TypeId.VOID, "println", TypeId.INT);
+    }
+    
     public void areturn() {
         Local local = stack.pop();
         getMethodVisitor().returnValue(local);
@@ -182,8 +225,81 @@ public class DexMethodAdapter {
         getMethodVisitor().returnValue(local);
     }
     
+    public void newobj(Class arg0, int argAmount) {
+        Local local = localVariables.get(0);
+        localVariables.remove(0);
+        
+        TypeId objMethodType = TypeId.get(arg0);
+        
+        TypeId[] params = new TypeId[argAmount];
+        Local[] args = new Local[argAmount];
+        for (int i = argAmount - 1; i == 0; i--) {
+            args[i] = stack.pop();
+            params[i] = args[i].getType();
+        }
+        
+        MethodId objMethod = objMethodType.getConstructor(params);
+        getMethodVisitor().newInstance(local, objMethod, args);
+    }
+    
+    public void dup() {
+        Local local = stack.peek();
+        stack.push(local);
+    }
+    
+    public void swap() {
+        Local first = stack.pop();
+        Local second = stack.pop();
+        stack.push(first);
+        stack.push(second);
+    }
+    
+    public void swap2() {
+        dup2_x2();
+        pop2();
+    }
+    
+    public void getstatic(TypeId arg1, TypeId arg2, String arg3) {
+        Local local = localVariables.get(0);
+        localVariables.remove(0);
+        
+        FieldId field = arg1.getField(arg2, arg3);
+        getMethodVisitor().sget(field, local);
+        stack.push(local);
+    }
+    
+    public void putstatic(TypeId arg1, TypeId arg2, String arg3) {
+        FieldId field = arg1.getField(arg2, arg3);
+        Local local = stack.pop();
+        getMethodVisitor().sput(field, local);
+    }
+    
+    public void getfield(TypeId arg1, TypeId arg2, String arg3) {
+        Local local = localVariables.get(0);
+        localVariables.remove(0);
+        
+        FieldId field = arg1.getField(arg2, arg3); 
+        getMethodVisitor().iget(field, intLocal, intLocal);
+        stack.push(local);
+    }
+    
+    public void putfield(TypeId arg1, TypeId arg2, String arg3) {
+        FieldId field = arg1.getField(arg2, arg3);
+        Local local = stack.pop();
+        getMethodVisitor().iput(field, intLocal, intLocal);
+    }
+    
     public void voidreturn() {
         getMethodVisitor().returnVoid();
+    }
+    
+    public void newarray() {
+        Local local = localVariables.get(0);
+        localVariables.remove(0);
+        
+        Local length = stack.pop();
+        getMethodVisitor().newArray(local, length);
+        stack.push(local);
     }
     
     public void iconst_m1() {
@@ -227,6 +343,21 @@ public class DexMethodAdapter {
     
     public void label(Label label) {
         getMethodVisitor().mark(label);
+    }
+    
+    public void nop() {    
+    }
+    
+    public void pop() {
+        stack.pop();
+    }
+    
+    public void pop2() {
+        Local local = stack.pop();
+        
+        if (local.getType() != TypeId.LONG && local.getType() != TypeId.DOUBLE) {
+            stack.pop();
+        }
     }
     
     public void arrayload() {
@@ -341,6 +472,100 @@ public class DexMethodAdapter {
         stack.push(intLocal);
     }
     
+    public void dup_x2() {
+        Local top = stack.pop();
+        Local second = stack.pop();
+        Local third = stack.pop();
+        stack.push(top);
+        stack.push(third);
+        stack.push(second);
+        stack.push(top);
+    }
+    
+    public void dup_x1() {
+        Local top = stack.pop();
+        Local second = stack.pop();
+        stack.push(top);
+        stack.push(second);
+        stack.push(top);
+    }
+    
+    public void dup2_x2() {
+        Local top = stack.pop();
+        if (top.getType() == TypeId.LONG || top.getType() == TypeId.DOUBLE) {
+            
+            Local second = stack.pop();
+            if (second.getType() == TypeId.LONG || second.getType() == TypeId.DOUBLE) {
+                stack.push(top);
+                stack.push(second);
+                stack.push(top);
+            } else {
+                Local third = stack.pop();
+                stack.push(top);
+                stack.push(third);
+                stack.push(second);
+                stack.push(top);
+            }
+            
+        } else {
+            
+            Local second = stack.pop();
+            Local third = stack.pop();
+            if (third.getType() == TypeId.LONG || third.getType() == TypeId.DOUBLE) {
+                stack.push(second);
+                stack.push(top); 
+                stack.push(third);
+                stack.push(second);
+                stack.push(top);
+            } else {
+                Local fourth = stack.pop();    
+                stack.push(second);
+                stack.push(top); 
+                stack.push(fourth);
+                stack.push(third);
+                stack.push(second);
+                stack.push(top);
+            }
+        }
+    }
+    
+    public void dup2_x1() {
+        Local top = stack.pop();
+        if (top.getType() == TypeId.LONG || top.getType() == TypeId.DOUBLE) {
+            Local second = stack.pop();
+            stack.push(top);
+            stack.push(second);
+            stack.push(top);
+        } else {
+            Local second = stack.pop();
+            Local third = stack.pop();
+            stack.push(second);
+            stack.push(top);
+            stack.push(third);
+            stack.push(second);
+            stack.push(top);
+        }
+        
+    }
+    
+    public void dup2() {
+        Local top = stack.pop();
+        if (top.getType() == TypeId.LONG || top.getType() == TypeId.DOUBLE) {
+            stack.push(top);
+            stack.push(top);
+        } else {
+            Local second = stack.pop();
+            stack.push(second);
+            stack.push(top);
+            stack.push(second);
+//            stack.push(top);
+        }
+    }
+    
+    public void go_to(Label arg0) {
+        getMethodVisitor().jump(arg0);
+    }
+    
     public void ifeq(Label arg0) {
         comparisonzero(Comparison.EQ, arg0);
     }
@@ -383,6 +608,30 @@ public class DexMethodAdapter {
     
     public void if_icmpeq(Label arg0) {
         comparison(Comparison.EQ, arg0);
+    }
+    
+    public void ifnonnull(Label arg0) {
+        comparisonzero(Comparison.NE, arg0);
+    }
+    
+    public void ifnull(Label arg0) {
+        comparisonzero(Comparison.EQ, arg0);
+    }
+    
+    public void iflt(Label arg0) {
+        comparisonzero(Comparison.LT, arg0);
+    }
+    
+    public void ifle(Label arg0) {
+        comparisonzero(Comparison.LE, arg0);
+    }
+    
+    public void ifgt(Label arg0) {
+        comparisonzero(Comparison.GT, arg0);
+    }
+    
+    public void ifge(Label arg0) {
+        comparisonzero(Comparison.GE, arg0);
     }
     
     public void ishr() {
@@ -594,6 +843,24 @@ public class DexMethodAdapter {
     
     public void d2l() {
         casting(longLocal);
+    }
+    
+    public void iinc(int arg0, int arg1) {
+        iload(arg0);
+        getMethodVisitor().loadConstant(intLocal, arg1);
+        stack.push(intLocal);
+        iadd();
+        istore(arg0);
+    }
+    
+    public void monitorenter() {
+        Local local = stack.pop();
+        getMethodVisitor().monitorEnter(local);
+    }
+    
+    public void monitorexit() {
+        Local local = stack.pop();
+        getMethodVisitor().monitorExit(local);
     }
     
     /**
