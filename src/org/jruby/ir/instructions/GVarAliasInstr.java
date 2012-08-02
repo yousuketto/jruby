@@ -51,9 +51,12 @@ public class GVarAliasInstr extends Instr {
     public void visit(IRVisitor visitor) {
         visitor.GVarAliasInstr(this);
     }
-    
-    @Override
-    public String toString() {
-        return super.toString() + "(" + newName + "," + oldName + ")";
+
+    public Operand getNewName() {
+        return newName;
+    }
+
+    public Operand getOldName() {
+        return oldName;
     }
 }

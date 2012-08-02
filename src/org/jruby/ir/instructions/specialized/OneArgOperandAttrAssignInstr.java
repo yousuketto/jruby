@@ -1,5 +1,6 @@
 package org.jruby.ir.instructions.specialized;
 
+import org.jruby.ir.IRVisitor;
 import org.jruby.ir.instructions.AttrAssignInstr;
 import org.jruby.ir.operands.Operand;
 import org.jruby.javasupport.util.RuntimeHelpers;
@@ -15,11 +16,6 @@ import org.jruby.runtime.builtin.IRubyObject;
 public class OneArgOperandAttrAssignInstr extends AttrAssignInstr {
     public OneArgOperandAttrAssignInstr(AttrAssignInstr instr) {
         super(instr);
-    }
-    
-    @Override
-    public String toString() {
-        return super.toString() + "{1O}";
     }    
     
     @Override
@@ -31,5 +27,10 @@ public class OneArgOperandAttrAssignInstr extends AttrAssignInstr {
         CallType callType = self == object ? CallType.FUNCTIONAL : CallType.NORMAL;
         RuntimeHelpers.invoke(context, object, getMethodAddr().getName(), value, callType, Block.NULL_BLOCK);
         return null;
-    }    
+    }
+    
+    @Override
+    public void visit(IRVisitor visitor) {
+        visitor.OneArgOperandAttrAssignInstr(this);
+    }
 }

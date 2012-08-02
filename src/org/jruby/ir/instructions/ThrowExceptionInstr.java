@@ -34,11 +34,6 @@ public class ThrowExceptionInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + exceptionArg + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new ThrowExceptionInstr(exceptionArg.cloneForInlining(ii));
     }
@@ -63,5 +58,9 @@ public class ThrowExceptionInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.ThrowExceptionInstr(this);
+    }
+
+    public Operand getExceptionArg() {
+        return exceptionArg;
     }
 }

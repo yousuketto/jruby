@@ -53,11 +53,6 @@ public class EnsureRubyArrayInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + object + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new EnsureRubyArrayInstr(ii.getRenamedVariable(result), object.cloneForInlining(ii));
     }
@@ -72,5 +67,9 @@ public class EnsureRubyArrayInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.EnsureRubyArrayInstr(this);
+    }
+
+    public Operand getObject() {
+        return object;
     }
 }

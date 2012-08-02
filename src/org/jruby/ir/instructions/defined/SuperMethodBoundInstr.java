@@ -44,11 +44,6 @@ public class SuperMethodBoundInstr extends DefinedInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + getObject() + ")";
-    }
-
-    @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
         IRubyObject receiver = (IRubyObject) getObject().retrieve(context, self, currDynScope, temp);
         boolean flag = false;

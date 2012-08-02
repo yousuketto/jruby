@@ -45,11 +45,6 @@ public class NotInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + arg + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new NotInstr(ii.getRenamedVariable(result), arg.cloneForInlining(ii));
     }
@@ -73,5 +68,9 @@ public class NotInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.NotInstr(this);
+    }
+    
+    public Operand getArg() {
+        return arg;
     }
 }

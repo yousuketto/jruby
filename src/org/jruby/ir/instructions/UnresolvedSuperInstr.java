@@ -81,15 +81,5 @@ public class UnresolvedSuperInstr extends CallInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.UnresolvedSuperInstr(this);
-    }
-    
-    @Override
-    protected boolean needToPersistCallType() {
-        return false;
-    }
-    
-    @Override
-    protected boolean needToPersistMethAddr() {
-        return false;
-    }
+    } 
 }

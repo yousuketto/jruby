@@ -42,11 +42,6 @@ public class ReceiveExceptionInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + checkType +  ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new ReceiveExceptionInstr(ii.getRenamedVariable(result));
     }
@@ -54,5 +49,9 @@ public class ReceiveExceptionInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.ReceiveExceptionInstr(this);
+    }
+    
+    public boolean isCheckType() {
+        return checkType;
     }
 }

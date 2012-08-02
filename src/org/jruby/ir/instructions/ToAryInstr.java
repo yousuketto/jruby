@@ -63,11 +63,6 @@ public class ToAryInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() { 
-        return super.toString() + "(" + array + ", " + dontToAryArrays + ")";
-    }
-
-    @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
         Object receiver = array.retrieve(context, self, currDynScope, temp);
 
@@ -89,5 +84,13 @@ public class ToAryInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.ToAryInstr(this);
+    }
+
+    public BooleanLiteral getDontToAryArrays() {
+        return dontToAryArrays;
+    }
+
+    public Operand getArray() {
+        return array;
     }
 }

@@ -24,11 +24,6 @@ public class CheckArityInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + required + ", " + opt + ", " + rest + ")";
-    }
-
-    @Override
     public Instr cloneForInlinedScope(InlinerInfo ii) {
         if (ii.canMapArgsStatically()) {
             // Since we know arity at a callsite, arity check passes or we have an ArgumentError

@@ -39,11 +39,6 @@ public class CheckArgsArrayArityInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + argsArray + ", " +  required + ", " + opt + ", " + rest + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new CheckArgsArrayArityInstr(argsArray.cloneForInlining(ii), required, opt, rest);
     }
@@ -61,5 +56,9 @@ public class CheckArgsArrayArityInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.CheckArgsArrayArityInstr(this);
+    }
+
+    public Operand getArgsArray() {
+        return argsArray;
     }
 }

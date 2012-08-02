@@ -37,12 +37,6 @@ public abstract class PutInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + operands[TARGET] +
-                (ref == null ? "" : ", " + ref) + ") = " + operands[VALUE];
-    }
-
-    @Override
     public void simplifyOperands(Map<Operand, Operand> valueMap, boolean force) {
         operands[VALUE] = operands[VALUE].getSimplifiedOperand(valueMap, force);
         operands[TARGET] = operands[TARGET].getSimplifiedOperand(valueMap, force);

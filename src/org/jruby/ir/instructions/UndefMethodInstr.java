@@ -30,11 +30,6 @@ public class UndefMethodInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + methodName + ")";
-    }
-
-    @Override
     public void simplifyOperands(Map<Operand, Operand> valueMap, boolean force) {
         methodName = methodName.getSimplifiedOperand(valueMap, force);
     }
@@ -61,5 +56,9 @@ public class UndefMethodInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.UndefMethodInstr(this);
+    }
+
+    public Operand getMethodName() {
+        return methodName;
     }
 }

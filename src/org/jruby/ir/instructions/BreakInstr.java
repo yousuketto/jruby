@@ -35,7 +35,7 @@ import java.util.Map;
 //
 public class BreakInstr extends Instr {
     private final IRScope scopeToReturnTo;
-    protected Operand returnValue;
+    private Operand returnValue;
 
     public BreakInstr(Operand rv, IRScope s) {
         super(Operation.BREAK);
@@ -49,12 +49,12 @@ public class BreakInstr extends Instr {
 
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
-        return new BreakInstr(returnValue.cloneForInlining(ii), scopeToReturnTo);
+        return new BreakInstr(returnValue.cloneForInlining(ii), getScopeToReturnTo());
     }
 
     @Override
     public Instr cloneForInlinedScope(InlinerInfo ii) {
-        if (ii.getInlineHostScope() == scopeToReturnTo) {
+        if (ii.getInlineHostScope() == getScopeToReturnTo()) {
             // If the break got inlined into the scope we had to break to, replace the break
             // with a COPY of the break-value into the call's result var.
             // Ex: v = foo { ..; break n; ..}.  So, "break n" is replaced with "v = n"
@@ -70,12 +70,7 @@ public class BreakInstr extends Instr {
 
     @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
-        throw IRBreakJump.create(scopeToReturnTo, returnValue.retrieve(context, self, currDynScope, temp));
-    }
-
-    @Override
-    public String toString() {
-        return getOperation() + "(" + returnValue + (scopeToReturnTo == null ? "" : ", " + scopeToReturnTo.getName()) + ")";
+        throw IRBreakJump.create(getScopeToReturnTo(), returnValue.retrieve(context, self, currDynScope, temp));
     }
 
     @Override
@@ -86,5 +81,13 @@ public class BreakInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.BreakInstr(this);
+    }
+
+    public IRScope getScopeToReturnTo() {
+        return scopeToReturnTo;
+    }
+
+    public Operand getReturnValue() {
+        return returnValue;
     }
 }

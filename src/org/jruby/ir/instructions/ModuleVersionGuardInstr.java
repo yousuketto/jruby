@@ -53,11 +53,6 @@ public class ModuleVersionGuardInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + candidateObj + ", " + expectedVersion + ", " + module.getName() + ", " + failurePathLabel + ")";
-    }
-
-    @Override
     public Instr cloneForInlinedScope(InlinerInfo ii) {
         return new ModuleVersionGuardInstr(module, expectedVersion, candidateObj.cloneForInlining(ii), ii.getRenamedLabel(failurePathLabel));
     }
@@ -80,5 +75,17 @@ public class ModuleVersionGuardInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.ModuleVersionGuardInstr(this);
+    }
+
+    public int getExpectedVersion() {
+        return expectedVersion;
+    }
+
+    public RubyModule getModule() {
+        return module;
+    }
+
+    public Operand getCandidateObj() {
+        return candidateObj;
     }
 }

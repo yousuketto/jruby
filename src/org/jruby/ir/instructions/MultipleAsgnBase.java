@@ -54,4 +54,12 @@ public abstract class MultipleAsgnBase extends Instr implements ResultInstr {
         return val.fetchCompileTimeArrayElement(index);
 */
     }
+    
+    public Operand getArray() {
+        return array;
+    }
+    
+    public int getIndex() {
+        return index;
+    }
 }

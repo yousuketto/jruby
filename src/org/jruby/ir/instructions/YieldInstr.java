@@ -18,7 +18,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 import java.util.Map;
 
 public class YieldInstr extends Instr implements ResultInstr {
-    public final boolean unwrapArray;
+    private final boolean unwrapArray;
     private Operand blockArg;
     private Operand yieldArg;
     private Variable result;
@@ -45,11 +45,6 @@ public class YieldInstr extends Instr implements ResultInstr {
 
     public Operand getYieldArg() {
         return yieldArg;
-    }
-
-    @Override
-    public String toString() { 
-        return super.toString() + "(" + blockArg + ", " + yieldArg + "," + unwrapArray + ")";
     }
 
     // if unwrapArray, maybe convert yieldArg into a CompoundArray operand?
@@ -96,5 +91,9 @@ public class YieldInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.YieldInstr(this);
+    }
+
+    public boolean isUnwrapArray() {
+        return unwrapArray;
     }
 }

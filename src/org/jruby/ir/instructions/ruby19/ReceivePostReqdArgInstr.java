@@ -31,11 +31,6 @@ public class ReceivePostReqdArgInstr extends ReceiveArgBase {
     }
 
     @Override
-    public String toString() {
-        return (isDead() ? "[DEAD]" : "") + (hasUnusedResult() ? "[DEAD-RESULT]" : "") + getResult() + " = " + getOperation() + "(" + argIndex + ", " + preReqdArgsCount + ", " + postReqdArgsCount + ")";
-    }
-
-    @Override
     public Instr cloneForInlinedScope(InlinerInfo ii) {
         if (ii.canMapArgsStatically()) {
            int n = ii.getArgsCount();

@@ -42,11 +42,6 @@ public class AliasInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return getOperation().toString() + "(" + getReceiver() + ", " + getNewName() + ", " + getOldName() + ")";
-    }
-
-    @Override
     public void simplifyOperands(Map<Operand, Operand> valueMap, boolean force) {
         oldName = getOldName().getSimplifiedOperand(valueMap, force);
         newName = getNewName().getSimplifiedOperand(valueMap, force);

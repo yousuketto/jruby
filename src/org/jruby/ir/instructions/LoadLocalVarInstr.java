@@ -45,10 +45,6 @@ public class LoadLocalVarInstr extends Instr implements ResultInstr {
         this.result = (TemporaryVariable)v;
     }
 
-    public String toString() {
-        return super.toString() + "(" + scope.getName() + ", " + lvar + ")";
-    }
-
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         // SSS FIXME: Do we need to rename lvar really?  It is just a name-proxy!
@@ -68,5 +64,9 @@ public class LoadLocalVarInstr extends Instr implements ResultInstr {
 
     public LocalVariable getLocalVar() {
         return lvar;
+    }
+
+    public IRScope getScope() {
+        return scope;
     }
 }

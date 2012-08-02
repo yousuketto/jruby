@@ -22,7 +22,7 @@ import java.util.Map;
 // this call to the parent scope.
 
 public class LexicalSearchConstInstr extends Instr implements ResultInstr {
-    Operand definingScope;
+    private Operand definingScope;
     String constName;
     private Variable result;
 
@@ -63,11 +63,6 @@ public class LexicalSearchConstInstr extends Instr implements ResultInstr {
         return new LexicalSearchConstInstr(ii.getRenamedVariable(result), definingScope.cloneForInlining(ii), constName);
     }
 
-    @Override
-    public String toString() { 
-        return super.toString() + "(" + definingScope + ", " + constName  + ")";
-    }
-
     private Object cache(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Ruby runtime, Object constant) {
         StaticScope staticScope = (StaticScope) definingScope.retrieve(context, self, currDynScope, temp);
         RubyModule object = runtime.getObject();
@@ -100,5 +95,13 @@ public class LexicalSearchConstInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.LexicalSearchConstInstr(this);
+    }
+    
+    public String getConstName() {
+        return constName;
+    }
+
+    public Operand getDefiningScope() {
+        return definingScope;
     }
 }

@@ -112,7 +112,7 @@ LoopLabelBeginning = _(LOOP|ITER)_(BEGIN|END)
     "IRStaticScope"                              { return token(Terminals.STATIC_SCOPE); }
     "SpecificInfo:"                              { return token(Terminals.SPECIFIC_INFO_MARKER); }
 
-    /* operand markers */
+    /* Operand markers */
     "ArgsCat:"                                   { return token(Terminals.ARGS_CAT_MARKER); }
     "ArgsPush:"                                  { return token(Terminals.ARGS_PUSH_MARKER); }
     "Array:"                                     { return token(Terminals.ARRAY_MARKER); }
@@ -129,18 +129,18 @@ LoopLabelBeginning = _(LOOP|ITER)_(BEGIN|END)
     "SValue:"                                    { return token(Terminals.SVALUE_MARKER); }
     "WrappedIRClosure:"                          { yybegin(INSIDE_CHEVRONS); return token(Terminals.WRAPPED_IR_CLOSURE_MARKER); }
     
-    /* special cases */
+    /* Special cases */
     "-unknown-super-target-"                     { return token(Terminals.UNKNOWN_SUPER_TARGET); } 
     "<Class:Object>"                             { return token(Terminals.OBJECT_CLASS); }
     "StandardError"                              { return token(Terminals.STANDARD_ERROR); }
     "%undefined"                                 { return token(Terminals.UNDEFINED_VALUE); }
     "nil(unexecutable)"                          { return token(Terminals.UNEXECUTABLE_NIL); }
     
-    /* local variable special cases*/
+    /* Local variable special cases*/
     "%block"                                     { return token(Terminals.BLOCK); }
     "%self"                                      { return token(Terminals.SELF); }
     
-    /* nil literal */
+    /* Nil literal */
     "nil"                                        { return token(Terminals.NIL); }
     
     {BooleanLiteral}                             { return token(Terminals.BOOLEAN); }
@@ -148,6 +148,10 @@ LoopLabelBeginning = _(LOOP|ITER)_(BEGIN|END)
     "kcode:"                                     { return token(Terminals.KCODE_MARKER); }
     
     "null"                                       { return token(Terminals.NULL); }
+    
+    /* Markers that are common for all instructions */
+    "[DEAD]"                                     { return token(Terminals.DEAD_INSTR_MARKER); }
+    "[DEAD-RESULT]"                              { return token(Terminals.DEAD_RESULT_INSTR_MARKER); }    
     
     /* labels */
     "_GLOBAL_ENSURE_BLOCK"                       { return token(Terminals.ENSURE_BLOCK_LABEL); }

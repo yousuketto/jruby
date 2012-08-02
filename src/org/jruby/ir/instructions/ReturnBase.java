@@ -24,11 +24,6 @@ public abstract class ReturnBase extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + returnValue + ")";
-    }
-
-    @Override
     public void simplifyOperands(Map<Operand, Operand> valueMap, boolean force) {
         returnValue = returnValue.getSimplifiedOperand(valueMap, force);
     }

@@ -21,11 +21,6 @@ public class LineNumberInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + lineNumber + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         // SSS FIXME: Okay to share this or not?
         return this;

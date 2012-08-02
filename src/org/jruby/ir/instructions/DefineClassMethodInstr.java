@@ -30,11 +30,6 @@ public class DefineClassMethodInstr extends Instr {
         this.container = container;
         this.method = method;
     }
-
-    @Override
-    public String toString() {
-        return getOperation() + "(" + container + ", " + method.getName() + ")";
-    }
     
     public IRMethod getMethod() {
         return method;
@@ -85,5 +80,9 @@ public class DefineClassMethodInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.DefineClassMethodInstr(this);
+    }
+
+    public Operand getContainer() {
+        return container;
     }
 }

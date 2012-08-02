@@ -26,11 +26,6 @@ public class RestArgMultipleAsgnInstr extends MultipleAsgnBase {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + array + ", " + index + ", " + preArgsCount + ", " + postArgsCount + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new RestArgMultipleAsgnInstr(ii.getRenamedVariable(result), array.cloneForInlining(ii), preArgsCount, postArgsCount, index);
     }
@@ -63,5 +58,13 @@ public class RestArgMultipleAsgnInstr extends MultipleAsgnBase {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.RestArgMultipleAsgnInstr(this);
+    }
+    
+    public int getPreArgsCount() {
+        return preArgsCount;
+    }
+
+    public int getPostArgsCount() {
+        return postArgsCount;
     }
 }

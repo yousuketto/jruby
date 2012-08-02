@@ -32,11 +32,6 @@ public class JumpIndirectInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + target + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new JumpIndirectInstr(ii.getRenamedVariable(target));
     }

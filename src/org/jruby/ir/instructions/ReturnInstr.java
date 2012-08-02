@@ -20,11 +20,6 @@ public class ReturnInstr extends ReturnBase {
     }
 
     @Override
-    public String toString() { 
-        return getOperation() + "(" + returnValue + (methodToReturnFrom == null ? "" : ", " + methodToReturnFrom.getName()) + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new ReturnInstr(returnValue.cloneForInlining(ii), methodToReturnFrom);
     }

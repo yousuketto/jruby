@@ -44,11 +44,6 @@ public class StoreLocalVarInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + value + ", " + scope.getName() + ", " + lvar + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         // SSS FIXME: Do we need to rename lvar really?  It is just a name-proxy!
         return new StoreLocalVarInstr(value.cloneForInlining(ii), scope, (LocalVariable)lvar.cloneForInlining(ii));
@@ -68,5 +63,9 @@ public class StoreLocalVarInstr extends Instr {
 
     public Operand getValue() {
         return value;
+    }
+
+    public IRScope getScope() {
+        return scope;
     }
 }

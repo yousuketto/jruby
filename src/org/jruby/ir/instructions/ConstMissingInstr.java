@@ -45,22 +45,21 @@ public class ConstMissingInstr extends CallInstr implements ResultInstr {
     
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
-        return new ConstMissingInstr(ii.getRenamedVariable(result), receiver.cloneForInlining(ii), missingConst);
-    }
-
-    @Override
-    public String toString() { 
-        return result + " = " + getOperation()  + "(" + receiver + ", " + missingConst  + ")";
+        return new ConstMissingInstr(ii.getRenamedVariable(result), receiver.cloneForInlining(ii), getMissingConst());
     }
 
     @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
         RubyModule module = (RubyModule) receiver.retrieve(context, self, currDynScope, temp);
-        return module.callMethod(context, "const_missing", context.getRuntime().fastNewSymbol(missingConst));
+        return module.callMethod(context, "const_missing", context.getRuntime().fastNewSymbol(getMissingConst()));
     }
 
     @Override
     public void visit(IRVisitor visitor) {
         visitor.ConstMissingInstr(this);
+    }
+
+    public String getMissingConst() {
+        return missingConst;
     }
 }

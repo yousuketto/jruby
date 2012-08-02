@@ -26,11 +26,6 @@ public class OptArgMultipleAsgnInstr extends MultipleAsgnBase {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + array + "," + index + "," + minArgsLength + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new OptArgMultipleAsgnInstr(ii.getRenamedVariable(result), array.cloneForInlining(ii), index, minArgsLength);
     }
@@ -48,5 +43,9 @@ public class OptArgMultipleAsgnInstr extends MultipleAsgnBase {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.OptArgMultipleAsgnInstr(this);
+    }
+
+    public int getMinArgsLength() {
+        return minArgsLength;
     }
 }

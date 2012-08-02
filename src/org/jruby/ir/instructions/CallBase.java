@@ -1,5 +1,11 @@
 package org.jruby.ir.instructions;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.jruby.RubyArray;
 import org.jruby.RubyMethod;
 import org.jruby.RubyProc;
@@ -20,12 +26,6 @@ import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.TypeConverter;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public abstract class CallBase extends Instr implements Specializeable {
     protected Operand   receiver;
@@ -69,6 +69,10 @@ public abstract class CallBase extends Instr implements Specializeable {
 
     public Operand getClosureArg(Operand ifUnspecified) {
         return closure == null ? ifUnspecified : closure;
+    }
+    
+    public Operand getClosure() {
+        return closure;
     }
 
     public Operand getReceiver() {
@@ -280,52 +284,6 @@ public abstract class CallBase extends Instr implements Specializeable {
     // Regexp and IO calls can do this -- and since we do not know at IR-build time 
     // what the call target is, we have to conservatively assume yes
     public boolean canSetDollarVars() {
-        return true;
-    }
-
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        
-        builder.append(super.toString()).append("(");
-        builder.append(receiver);
-        if(needToPersistCallType()) {
-            builder.append(", ").append(callType);
-        }
-        if(callType == CallType.SUPER) {
-            SuperInstrType type;
-            if(this instanceof InstanceSuperInstr) {
-                type = SuperInstrType.INSTANCE;
-            } else if (this instanceof ClassSuperInstr) {
-                type = SuperInstrType.CLASS;
-            } else {
-                type = SuperInstrType.UNRESOLVED;
-            }
-            builder.append(", ").append(type);
-        }
-        if(needToPersistMethAddr()) {
-            builder.append(", ").append(methAddr);
-        }
-        if(needToPersistCallArgs()) {
-            builder.append(", ").append(Arrays.toString(getCallArgs()));
-        }
-        if(closure != null) {
-            builder.append(", ").append(closure);
-        }
-        builder.append(")");
-        
-        return builder.toString();
-    }
-    
-    protected boolean needToPersistCallType() {
-        return true;
-    }
-    
-    protected boolean needToPersistMethAddr() {
-        return true;
-    }
-    
-    protected boolean needToPersistCallArgs() {
         return true;
     }
 

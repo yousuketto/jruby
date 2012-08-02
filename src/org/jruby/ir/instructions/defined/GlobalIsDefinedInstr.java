@@ -44,11 +44,6 @@ public class GlobalIsDefinedInstr extends DefinedInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + getName() + ")";
-    }
-
-    @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
         Ruby runtime = context.runtime;
         

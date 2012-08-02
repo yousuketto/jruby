@@ -80,8 +80,11 @@ public class BuildLambdaInstr extends Instr implements ResultInstr {
         visitor.BuildLambdaInstr(this);
     }
     
-    @Override
-    public String toString() {
-        return super.toString() + "(" + getLambdaBody().getName() + ", " + position.getFile() + ", " + position.getLine() + ")";
+    public String getLambdaBodyName() {
+        return getLambdaBody().getName();
+    }
+
+    public ISourcePosition getPosition() {
+        return position;
     }
 }

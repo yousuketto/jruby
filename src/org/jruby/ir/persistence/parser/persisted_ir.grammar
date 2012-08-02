@@ -6,6 +6,7 @@
 %import "org.jruby.ir.IRScopeType";
 
 %import "org.jruby.ir.instructions.Instr";
+%import "org.jruby.ir.instructions.ResultInstr";
 %import "org.jruby.ir.operands.CompoundString";
 %import "org.jruby.ir.operands.Label";
 %import "org.jruby.ir.operands.Operand";
@@ -18,7 +19,6 @@
 %import "org.jruby.parser.IRStaticScope";
 %import "org.jruby.parser.IRStaticScopeType";
 
-%import "org.jruby.util.KCode";
 %import "org.jruby.util.RegexpOptions";
 
 %class "PersistedIRParser";
@@ -31,6 +31,7 @@
 %terminals SCOPE, LEXICAL_PARENT_MARKER, STATIC_SCOPE, SPECIFIC_INFO_MARKER;
 %terminals SCOPE_MARKER, MODULE_MARKER;
 %terminals ASTERISK, GTE, BACKTICK, COLON, DOLLAR, HASH, PERCENT;
+%terminals DEAD_RESULT_INSTR_MARKER, DEAD_INSTR_MARKER;
 
 %terminals ENSURE_BLOCK_LABEL, LABEL, COMPLEX_LABEL;
 
@@ -54,7 +55,7 @@
 %typeof variable = "Variable";
 %typeof compound_string  = "CompoundString";
 %typeof regexp_options = "RegexpOptions";
-%typeof instruction = "Instr";
+%typeof abstract_instruction = "Instr";
 %typeof key_value_pair = "KeyValuePair";
 %typeof label = "Label";
 %typeof param = "Object";
@@ -153,31 +154,40 @@ scope_descriptor
 
 /* Instructions */
 instructions
-    =    instruction.i EOLN             {: return logic.addFirstInstruction(i); :}
-    |    instructions.lst instruction.i EOLN
-                                        {: return logic.addFollowingInstrctions(lst, i, _symbol_lst); :}
+    =    abstract_instruction.i EOLN    {: return logic.addFirstInstruction(i); :}
+    |    instructions.lst abstract_instruction.i EOLN
+                                        {: return logic.addFollowingInstructions(lst, i, _symbol_lst); :}
                                         
     ;
+    
+abstract_instruction
+    =    instruction.instr DEAD_INSTR_MARKER.marker?
+                                        {: return logic.markAsDeadIfNeeded(instr, marker); :}
+    ;     
     
 instruction
     =    label_instr   
     |    simple_instr
-    |    result_instr
+    |    abstract_result_instr
     |    put_instr
     ;
     
 label_instr
-    =    label.label COLON              {: return logic.createLabelInstr(label); :}
+    =    ID label.label COLON              {: return logic.createLabelInstr(label); :}
     ;
 
 simple_instr
     =    ID.id                          {: return logic.createInstrWithoutParams(id); :}
-    // only jump so far
     |    ID.id label.target             {: return logic.createJump(target); :}
     |    single_param_instr.instr       {: return logic.createInstrWithSingleParam(instr); :}
     |    multi_param_instr.instr        {: return logic.createInstrWithMultipleParams(instr); :}
     ;
      
+abstract_result_instr
+    =    result_instr.instr DEAD_RESULT_INSTR_MARKER.marker?
+                                        {: return logic.markHasUnusedResultIfNeeded(instr, marker); :}
+    ;
+
 result_instr
     =    variable.var EQ rvalue_operand.rv
                                         {: return logic.createCopy(var, rv); :}

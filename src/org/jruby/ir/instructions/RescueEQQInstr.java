@@ -58,11 +58,6 @@ public class RescueEQQInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + arg1 + ", " + arg2 + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new RescueEQQInstr(ii.getRenamedVariable(result), 
                 arg1.cloneForInlining(ii), arg2.cloneForInlining(ii));
@@ -114,5 +109,13 @@ public class RescueEQQInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.RescueEQQInstr(this);
+    }
+    
+    public Operand getArg1() {
+        return arg1;
+    }
+
+    public Operand getArg2() {
+        return arg2;
     }
 }

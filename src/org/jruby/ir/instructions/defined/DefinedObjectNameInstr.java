@@ -39,10 +39,5 @@ public abstract class DefinedObjectNameInstr extends DefinedInstr {
         for (int i = 0; i < operands.length; i++) {
             operands[i] = operands[i].getSimplifiedOperand(valueMap, force);
         }
-    }
-    
-    @Override
-    public String toString() {
-        return super.toString() + "(" + getObject() + ", " + getName() + ")";
-    }    
+    }  
 }

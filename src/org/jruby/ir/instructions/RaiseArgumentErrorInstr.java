@@ -31,11 +31,6 @@ public class RaiseArgumentErrorInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + required + ", " + opt + ", " + rest + ", " + numArgs + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new RaiseArgumentErrorInstr(required, opt, rest, numArgs);
     }
@@ -49,6 +44,22 @@ public class RaiseArgumentErrorInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.RaiseArgumentErrorInstr(this);
+    }
+
+    public int getRequired() {
+        return required;
+    }
+
+    public int getOpt() {
+        return opt;
+    }
+
+    public int getRest() {
+        return rest;
+    }
+
+    public int getNumArgs() {
+        return numArgs;
     }
     
 }

@@ -1,6 +1,84 @@
 package org.jruby.ir;
 
-import org.jruby.ir.instructions.*;
+import org.jruby.ir.instructions.AliasInstr;
+import org.jruby.ir.instructions.AttrAssignInstr;
+import org.jruby.ir.instructions.BEQInstr;
+import org.jruby.ir.instructions.BFalseInstr;
+import org.jruby.ir.instructions.BNEInstr;
+import org.jruby.ir.instructions.BNilInstr;
+import org.jruby.ir.instructions.BTrueInstr;
+import org.jruby.ir.instructions.BUndefInstr;
+import org.jruby.ir.instructions.BlockGivenInstr;
+import org.jruby.ir.instructions.BreakInstr;
+import org.jruby.ir.instructions.CallInstr;
+import org.jruby.ir.instructions.CheckArgsArrayArityInstr;
+import org.jruby.ir.instructions.CheckArityInstr;
+import org.jruby.ir.instructions.ClassSuperInstr;
+import org.jruby.ir.instructions.ClosureReturnInstr;
+import org.jruby.ir.instructions.ConstMissingInstr;
+import org.jruby.ir.instructions.CopyInstr;
+import org.jruby.ir.instructions.DefineClassInstr;
+import org.jruby.ir.instructions.DefineClassMethodInstr;
+import org.jruby.ir.instructions.DefineInstanceMethodInstr;
+import org.jruby.ir.instructions.DefineMetaClassInstr;
+import org.jruby.ir.instructions.DefineModuleInstr;
+import org.jruby.ir.instructions.EQQInstr;
+import org.jruby.ir.instructions.EnsureRubyArrayInstr;
+import org.jruby.ir.instructions.ExceptionRegionEndMarkerInstr;
+import org.jruby.ir.instructions.ExceptionRegionStartMarkerInstr;
+import org.jruby.ir.instructions.GVarAliasInstr;
+import org.jruby.ir.instructions.GetClassVarContainerModuleInstr;
+import org.jruby.ir.instructions.GetClassVariableInstr;
+import org.jruby.ir.instructions.GetFieldInstr;
+import org.jruby.ir.instructions.GetGlobalVariableInstr;
+import org.jruby.ir.instructions.InheritanceSearchConstInstr;
+import org.jruby.ir.instructions.InstanceOfInstr;
+import org.jruby.ir.instructions.InstanceSuperInstr;
+import org.jruby.ir.instructions.Instr;
+import org.jruby.ir.instructions.JumpIndirectInstr;
+import org.jruby.ir.instructions.JumpInstr;
+import org.jruby.ir.instructions.LabelInstr;
+import org.jruby.ir.instructions.LexicalSearchConstInstr;
+import org.jruby.ir.instructions.LineNumberInstr;
+import org.jruby.ir.instructions.LoadLocalVarInstr;
+import org.jruby.ir.instructions.Match2Instr;
+import org.jruby.ir.instructions.Match3Instr;
+import org.jruby.ir.instructions.MatchInstr;
+import org.jruby.ir.instructions.MethodLookupInstr;
+import org.jruby.ir.instructions.ModuleVersionGuardInstr;
+import org.jruby.ir.instructions.NoResultCallInstr;
+import org.jruby.ir.instructions.NopInstr;
+import org.jruby.ir.instructions.NotInstr;
+import org.jruby.ir.instructions.OptArgMultipleAsgnInstr;
+import org.jruby.ir.instructions.PopBindingInstr;
+import org.jruby.ir.instructions.PopFrameInstr;
+import org.jruby.ir.instructions.ProcessModuleBodyInstr;
+import org.jruby.ir.instructions.PushBindingInstr;
+import org.jruby.ir.instructions.PushFrameInstr;
+import org.jruby.ir.instructions.PutClassVariableInstr;
+import org.jruby.ir.instructions.PutConstInstr;
+import org.jruby.ir.instructions.PutFieldInstr;
+import org.jruby.ir.instructions.PutGlobalVarInstr;
+import org.jruby.ir.instructions.RaiseArgumentErrorInstr;
+import org.jruby.ir.instructions.ReceiveClosureInstr;
+import org.jruby.ir.instructions.ReceiveExceptionInstr;
+import org.jruby.ir.instructions.ReceivePreReqdArgInstr;
+import org.jruby.ir.instructions.ReceiveSelfInstr;
+import org.jruby.ir.instructions.RecordEndBlockInstr;
+import org.jruby.ir.instructions.ReqdArgMultipleAsgnInstr;
+import org.jruby.ir.instructions.RescueEQQInstr;
+import org.jruby.ir.instructions.RestArgMultipleAsgnInstr;
+import org.jruby.ir.instructions.ReturnInstr;
+import org.jruby.ir.instructions.SearchConstInstr;
+import org.jruby.ir.instructions.SetReturnAddressInstr;
+import org.jruby.ir.instructions.StoreLocalVarInstr;
+import org.jruby.ir.instructions.ThreadPollInstr;
+import org.jruby.ir.instructions.ThrowExceptionInstr;
+import org.jruby.ir.instructions.ToAryInstr;
+import org.jruby.ir.instructions.UndefMethodInstr;
+import org.jruby.ir.instructions.UnresolvedSuperInstr;
+import org.jruby.ir.instructions.YieldInstr;
+import org.jruby.ir.instructions.ZSuperInstr;
 import org.jruby.ir.instructions.defined.BackrefIsMatchDataInstr;
 import org.jruby.ir.instructions.defined.ClassVarIsDefinedInstr;
 import org.jruby.ir.instructions.defined.GetBackrefInstr;
@@ -20,6 +98,11 @@ import org.jruby.ir.instructions.ruby19.GetEncodingInstr;
 import org.jruby.ir.instructions.ruby19.ReceiveOptArgInstr19;
 import org.jruby.ir.instructions.ruby19.ReceivePostReqdArgInstr;
 import org.jruby.ir.instructions.ruby19.ReceiveRestArgInstr19;
+import org.jruby.ir.instructions.specialized.OneArgOperandAttrAssignInstr;
+import org.jruby.ir.instructions.specialized.OneFixnumArgNoBlockCallInstr;
+import org.jruby.ir.instructions.specialized.OneOperandArgNoBlockCallInstr;
+import org.jruby.ir.instructions.specialized.OneOperandArgNoBlockNoResultCallInstr;
+import org.jruby.ir.instructions.specialized.ZeroOperandArgNoBlockCallInstr;
 import org.jruby.ir.operands.Array;
 import org.jruby.ir.operands.AsString;
 import org.jruby.ir.operands.Backref;
@@ -29,7 +112,6 @@ import org.jruby.ir.operands.BooleanLiteral;
 import org.jruby.ir.operands.ClosureLocalVariable;
 import org.jruby.ir.operands.CompoundArray;
 import org.jruby.ir.operands.CompoundString;
-import org.jruby.ir.operands.ScopeModule;
 import org.jruby.ir.operands.CurrentScope;
 import org.jruby.ir.operands.DynamicSymbol;
 import org.jruby.ir.operands.Fixnum;
@@ -47,6 +129,7 @@ import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Range;
 import org.jruby.ir.operands.Regexp;
 import org.jruby.ir.operands.SValue;
+import org.jruby.ir.operands.ScopeModule;
 import org.jruby.ir.operands.Self;
 import org.jruby.ir.operands.Splat;
 import org.jruby.ir.operands.StandardError;
@@ -180,6 +263,23 @@ public abstract class IRVisitor {
     public void ReceivePostReqdArgInstr(ReceivePostReqdArgInstr receivepostreqdarginstr) { error(receivepostreqdarginstr); }
     public void ReceiveRestArgInstr19(ReceiveRestArgInstr19 receiverestarginstr) { error(receiverestarginstr); }
 
+    // specialized instructions. By default, method of supper class is called
+    public void OneArgOperandAttrAssignInstr(OneArgOperandAttrAssignInstr oneargoperandattrassigninstr)  { 
+        AttrAssignInstr(oneargoperandattrassigninstr); 
+    }
+    public void OneFixnumArgNoBlockCallInstr(OneFixnumArgNoBlockCallInstr onefixnumargnoblockcallinstr) {
+        CallInstr(onefixnumargnoblockcallinstr);
+    }
+    public void OneOperandArgNoBlockCallInstr(OneOperandArgNoBlockCallInstr oneoperandargnoblockcallinstr) {
+        CallInstr(oneoperandargnoblockcallinstr);
+    }
+    public void OneOperandArgNoBlockNoResultCallInstr(OneOperandArgNoBlockNoResultCallInstr oneoperandargnoblocknoresultcallinstr) {
+        NoResultCallInstr(oneoperandargnoblocknoresultcallinstr);
+    }
+    public void ZeroOperandArgNoBlockCallInstr(ZeroOperandArgNoBlockCallInstr zerooperandargnoblockcallinstr) {
+        CallInstr(zerooperandargnoblockcallinstr);
+    }
+    
     // operands
     public void Array(Array array) { error(array); }
     public void AsString(AsString asstring) { error(asstring); }

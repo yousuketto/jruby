@@ -19,11 +19,6 @@ public class LabelInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return label + ":";
-    }
-
-    @Override
     public void visit(IRVisitor visitor) {
         visitor.LabelInstr(this);
     }

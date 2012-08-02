@@ -65,11 +65,6 @@ public class InheritanceSearchConstInstr extends Instr implements ResultInstr {
         return new InheritanceSearchConstInstr(ii.getRenamedVariable(result), currentModule.cloneForInlining(ii), constName, noPrivateConsts);
     }
 
-    @Override
-    public String toString() { 
-        return super.toString() + "(" + currentModule + ", " + constName + ", " + noPrivateConsts + ")";
-    }
-
     private Object cache(Ruby runtime, RubyModule module) {
         Object constant = noPrivateConsts ? module.getConstantFromNoConstMissing(constName, false) : module.getConstantNoConstMissing(constName);
         if (constant == null) {

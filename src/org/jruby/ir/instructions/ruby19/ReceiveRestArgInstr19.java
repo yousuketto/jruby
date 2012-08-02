@@ -34,11 +34,6 @@ public class ReceiveRestArgInstr19 extends ReceiveRestArgBase {
     }
 
     @Override
-    public String toString() {
-        return (isDead() ? "[DEAD]" : "") + (hasUnusedResult() ? "[DEAD-RESULT]" : "") + getResult() + " = " + getOperation() + "(" + argIndex + ", " + totalRequiredArgs + ", " + totalOptArgs + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         if (ii.canMapArgsStatically()) {
             // FIXME: Check this
@@ -70,5 +65,13 @@ public class ReceiveRestArgInstr19 extends ReceiveRestArgBase {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.ReceiveRestArgInstr19(this);
+    }
+
+    public int getTotalRequiredArgs() {
+        return totalRequiredArgs;
+    }
+
+    public int getTotalOptArgs() {
+        return totalOptArgs;
     }
 }

@@ -39,11 +39,6 @@ public class Match3Instr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + receiver + ", " + arg + ")";
-    }
-
-    @Override
     public void simplifyOperands(Map<Operand, Operand> valueMap, boolean force) {
         receiver = receiver.getSimplifiedOperand(valueMap, force);
         arg = arg.getSimplifiedOperand(valueMap, force);
@@ -80,5 +75,13 @@ public class Match3Instr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.Match3Instr(this);
+    }
+
+    public Operand getReceiver() {
+        return receiver;
+    }
+
+    public Operand getArg() {
+        return arg;
     }
 }

@@ -25,12 +25,11 @@ public class PushBindingInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + scope.getName() + ")";
-    }
-
-    @Override
     public void visit(IRVisitor visitor) {
         visitor.PushBindingInstr(this);
+    }
+    
+    public IRScope getScope() {
+        return scope;
     }
 }

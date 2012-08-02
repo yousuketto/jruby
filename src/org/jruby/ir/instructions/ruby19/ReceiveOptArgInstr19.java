@@ -21,11 +21,6 @@ public class ReceiveOptArgInstr19 extends ReceiveOptArgBase {
     }
 
     @Override
-    public String toString() {
-        return (isDead() ? "[DEAD]" : "") + (hasUnusedResult() ? "[DEAD-RESULT]" : "") + getResult() + " = " + getOperation() + "(" + argIndex + ", " + minArgsLength + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         if (ii.canMapArgsStatically()) {
             int n = ii.getArgsCount();

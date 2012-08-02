@@ -40,8 +40,5 @@ public abstract class BranchInstr extends Instr {
         if (arg2 != null) arg2 = arg2.getSimplifiedOperand(valueMap, force);
     }
 
-    @Override
-    public String toString() {
-        return "" + getOperation() + "(" + arg1 + ", " + (arg2 != null ? arg2 + ", " : "") + target + ")";
-    }
+    
 }

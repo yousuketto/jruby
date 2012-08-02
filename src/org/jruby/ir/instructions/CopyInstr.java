@@ -60,11 +60,6 @@ public class CopyInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() { 
-        return (arg instanceof Variable) ? (super.toString() + "(" + arg + ")") : (result + " = " + arg);
-    }
-
-    @Override
     public void visit(IRVisitor visitor) {
         visitor.CopyInstr(this);
     }

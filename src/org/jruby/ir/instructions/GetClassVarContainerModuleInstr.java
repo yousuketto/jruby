@@ -1,10 +1,11 @@
 package org.jruby.ir.instructions;
 
+import java.util.Map;
+
 import org.jruby.Ruby;
 import org.jruby.RubyModule;
 import org.jruby.common.IRubyWarnings.ID;
 import org.jruby.ir.IRVisitor;
-import org.jruby.ir.IRMethod;
 import org.jruby.ir.Operation;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Variable;
@@ -14,8 +15,6 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
-
-import java.util.Map;
 
 /*
  * Finds the module that will hold class vars for the object that is being queried.
@@ -40,11 +39,6 @@ public class GetClassVarContainerModuleInstr extends Instr implements ResultInst
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new GetClassVarContainerModuleInstr(ii.getRenamedVariable(result), startingScope.cloneForInlining(ii), object == null ? null : object.cloneForInlining(ii));
-    }
-
-    @Override
-    public String toString() { 
-        return super.toString() + "(" + startingScope + ", " + object + ")";
     }
 
     public Operand[] getOperands() {
@@ -94,5 +88,13 @@ public class GetClassVarContainerModuleInstr extends Instr implements ResultInst
     @Override
     public void visit(IRVisitor visitor) {
         visitor.GetClassVarContainerModuleInstr(this);
+    }
+
+    public Operand getStartingScope() {
+        return startingScope;
+    }
+
+    public Operand getObject() {
+        return object;
     }
 }

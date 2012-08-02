@@ -18,11 +18,6 @@ public class JumpInstr extends Instr {
         return EMPTY_OPERANDS;
     }
 
-    @Override
-    public String toString() {
-        return super.toString() + " " + target;
-    }
-
     public Label getJumpTarget() {
         return target;
     }

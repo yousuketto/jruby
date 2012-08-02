@@ -61,11 +61,6 @@ public class SearchConstInstr extends Instr implements ResultInstr {
         return new SearchConstInstr(ii.getRenamedVariable(result), constName, startingScope.cloneForInlining(ii), noPrivateConsts);
     }
 
-    @Override
-    public String toString() { 
-        return super.toString() + "(" + constName + ", " + startingScope + ", " + noPrivateConsts + ")";
-    }
-
     private Object cache(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Ruby runtime) {
         // Lexical lookup
         RubyModule object = runtime.getObject();

@@ -28,11 +28,6 @@ public class RecordEndBlockInstr extends Instr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + endBlockClosure.getName() + ")";
-    }
-
-    @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         // SSS FIXME: Correct in all situations??
         return new RecordEndBlockInstr(declaringScope, endBlockClosure);
@@ -47,5 +42,9 @@ public class RecordEndBlockInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.RecordEndBlockInstr(this);
+    }
+
+    public IRClosure getEndBlockClosure() {
+        return endBlockClosure;
     }
 }

@@ -51,11 +51,6 @@ public class InstanceOfInstr extends Instr implements ResultInstr {
         object = object.getSimplifiedOperand(valueMap, force);
     }
 
-    @Override 
-    public String toString() {
-        return super.toString() + "(" + object + ", " + className + ")";
-    }
-
     @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
         try {
@@ -74,5 +69,13 @@ public class InstanceOfInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.InstanceOfInstr(this);
+    }
+    
+    public String getClassName() {
+        return className;
+    }
+
+    public Operand getObject() {
+        return object;
     }
 }

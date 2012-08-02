@@ -21,19 +21,6 @@ public class ExceptionRegionStartMarkerInstr extends Instr {
         this.ensureBlockLabel = ensureBlockLabel;
     }
 
-    @Override
-    public String toString() {
-        StringBuilder buf = new StringBuilder(super.toString());
-        
-        buf.append(super.toString()).append("(").append(begin).append(", ").append(end).append(", ").append(firstRescueBlockLabel);
-        if (ensureBlockLabel != null) {
-            buf.append(", ").append(ensureBlockLabel);
-        }
-        buf.append(")");
-        
-        return buf.toString();
-    }
-
     public Operand[] getOperands() {
         return EMPTY_OPERANDS;
     }

@@ -43,11 +43,6 @@ public abstract class GetInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() { 
-        return super.toString() + "(" + source + ", " + ref + ")";
-    }
-
-    @Override
     public void simplifyOperands(Map<Operand, Operand> valueMap, boolean force) {
         source = source.getSimplifiedOperand(valueMap, force);
     }

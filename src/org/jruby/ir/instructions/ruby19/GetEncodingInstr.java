@@ -28,11 +28,6 @@ public class GetEncodingInstr extends Instr implements ResultInstr {
     public Operand[] getOperands() {
         return EMPTY_OPERANDS;
     }
-
-    @Override
-    public String toString() {
-        return super.toString() + "(" + encoding.toString() + ")";
-    }
     
     public Variable getResult() {
         return result;
@@ -55,5 +50,9 @@ public class GetEncodingInstr extends Instr implements ResultInstr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.GetEncodingInstr(this);
+    }
+
+    public Encoding getEncoding() {
+        return encoding;
     }
 }

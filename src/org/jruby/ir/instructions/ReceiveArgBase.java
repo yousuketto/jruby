@@ -36,9 +36,4 @@ public abstract class ReceiveArgBase extends Instr implements ResultInstr {
     public int getArgIndex() {
         return argIndex;
     }
-
-    @Override
-    public String toString() {
-        return super.toString() + "(" + argIndex + ")";
-    }
 }

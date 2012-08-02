@@ -51,11 +51,6 @@ public class SetReturnAddressInstr extends Instr implements ResultInstr {
     }
 
     @Override
-    public String toString() {
-        return super.toString() + "(" + returnAddr + ")";
-    }
-
-    @Override
     public Instr cloneForInlinedScope(InlinerInfo ii) {
         return new SetReturnAddressInstr(ii.getRenamedVariable(result), ii.getRenamedLabel(returnAddr));
     }
