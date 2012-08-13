@@ -7,6 +7,9 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
+import org.jruby.parser.StaticScope;
+import org.jruby.runtime.Block;
+import org.jruby.runtime.ThreadContext;
 import org.jruby.util.JavaNameMangler;
 
 /**
@@ -60,8 +63,20 @@ public class Dalvik {
     
     public void pushmethod(String name, int arity) {
         // Set up locals
-        // Set up types in
         clsData().pushmethod(name, arity, clstype);
+        
+        // locals for ThreadContext and self
+        methodData().local("$context", TypeId.get(ThreadContext.class));
+        methodData().local("$scope", TypeId.get(StaticScope.class));
+        methodData().local("$self");
+        for (int i = 0; i < arity; i++) {
+            // incoming arguments
+            methodData().local("$argument" + i);
+        }
+        methodData().local("$block", TypeId.get(Block.class));
+
+        // TODO: this should go into the PushBinding instruction
+        methodData().local("$dynamicScope");
     }
     
     public void popmethod() {
@@ -83,5 +98,4 @@ public class Dalvik {
             clsData().fieldSet.add(field);
         }
     }
-    
 }

@@ -1,10 +1,10 @@
 package org.jruby.ir.targets.dalvik;
 
-import java.util.Stack;
-import java.util.ArrayList;
-
 import com.google.dexmaker.*;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Stack;
 
 /**
  *
@@ -13,21 +13,12 @@ import java.io.PrintStream;
 public class DexMethodAdapter {
     private Code code;
     private Stack<Local> stack = new Stack<Local>();
-    private ArrayList<Local> localVariables;
-    
-    // Variables to allow casting
-    private Local<Integer> intLocal;
-    private Local<Float> floatLocal;
-    private Local<Double> doubleLocal;
-    private Local<Short> shortLocal;
-    private Local<Long> longLocal;
-    private Local<Byte> byteLocal;
-    private Local<Character> charLocal;
+    private HashMap<TypeId, Local> localVariables;
     
     public DexMethodAdapter(DexMaker dexmaker, int flags, MethodId method, ArrayList<TypeId> types) {
         setMethodVisitor(dexmaker.declare(method, flags));
-        setLocalVariables(types);
         setCastingVariables();
+        setLocalVariables(types);
     }
     
     /**
@@ -36,21 +27,24 @@ public class DexMethodAdapter {
      * and initialize and place them in a local variable list to be used throughout.
      */
     public void setLocalVariables(ArrayList<TypeId> types) {
-        localVariables = new ArrayList<Local>(); 
-        for(int i=0; i<types.size(); i++) {
+        localVariables = new HashMap<TypeId, Local>(); 
+        for(int i = 0; i < types.size(); i++) {
             Local local = code.newLocal(types.get(i));
-            localVariables.add(local);
+            if (!localVariables.containsKey(types.get(i))) {
+                localVariables.put(types.get(i), local);
+            }
         }
     }
     
     public void setCastingVariables() {
-        intLocal = code.newLocal(TypeId.INT);
-        floatLocal = code.newLocal(TypeId.FLOAT);
-        doubleLocal = code.newLocal(TypeId.DOUBLE);
-        shortLocal = code.newLocal(TypeId.SHORT);
-        longLocal = code.newLocal(TypeId.LONG);
-        byteLocal = code.newLocal(TypeId.BYTE);
-        charLocal = code.newLocal(TypeId.CHAR);
+        localVariables.put(TypeId.INT, code.newLocal(TypeId.INT));
+        localVariables.put(TypeId.FLOAT, code.newLocal(TypeId.FLOAT));
+        localVariables.put(TypeId.DOUBLE, code.newLocal(TypeId.DOUBLE));
+        localVariables.put(TypeId.SHORT, code.newLocal(TypeId.SHORT));
+        localVariables.put(TypeId.LONG, code.newLocal(TypeId.LONG));
+        localVariables.put(TypeId.BYTE, code.newLocal(TypeId.BYTE));
+        localVariables.put(TypeId.CHAR, code.newLocal(TypeId.CHAR));
+        localVariables.put(TypeId.OBJECT, code.newLocal(TypeId.OBJECT));
     }
     
     public Code getMethodVisitor() {
@@ -129,22 +123,52 @@ public class DexMethodAdapter {
     }
     
     public void ldc(Object arg0) {
-        Local local = localVariables.get(0);
+        Local local = localVariables.get(TypeId.get(arg0.getClass()));
         getMethodVisitor().loadConstant(local, arg0);
         stack.push(local);
-        localVariables.remove(0);
     }
     
     public void bipush(int arg) {
-        pushValue(arg);
+        pushValue(TypeId.BYTE, arg);
     }
     
     public void sipush(int arg) {
-        pushValue(arg);
+        pushValue(TypeId.SHORT, arg);
     }
-        
+    
     public void pushInt(int value) {
-        pushValue(value);
+        if (value <= Byte.MAX_VALUE && value >= Byte.MIN_VALUE) {
+            switch (value) {
+            case -1:
+                iconst_m1();
+                break;
+            case 0:
+                iconst_0();
+                break;
+            case 1:
+                iconst_1();
+                break;
+            case 2:
+                iconst_2();
+                break;
+            case 3:
+                iconst_3();
+                break;
+            case 4:
+                iconst_4();
+                break;
+            case 5:
+                iconst_5();
+                break;
+            default:
+                bipush(value);
+                break;
+            }
+        } else if (value <= Short.MAX_VALUE && value >= Short.MIN_VALUE) {
+            sipush(value);
+        } else {
+            ldc(value);
+        }
     }
     
     public void pushBoolean(boolean bool) {
@@ -153,7 +177,7 @@ public class DexMethodAdapter {
     
     public void invokestatic(TypeId arg1, TypeId arg2, String arg3, TypeId... arg4) {
         MethodId method = arg1.getMethod(arg2, arg3, arg4);
-        Local target = localVariables.get(0);
+        Local target = localVariables.get(arg2);
         
         Local[] params = new Local[arg4.length];
         for (int i = arg4.length - 1; i == 0; i--) {
@@ -161,7 +185,26 @@ public class DexMethodAdapter {
         }
         
         getMethodVisitor().invokeStatic(method, target, params);      
-        localVariables.remove(0);
+    }
+    
+    public void invokespecial(TypeId arg1, TypeId arg2, String arg3, TypeId... arg4) {
+        MethodId method = arg1.getMethod(arg2, arg3, arg4);
+        Local target;
+        
+        Local[] params = new Local[arg4.length];
+        for (int i = arg4.length - 1; i == 0; i--) {
+            params[i] = stack.pop();
+        }
+        
+        Local instance = stack.pop();
+        
+        if (arg2 == TypeId.VOID) {
+           target = null; 
+        } else {
+            target = localVariables.get(arg2);
+        }
+        getMethodVisitor().invokeDirect(method, target, instance, params); 
+        
     }
     
     public void invokevirtual(TypeId arg1, TypeId arg2, String arg3, TypeId... arg4) {
@@ -178,11 +221,30 @@ public class DexMethodAdapter {
         if (arg2 == TypeId.VOID) {
            target = null; 
         } else {
-            target = localVariables.get(0);
-            localVariables.remove(0);
+            target = localVariables.get(arg2);
         }
         
         getMethodVisitor().invokeVirtual(method, target, instance, params); 
+        
+    }
+    
+    public void invokeinterface(TypeId arg1, TypeId arg2, String arg3, TypeId... arg4) {
+        MethodId method = arg1.getMethod(arg2, arg3, arg4);
+        Local target;
+        
+        Local[] params = new Local[arg4.length];
+        for (int i = arg4.length - 1; i == 0; i--) {
+            params[i] = stack.pop();
+        }
+        
+        Local instance = stack.pop();
+        
+        if (arg2 == TypeId.VOID) {
+           target = null; 
+        } else {
+            target = localVariables.get(arg2);
+        }
+        getMethodVisitor().invokeInterface(method, target, instance, params); 
         
     }
     
@@ -226,8 +288,7 @@ public class DexMethodAdapter {
     }
     
     public void newobj(Class arg0, int argAmount) {
-        Local local = localVariables.get(0);
-        localVariables.remove(0);
+        Local local = localVariables.get(TypeId.get(arg0));
         
         TypeId objMethodType = TypeId.get(arg0);
         
@@ -260,8 +321,7 @@ public class DexMethodAdapter {
     }
     
     public void getstatic(TypeId arg1, TypeId arg2, String arg3) {
-        Local local = localVariables.get(0);
-        localVariables.remove(0);
+        Local local = localVariables.get(arg2);
         
         FieldId field = arg1.getField(arg2, arg3);
         getMethodVisitor().sget(field, local);
@@ -275,15 +335,15 @@ public class DexMethodAdapter {
     }
     
     public void getfield(TypeId arg1, TypeId arg2, String arg3) {
-        Local local = localVariables.get(0);
-        localVariables.remove(0);
-        
+        Local local = localVariables.get(arg2);
+        Local intLocal = localVariables.get(TypeId.INT);
         FieldId field = arg1.getField(arg2, arg3); 
         getMethodVisitor().iget(field, intLocal, intLocal);
         stack.push(local);
     }
     
     public void putfield(TypeId arg1, TypeId arg2, String arg3) {
+        Local intLocal = localVariables.get(TypeId.INT);
         FieldId field = arg1.getField(arg2, arg3);
         Local local = stack.pop();
         getMethodVisitor().iput(field, intLocal, intLocal);
@@ -293,9 +353,8 @@ public class DexMethodAdapter {
         getMethodVisitor().returnVoid();
     }
     
-    public void newarray() {
-        Local local = localVariables.get(0);
-        localVariables.remove(0);
+    public void newarray(TypeId type) {
+        Local local = localVariables.get(type);
         
         Local length = stack.pop();
         getMethodVisitor().newArray(local, length);
@@ -303,42 +362,41 @@ public class DexMethodAdapter {
     }
     
     public void iconst_m1() {
-        pushValue(-1);
+        pushValue(TypeId.INT, -1);
     }
     
     public void iconst_0() {
-        pushValue(0);
+        pushValue(TypeId.INT, 0);
     }
     
     public void iconst_1() {
-        pushValue(1);
+        pushValue(TypeId.INT, 1);
     }
     
     public void iconst_2() {
-        pushValue(2);
+        pushValue(TypeId.INT, 2);
     }
     
     public void iconst_3() {
-        pushValue(3);
+        pushValue(TypeId.INT, 3);
     }
     
     public void iconst_4() {
-        pushValue(4);
+        pushValue(TypeId.INT, 4);
     }
     
     public void iconst_5() {
-        pushValue(5);
+        pushValue(TypeId.INT, 5);
     }
     
     public void lconst_0() {
-        pushValue(0);
+        pushValue(TypeId.LONG, 0);
     }
     
     public void aconst_null() {
-        Local local = localVariables.get(0);
+        Local local = localVariables.get(TypeId.OBJECT);
         getMethodVisitor().loadConstant(local, null);
         stack.push(local);
-        localVariables.remove(0);
     }
     
     public void label(Label label) {
@@ -381,7 +439,7 @@ public class DexMethodAdapter {
     }
     
     public void aaload() {
-        arrayloader();
+        arrayloader(TypeId.OBJECT);
     }
     
     public void aastore() {
@@ -389,7 +447,7 @@ public class DexMethodAdapter {
     }
     
     public void iaload() {
-        arrayloader();
+        arrayloader(TypeId.INT);
     }
     
     public void iastore() {
@@ -397,7 +455,7 @@ public class DexMethodAdapter {
     }
     
     public void laload() {
-        arrayloader();
+        arrayloader(TypeId.LONG);
     }
     
     public void lastore() {
@@ -405,7 +463,7 @@ public class DexMethodAdapter {
     }
     
     public void baload() {
-        arrayloader();
+        arrayloader(TypeId.BYTE);
     }
     
     public void bastore() {
@@ -413,7 +471,7 @@ public class DexMethodAdapter {
     }
     
     public void saload() {
-        arrayloader();
+        arrayloader(TypeId.SHORT);
     }
     
     public void sastore() {
@@ -421,7 +479,7 @@ public class DexMethodAdapter {
     }
     
     public void caload() {
-        arrayloader();
+        arrayloader(TypeId.CHAR);
     }
     
     public void castore() {
@@ -429,7 +487,7 @@ public class DexMethodAdapter {
     }
     
     public void faload() {
-        arrayloader();
+        arrayloader(TypeId.FLOAT);
     }
     
     public void fastore() {
@@ -437,7 +495,7 @@ public class DexMethodAdapter {
     }
     
     public void daload() {
-        arrayloader();
+        arrayloader(TypeId.DOUBLE);
     }
     
     public void dastore() {
@@ -445,6 +503,7 @@ public class DexMethodAdapter {
     }
     
     public void fcmpl() {
+        Local intLocal = localVariables.get(TypeId.INT);
         Local arg2 = stack.pop();
         Local arg1 = stack.pop();
         getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, -1);
@@ -452,6 +511,7 @@ public class DexMethodAdapter {
     }
     
     public void fcmpg() {
+        Local intLocal = localVariables.get(TypeId.INT);
         Local arg2 = stack.pop();
         Local arg1 = stack.pop();
         getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, 1);
@@ -459,6 +519,7 @@ public class DexMethodAdapter {
     }
     
     public void dcmpl() {
+        Local intLocal = localVariables.get(TypeId.INT);
         Local arg2 = stack.pop();
         Local arg1 = stack.pop();
         getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, -1);
@@ -466,6 +527,7 @@ public class DexMethodAdapter {
     }
     
     public void dcmpg() {
+        Local intLocal = localVariables.get(TypeId.INT);
         Local arg2 = stack.pop();
         Local arg1 = stack.pop();
         getMethodVisitor().compareFloatingPoint(intLocal, arg1, arg2, 1);
@@ -558,7 +620,7 @@ public class DexMethodAdapter {
             stack.push(second);
             stack.push(top);
             stack.push(second);
-//            stack.push(top);
+            stack.push(top);
         }
     }
     
@@ -610,6 +672,12 @@ public class DexMethodAdapter {
         comparison(Comparison.EQ, arg0);
     }
     
+    public void checkcast(Class checkType) {
+        Local source = stack.peek();
+        Local check = localVariables.get(TypeId.get(checkType));
+        getMethodVisitor().cast(check, source);
+    }
+    
     public void ifnonnull(Label arg0) {
         comparisonzero(Comparison.NE, arg0);
     }
@@ -659,6 +727,7 @@ public class DexMethodAdapter {
     }
     
     public void lcmp() {
+        Local intLocal = localVariables.get(TypeId.INT);
         Local arg2 = stack.pop();
         Local arg1 = stack.pop();
         getMethodVisitor().compareLongs(intLocal, arg1, arg2);
@@ -786,71 +855,72 @@ public class DexMethodAdapter {
     }
     
     public void i2d() {
-        casting(doubleLocal);
+        casting(TypeId.DOUBLE);
     }
        
     public void i2l() {
-        casting(longLocal);
+        casting(TypeId.LONG);
     }
     
     public void i2f() {
-        casting(floatLocal);
+        casting(TypeId.FLOAT);
     }
     
     public void i2s() {
-        casting(shortLocal);
+        casting(TypeId.SHORT);
     }
     
     public void i2c() {
-        casting(charLocal);
+        casting(TypeId.CHAR);
     }
     
     public void i2b() {
-        casting(byteLocal);
+        casting(TypeId.BYTE);
     }
     
     public void l2d() {
-        casting(doubleLocal);
+        casting(TypeId.DOUBLE);
     }
     
     public void l2i() {
-        casting(intLocal);
+        casting(TypeId.INT);
     }
     
     public void l2f() {
-        casting(floatLocal);
+        casting(TypeId.FLOAT);
     }
     
     public void f2d() {
-        casting(doubleLocal);
+        casting(TypeId.DOUBLE);
     }
     
     public void f2i() {
-        casting(intLocal);
+        casting(TypeId.INT);
     }
     
     public void f2l() {
-        casting(longLocal);
+        casting(TypeId.LONG);
     }
     
     public void d2f() {
-        casting(floatLocal);
+        casting(TypeId.FLOAT);
     }
     
     public void d2i() {
-        casting(intLocal);
+        casting(TypeId.INT);
     }
     
     public void d2l() {
-        casting(longLocal);
+        casting(TypeId.LONG);
     }
     
-    public void iinc(int arg0, int arg1) {
-        iload(arg0);
-        getMethodVisitor().loadConstant(intLocal, arg1);
+    public void iinc(int variable, int amount) {
+        Local intLocal = localVariables.get(TypeId.INT);
+        iload(variable);
+        getMethodVisitor().loadConstant(intLocal, amount);
         stack.push(intLocal);
         iadd();
-        istore(arg0);
+        istore(variable);
     }
     
     public void monitorenter() {
@@ -883,32 +953,31 @@ public class DexMethodAdapter {
     }
     
     // Cast local's type to argument's type and push back onto the stack
-    public void casting(Local newtype) {
+    public void casting(TypeId type) {
+        Local newtype = localVariables.get(type);
         Local oldtype = stack.pop();
         getMethodVisitor().cast(newtype, oldtype);
         stack.push(newtype);
     }
     
     // Take a local from the local list, load the value into it and push onto stack
-    public void pushValue(int value) {
-        Local local = localVariables.get(0);
+    public void pushValue(TypeId type, int value) {
+        Local local = localVariables.get(type);
         getMethodVisitor().loadConstant(local, value);
         stack.push(local);
-        localVariables.remove(0);
     }
     
     /**
      * Pop arguments off the stack, assign target the value at local[index]
      * then push target onto the stack
      */
-    public void arrayloader() {
-        Local target = localVariables.get(0);
+    public void arrayloader(TypeId type) {
+        Local target = localVariables.get(type);
         Local index = stack.pop();
         Local local = stack.pop();
         
         getMethodVisitor().aget(target, local, index);
         stack.push(target);
-        localVariables.remove(0);
     }
     
     /**
@@ -924,15 +993,16 @@ public class DexMethodAdapter {
        stack.push(local); 
     }
     
-    public void comparison(Comparison comp, Label arg0) {
-        Local arg2 = stack.pop();
+    public void comparison(Comparison comp, Label label) {
         Local arg1 = stack.pop();
-        getMethodVisitor().compare(comp, arg0, arg1, arg2);
+        Local arg0 = stack.pop();
+        getMethodVisitor().compare(comp, label, arg0, arg1);
     }
     
-    public void comparisonzero(Comparison comp, Label arg0) {
-        Local arg1 = stack.pop();
-        code.loadConstant(intLocal, 0);
-        getMethodVisitor().compare(comp, arg0, arg1, intLocal);
+    public void comparisonzero(Comparison comp, Label label) {
+        Local arg0 = stack.pop();
+        Local zero = localVariables.get(TypeId.INT);
+        code.loadConstant(zero, 0);
+        getMethodVisitor().compare(comp, label, arg0, zero);
     }
 }
