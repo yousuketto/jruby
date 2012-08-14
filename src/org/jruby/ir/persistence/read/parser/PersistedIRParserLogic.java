@@ -77,8 +77,8 @@ public class PersistedIRParserLogic {
         return _symbol_lst;
     }
     
-    Symbol markAsDeadIfNeeded(Symbol instrSymbol, Object marker) {
-        if(marker != null) {
+    Symbol markAsDeadIfNeeded(Symbol instrSymbol, Symbol marker) {
+        if(marker.value != null) {
             Instr currentInstr =  (Instr) instrSymbol.value;
             currentInstr.markDead();
         }
@@ -95,8 +95,8 @@ public class PersistedIRParserLogic {
         return new Symbol(instr);
     }
     
-    Symbol markHasUnusedResultIfNeeded(Symbol instrSymbol, Object marker) {
-        if(marker != null) {
+    Symbol markHasUnusedResultIfNeeded(Symbol instrSymbol, Symbol marker) {
+        if(marker.value != null) {
             Instr currentInstr =  (Instr) instrSymbol.value;
             currentInstr.markUnusedResult();
         }
