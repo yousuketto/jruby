@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project basedir="..">
+    <import file="../build.xml"/>
 
     <patternset id="dist.bindir.files">
         <exclude name="bin/jruby"/>
@@ -63,6 +64,7 @@
         <include name="build.xml"/>
         <include name="ivy/**"/>
         <include name="rakelib/**"/>
+        <include name="antlib/**"/>
         <include name="nbproject/*"/>
         <include name=".project"/>
         <include name=".classpath"/>
@@ -248,9 +250,12 @@
         </antcall>
     </target>
 
-    <target name="dist" depends="install-dev-gems,dist-bin,dist-src,dist-jar-complete">
-        <rake task="gem"/>
+    <target name="dist" depends="install-dev-gems,dist-bin,dist-src,dist-jar-complete,dist-gem">
         <rake task="installer"/>
+    </target>
+
+    <target name="dist-gem" depends="install-dev-gems,dist-jar-complete">
+        <rake task="gem"/>
     </target>
 
     <target name="dist-clean">

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project basedir="..">
-    <target name="compile-test" depends="jar" description="Compile the unit tests">
+    <import file="../build.xml"/>
+
+	<target name="compile-test" depends="jar" description="Compile the unit tests">
         <javac destdir="${test.classes.dir}" deprecation="true" encoding="UTF-8" debug="true"
                source="${javac.version}" target="${javac.version}" includeantruntime="false">
             <classpath>
@@ -39,6 +41,7 @@
     <target name="test-extended" depends="
     copy-test-files,
     install-gems,
+    run-junit-interpreted,
     run-junit-compiled,
     run-junit-embed,
     test-rake-targets"
@@ -61,6 +64,7 @@
       install-gems,
       test-security-manager,
       run-junit-interpreted,
+      run-junit-embed,
       run-junit-compiled,
       run-junit-precompiled,
       run-junit-reflected-precompiled,

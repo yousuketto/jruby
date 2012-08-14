@@ -50,7 +50,7 @@ public class DefineInstanceMethodInstr extends Instr {
         String     name  = method.getName();
 
         // Error checks and warnings on method definitions
-        Ruby runtime = context.getRuntime();
+        Ruby runtime = context.runtime;
         if (clazz == runtime.getDummy()) {
             throw runtime.newTypeError("no class/module to add method");
         }

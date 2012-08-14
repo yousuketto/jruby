@@ -61,7 +61,7 @@ public class GetClassVarContainerModuleInstr extends Instr implements ResultInst
 
     @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
-        Ruby        runtime   = context.getRuntime();
+        Ruby        runtime   = context.runtime;
         StaticScope scope     = (StaticScope) startingScope.retrieve(context, self, currDynScope, temp);
         RubyModule  rubyClass = scope.getModule();
 
@@ -80,7 +80,9 @@ public class GetClassVarContainerModuleInstr extends Instr implements ResultInst
             rubyClass = arg.getMetaClass();
         }
 
-        if (rubyClass == null) throw context.getRuntime().newTypeError("no class/module to define class variable");
+        if (rubyClass == null) {
+            throw context.runtime.newTypeError("no class/module to define class variable");
+        }
 
         return rubyClass;
     }

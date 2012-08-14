@@ -1042,8 +1042,6 @@ public class ScriptingContainerTest {
         // Sharing local variables over method call doesn't work.
         // Should delete methods with unit argument?
         logger1.info("callMethod(receiver, methodName, returnType, unit)");
-        Object receiver = null;
-        String methodName = "";
         Class<Object> returnType = null;
         EmbedEvalUnit unit = null;
         ScriptingContainer instance = new ScriptingContainer(LocalContextScope.THREADSAFE, LocalVariableBehavior.PERSISTENT);
@@ -1053,9 +1051,9 @@ public class ScriptingContainerTest {
         instance.setWriter(writer);
         instance.setErrorWriter(writer);
         
-        Object expResult = null;
-        Object result = instance.callMethod(receiver, methodName, returnType, unit);
-        assertEquals(expResult, result);
+        // Verify that empty message name returns null
+        Object result = instance.callMethod(null, "", returnType, unit);
+        assertEquals(null, result);
 
         String text = 
             "songs:\n"+
@@ -1065,17 +1063,15 @@ public class ScriptingContainerTest {
             "podcasts:\n" +
             "- Java Posse\n" +
             "- Stack Overflow";
-        String filename = "org/jruby/embed/ruby/yaml_dump.rb";
         StringWriter sw = new StringWriter();
         instance.setWriter(sw);
         // local variable doesn't work in this case, so instance variable is used.
         instance.put("@text", text);
-        unit = instance.parse(PathType.CLASSPATH, filename);
-        receiver = unit.run();
-        methodName = "dump";
-        result = instance.callMethod(receiver, methodName, null, unit);
-        expResult =
-            "songs: Hey Soul Sister, Who Says, Apologize\npodcasts: Java Posse, Stack Overflow\n";
+        unit = instance.parse(PathType.CLASSPATH, "org/jruby/embed/ruby/yaml_dump.rb");
+        Object receiver = unit.run();
+        instance.callMethod(instance.getProvider().getRuntime().getTopSelf(), "dump", null, unit);
+        Object expResult =
+                "songs: Hey Soul Sister, Who Says, Apologize\npodcasts: Java Posse, Stack Overflow\n";
         assertEquals(expResult, sw.toString());
 
         instance.getVarMap().clear();
@@ -1127,6 +1123,29 @@ public class ScriptingContainerTest {
         Double[] a = {3.1415, 2.7182, 1.4142};
         List expList = Arrays.asList(a);
         assertEquals(expList, list);
+    }
+
+    @Test
+    public void test_runRubyMethod_with_non_ruby_receiver() {
+        logger1.info("callMethod no returnType");
+        ScriptingContainer instance = new ScriptingContainer(LocalContextScope.THREADSAFE);
+        instance.setError(pstream);
+        instance.setOutput(pstream);
+        instance.setWriter(writer);
+        instance.setErrorWriter(writer);
+        assertEquals(true, instance.runRubyMethod(Boolean.class, null, "nil?"));
+        assertEquals(true, instance.runRubyMethod(Boolean.class, instance.getProvider().getRuntime().getNil(), "nil?"));
+        assertEquals(false, instance.runRubyMethod(Boolean.class, "A Java String", "nil?"));
+        String script =
+                "ScriptingContainer = Java::org.jruby.embed.ScriptingContainer\n" +
+                "class ScriptingContainer\n" +
+                  "def say_something\n" +
+                    "'Something'\n" +
+                  "end\n" +
+                "end\n";
+        instance.runScriptlet(script);
+        String something = instance.runRubyMethod(String.class, instance, "say_something");
+        assertEquals("Something", something);
     }
 
     /**
@@ -1399,7 +1418,7 @@ public class ScriptingContainerTest {
         esw = new StringWriter();
         instance.setErrorWriter(esw);
         instance.runScriptlet("ABC=10;ABC=20");
-        String expResult = "<script>:1 warning: already initialized constant ABC";
+        String expResult = "<script>:2 warning: already initialized constant ABC";
         assertEquals(expResult, esw.toString().trim());
 
         instance.getVarMap().clear();

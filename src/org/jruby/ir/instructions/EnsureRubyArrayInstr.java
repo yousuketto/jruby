@@ -60,7 +60,9 @@ public class EnsureRubyArrayInstr extends Instr implements ResultInstr {
     @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
         IRubyObject val = (IRubyObject)object.retrieve(context, self, currDynScope, temp);
-        if (!(val instanceof RubyArray)) val = ArgsUtil.convertToRubyArray(context.getRuntime(), val, false);
+        if (!(val instanceof RubyArray)) {
+            val = ArgsUtil.convertToRubyArray(context.runtime, val, false);
+        }
         return val;
     }
 

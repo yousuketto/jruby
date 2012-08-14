@@ -65,7 +65,7 @@ public class RescueEQQInstr extends Instr implements ResultInstr {
 
     // SSS FIXME: Is this code effectively equivalent to RuntimeHelpers.isJavaExceptionHandled?
     private boolean exceptionHandled(ThreadContext context, IRubyObject excType, Object excObj) {
-        Ruby runtime = context.getRuntime();
+        Ruby runtime = context.runtime;
         if (excObj instanceof IRubyObject) {
             // regular ruby exception
             if (!(excType instanceof RubyModule)) throw runtime.newTypeError("class or module required for rescue clause. Found: " + excType);
@@ -88,7 +88,7 @@ public class RescueEQQInstr extends Instr implements ResultInstr {
 
     @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
-        Ruby runtime = context.getRuntime();
+        Ruby runtime = context.runtime;
         IRubyObject excType = (IRubyObject) arg1.retrieve(context, self, currDynScope, temp);
         Object excObj = arg2.retrieve(context, self, currDynScope, temp);
 

@@ -13,7 +13,7 @@ public class BooleanLiteral extends ImmutableLiteral {
 
     @Override
     public Object createCacheObject(ThreadContext context) {
-        return context.getRuntime().newBoolean(isTrue());
+        return context.runtime.newBoolean(isTrue());
     }
     
     public boolean isTrue()  {

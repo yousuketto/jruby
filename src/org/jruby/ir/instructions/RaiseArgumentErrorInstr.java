@@ -37,7 +37,7 @@ public class RaiseArgumentErrorInstr extends Instr {
 
     @Override
     public Object interpret(ThreadContext context, DynamicScope currDynScope, IRubyObject self, Object[] temp, Block block) {
-        Arity.raiseArgumentError(context.getRuntime(), numArgs, required, required + opt);
+        Arity.raiseArgumentError(context.runtime, numArgs, required, required + opt);
         return null;
     }
 
