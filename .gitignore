@@ -54,3 +54,6 @@ build_graph.png
 /.idea/
 /.rbx/
 *.sw[mnop]
+src/org/jruby/ir/persistence/read/parser/PersistedIRParser.java
+src/org/jruby/ir/persistence/read/lexer/PersistedIRScanner.java
+
