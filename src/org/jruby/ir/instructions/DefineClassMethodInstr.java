@@ -35,6 +35,10 @@ public class DefineClassMethodInstr extends Instr {
         return method;
     }
 
+    public Operand getContainer() {
+        return container;
+    }
+
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         // SSS FIXME: So, what happens to the method?
@@ -80,9 +84,5 @@ public class DefineClassMethodInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.DefineClassMethodInstr(this);
-    }
-
-    public Operand getContainer() {
-        return container;
     }
 }

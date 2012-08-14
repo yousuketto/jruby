@@ -19,11 +19,9 @@ public class Label extends Operand {
 
     public static int index = 0;
 
-    public Label(String l) { label = l; }
-
-    @Override
-    public String toString() { 
-        return label;
+    public Label(String l) {
+        super(OperandType.LABEL);
+        label = l; 
     }
 
     @Override

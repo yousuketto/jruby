@@ -29,6 +29,10 @@ public class RestoreErrorInfoInstr extends Instr {
         this.arg = arg;
     }
 
+    public Operand getArg() {
+        return arg;
+    }
+
     @Override
     public Operand[] getOperands() {
         return new Operand[] { arg };
@@ -54,9 +58,5 @@ public class RestoreErrorInfoInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.RestoreErrorInfoInstr(this);
-    }
-
-    public Operand getArg() {
-        return arg;
     }
 }

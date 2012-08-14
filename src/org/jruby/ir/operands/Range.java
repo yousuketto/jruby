@@ -21,14 +21,10 @@ public class Range extends Operand {
     private boolean exclusive;
 
     public Range(Operand begin, Operand end, boolean exclusive) {
+        super(OperandType.RANGE);
         this.begin = begin;
         this.end = end;
         this.exclusive = exclusive;
-    }
-
-    @Override
-    public String toString() {
-        return "(" + begin + (exclusive ? ".." : "...") + end + ")";
     }
 
 // ---------- These methods below are used during compile-time optimizations ------- 
@@ -75,5 +71,17 @@ public class Range extends Operand {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.Range(this);
+    }    
+
+    public Operand getBegin() {
+        return begin;
+    }
+
+    public Operand getEnd() {
+        return end;
+    }
+
+    public boolean isExclusive() {
+        return exclusive;
     }
 }

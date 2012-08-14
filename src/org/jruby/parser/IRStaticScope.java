@@ -15,7 +15,7 @@ public class IRStaticScope extends StaticScope {
 
     private static final String[] NO_NAMES = new String[0];
 
-    private IRStaticScopeType type;
+    private final IRStaticScopeType type;
     private boolean isBlockOrEval;
     private boolean isArgumentScope; // Is this block and argument scope of a define_method (for the purposes of zsuper).
     
@@ -64,6 +64,10 @@ public class IRStaticScope extends StaticScope {
     @Override
     public void makeArgumentScope() {
         this.isArgumentScope = true;
+    }
+    
+    public IRStaticScopeType getType() {
+        return type;
     }
 
     /**

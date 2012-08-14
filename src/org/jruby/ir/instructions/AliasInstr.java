@@ -35,22 +35,34 @@ public class AliasInstr extends Instr {
         this.newName = newName;
         this.oldName = oldName;
     }
-
+    
+    public Variable getReceiver() {
+        return receiver;
+    }
+    
+    public Operand getNewName() {
+        return newName;
+    }
+    
+    public Operand getOldName() {
+        return oldName;
+    }
+    
     @Override
     public Operand[] getOperands() {
-        return new Operand[] {getReceiver(), getNewName(), getOldName()};
+        return new Operand[] {receiver, newName, oldName};
     }
 
     @Override
     public void simplifyOperands(Map<Operand, Operand> valueMap, boolean force) {
-        oldName = getOldName().getSimplifiedOperand(valueMap, force);
-        newName = getNewName().getSimplifiedOperand(valueMap, force);
+        oldName = oldName.getSimplifiedOperand(valueMap, force);
+        newName = newName.getSimplifiedOperand(valueMap, force);
     }
 
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
-        return new AliasInstr((Variable) receiver.cloneForInlining(ii), getNewName().cloneForInlining(ii),
-                getOldName().cloneForInlining(ii));
+        return new AliasInstr((Variable) receiver.cloneForInlining(ii), newName.cloneForInlining(ii),
+                oldName.cloneForInlining(ii));
     }
 
     @Override
@@ -61,8 +73,8 @@ public class AliasInstr extends Instr {
             throw context.getRuntime().newTypeError("no class to make alias");
         }
 
-        String newNameString = getNewName().retrieve(context, self, currDynScope, temp).toString();
-        String oldNameString = getOldName().retrieve(context, self, currDynScope, temp).toString();
+        String newNameString = newName.retrieve(context, self, currDynScope, temp).toString();
+        String oldNameString = oldName.retrieve(context, self, currDynScope, temp).toString();
 
         RubyModule module = (object instanceof RubyModule) ? (RubyModule) object : object.getMetaClass();
         module.defineAlias(newNameString, oldNameString);
@@ -73,17 +85,5 @@ public class AliasInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.AliasInstr(this);
-    }
-
-    public Variable getReceiver() {
-        return receiver;
-    }
-
-    public Operand getNewName() {
-        return newName;
-    }
-
-    public Operand getOldName() {
-        return oldName;
     }
 }

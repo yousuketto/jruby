@@ -15,10 +15,13 @@ public class DynamicSymbol extends Operand {
     // Or can it happen during optimizations that this becomes a generic operand?
     final private CompoundString symbolName;
 
-    public DynamicSymbol(CompoundString n) { symbolName = n; }
+    public DynamicSymbol(CompoundString n) {
+        super(OperandType.DYNAMIC_SYMBOL);
+        symbolName = n;
+    }
 
-    public String toString() {
-        return ":" + symbolName.toString();
+    public CompoundString getSymbolName() {
+        return symbolName;
     }
 
     public Operand getSimplifiedOperand(Map<Operand, Operand> valueMap, boolean force) {

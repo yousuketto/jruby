@@ -1,4 +1,5 @@
-package org.jruby.ir.persistence;
+package org.jruby.ir.persistence.read;
+
 
 public enum IRReadingContext {
     INSTANCE;
@@ -12,5 +13,4 @@ public enum IRReadingContext {
     public String getFileName() {
         return fileNameLocal.get();
     }
-
 }

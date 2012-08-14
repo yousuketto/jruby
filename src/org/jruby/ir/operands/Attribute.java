@@ -23,6 +23,10 @@ public class Attribute extends Operand
 //    DEFERRED
 //    AttributeValue _val;       // Attribute value
 
+    public Attribute() {
+        super(OperandType.ATTRIBUTE);
+    }
+    
     public Operand getSimplifiedOperand(Map<Operand, Operand> valueMap, boolean force)
     {
 /*

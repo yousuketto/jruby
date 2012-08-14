@@ -24,7 +24,12 @@ public class SValue extends Operand {
     final private Operand array;
 
     public SValue(Operand array) {
+        super(OperandType.SVALUE);
         this.array = array;
+    }
+
+    public Operand getArray() {
+        return array;
     }
 
     @Override
@@ -33,16 +38,12 @@ public class SValue extends Operand {
     }
 
     @Override
-    public String toString() {
-        return "SValue:" + array;
-    }
-
-    @Override
     public Operand getSimplifiedOperand(Map<Operand, Operand> valueMap, boolean force) {
         Operand newArray = array.getSimplifiedOperand(valueMap, force);
         if (newArray instanceof Array) {
             Array a = (Array) newArray;
-            return (a.elts.length == 1) ? a.elts[0] : a;
+            Operand[] elts = a.getElts();
+            return (elts.length == 1) ? elts[0] : a;
         } else {
             return (newArray == array) ? this : new SValue(newArray);
         }

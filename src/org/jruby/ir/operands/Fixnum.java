@@ -29,21 +29,21 @@ public class Fixnum extends ImmutableLiteral {
     final public Long value;
 
     public Fixnum(Long val) {
+        super(OperandType.FIXNUM);
         value = val;
     }
 
     public Fixnum(BigInteger val) { 
         this(val.longValue());
     }
+
+    public Long getValue() {
+        return value;
+    }
     
     @Override
     public Object createCacheObject(ThreadContext context) {
         return context.getRuntime().newFixnum(value);
-    }    
-
-    @Override
-    public String toString() { 
-        return "Fixnum:" + value;
     }
 
 // ---------- These methods below are used during compile-time optimizations ------- 
@@ -73,9 +73,5 @@ public class Fixnum extends ImmutableLiteral {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.Fixnum(this);
-    }
-
-    public Long getValue() {
-        return value;
     }
 }

@@ -7,10 +7,12 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class Self extends LocalVariable {
+    private static final String NAME = "%self";
+    
     public static final Self SELF = new Self();
 
     private Self() {
-        super("%self", 0, 0);
+        super(OperandType.SELF, NAME, 0, 0);
     }
 
     public boolean isSelf() {

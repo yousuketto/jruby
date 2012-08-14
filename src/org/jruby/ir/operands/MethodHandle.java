@@ -21,7 +21,7 @@ import java.util.Map;
 // which might be stored in an inline cache.
 public class MethodHandle extends Operand {
     final protected Operand methodName;
-    final protected Operand receiver;
+    private final Operand receiver;
 
     // Used during interpretation
     private String      resolvedMethodName;
@@ -29,6 +29,7 @@ public class MethodHandle extends Operand {
     private IRubyObject receiverObj;
 
     public MethodHandle(Operand methodName, Operand receiver) {
+        super(OperandType.METHOD_HANDLE);
         this.methodName = methodName;
         this.receiver = receiver;
     }
@@ -68,11 +69,6 @@ public class MethodHandle extends Operand {
     }
 
     @Override
-    public String toString() {
-        return "<" + receiver + "." + methodName + ">";
-    }
-
-    @Override
     public Operand cloneForInlining(InlinerInfo ii) { 
         return new MethodHandle(methodName.cloneForInlining(ii), receiver.cloneForInlining(ii));
     }
@@ -109,5 +105,9 @@ public class MethodHandle extends Operand {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.MethodHandle(this);
+    }
+
+    public Operand getReceiver() {
+        return receiver;
     }
 }

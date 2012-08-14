@@ -24,12 +24,17 @@ public class StringLiteral extends Operand {
     final public String   string;
 
     public StringLiteral(ByteList val) {
-        bytelist = val;
-        string = bytelist.toString();
+        this(val.toString(), val);
     }
     
     public StringLiteral(String s) {
-        bytelist = ByteList.create(s); string = s;
+        this(s, ByteList.create(s));
+    }
+    
+    private StringLiteral(String string, ByteList byteList ) {
+        super(OperandType.STRING_LITERAL);
+        bytelist = byteList;
+        this.string = string;
     }
 
     @Override
@@ -45,11 +50,6 @@ public class StringLiteral extends Operand {
     @Override
     public Operand cloneForInlining(InlinerInfo ii) {
         return this;
-    }
-
-    @Override
-    public String toString() {
-        return "\"" + string + "\"";
     }
 
     @Override

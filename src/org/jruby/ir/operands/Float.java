@@ -7,6 +7,7 @@ public class Float extends ImmutableLiteral {
     final public Double value;
 
     public Float(Double value) {
+        super(OperandType.FLOAT);
         this.value = value;
     }
 
@@ -18,11 +19,6 @@ public class Float extends ImmutableLiteral {
     @Override
     public Object createCacheObject(ThreadContext context) {
         return context.getRuntime().newFloat(value);
-    }
-
-    @Override
-    public String toString() {
-        return "Float:" + value;
     }
 
     public Operand computeValue(String methodName, Operand arg) {

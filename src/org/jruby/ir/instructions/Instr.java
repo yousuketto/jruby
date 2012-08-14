@@ -9,7 +9,7 @@ import org.jruby.ir.Operation;
 import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Variable;
-import org.jruby.ir.persistence.util.InstructionPersister;
+import org.jruby.ir.persistence.persist.string.IRToStringTranslator;
 import org.jruby.ir.transformations.inlining.InlinerInfo;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.DynamicScope;
@@ -47,13 +47,9 @@ public abstract class Instr {
 
     @Override
     public String toString() {
-        InstructionPersister persister = new InstructionPersister();
-        persister.visit(this);
-        return persister.getResult();
+        return IRToStringTranslator.translate(this);
     }
     
-    
-
     @Interp
     public Operation getOperation() {
         return operation;

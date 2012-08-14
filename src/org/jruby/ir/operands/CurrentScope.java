@@ -13,7 +13,12 @@ public class CurrentScope extends Operand {
     private final IRScope scope;
 
     public CurrentScope(IRScope scope) {
+        super(OperandType.CURRENT_SCOPE);
         this.scope = scope;
+    }
+
+    public IRScope getScope() {
+        return scope;
     }
     
     @Override
@@ -26,18 +31,9 @@ public class CurrentScope extends Operand {
         return this;
     }
 
-    public IRScope getScope() {
-        return scope;
-    }
-
     @Override
     public boolean canCopyPropagate() {
         return true;
-    }
-
-    @Override
-    public String toString() {
-        return "scope<" + scope.getName() + ">";
     }
 
     @Override

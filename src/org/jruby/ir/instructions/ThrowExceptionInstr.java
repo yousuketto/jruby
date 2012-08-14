@@ -24,6 +24,10 @@ public class ThrowExceptionInstr extends Instr {
         this.exceptionArg = exception;
     }
 
+    public Operand getExceptionArg() {
+        return exceptionArg;
+    }
+
     public Operand[] getOperands() {
         return new Operand[]{ exceptionArg };
     }
@@ -58,9 +62,5 @@ public class ThrowExceptionInstr extends Instr {
     @Override
     public void visit(IRVisitor visitor) {
         visitor.ThrowExceptionInstr(this);
-    }
-
-    public Operand getExceptionArg() {
-        return exceptionArg;
     }
 }

@@ -8,11 +8,11 @@ java_import org.jruby.ast.Node
 java_import org.jruby.ir.IRBuilder
 java_import org.jruby.ir.IRManager
 java_import org.jruby.ir.IRScope
-java_import org.jruby.ir.persistence.IRPersistenceFacade
-java_import org.jruby.ir.persistence.IRReadingContext
+java_import org.jruby.ir.persistence.persist.IRPersister
+java_import org.jruby.ir.persistence.read.IRReadingContext
 
 # Fibbonacci example from http://www.engineyard.com/blog/2012/oss-grant-roundup-jruby-runtime/ is used here
-describe IRPersistenceFacade do
+describe IRPersister do
   # Pathes
   CURRENT_DIR = File.expand_path(File.dirname(__FILE__))
   REFERENCE_DIR = "#{CURRENT_DIR}/reference"
@@ -59,10 +59,6 @@ describe IRPersistenceFacade do
     it 'should create file identical to the reference one' do
       FileUtils.identical?(REFERENCE_IR_FILE_PATH, EXPECTED_CREATED_IR_FILE_PATH).should be_true
     end
-  end
-
-  describe '.read' do
-    it 'should read IR from disk without loss of information'
   end
 
 end

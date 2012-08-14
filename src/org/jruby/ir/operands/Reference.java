@@ -9,7 +9,8 @@ import org.jruby.ir.transformations.inlining.InlinerInfo;
 public abstract class Reference extends Operand {
     final private String name;
 
-    public Reference(String name) {
+    public Reference(OperandType type, String name) {
+        super(type);
         this.name = name;
     }
 
@@ -25,10 +26,5 @@ public abstract class Reference extends Operand {
     @Override
     public Operand cloneForInlining(InlinerInfo ii) {
         return this;
-    }
-
-    @Override
-    public String toString() {
-        return name;
     }
 }

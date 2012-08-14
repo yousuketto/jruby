@@ -63,6 +63,8 @@ import org.jruby.util.cli.Options;
 import org.jruby.util.cli.OutputStrings;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
+import org.perf4j.LoggingStopWatch;
+import org.perf4j.StopWatch;
 
 /**
  * Class used to launch the interpreter.
@@ -187,6 +189,7 @@ public class Main {
      * @param args command-line args, provided by the JVM.
      */
     public static void main(String[] args) {
+        StopWatch stopWatch = new LoggingStopWatch("Alltogether");
         doGCJCheck();
         
         Main main = new Main(true);
@@ -206,7 +209,10 @@ public class Main {
                 System.err.println(ThreadContext.createRawBacktraceStringFromThrowable(t));
             }
             System.exit(1);
+        } finally {
+            stopWatch.stop();
         }
+        
     }
 
     public Status run(String[] args) {
