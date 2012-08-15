@@ -165,8 +165,6 @@ import org.jruby.util.io.SelectorPool;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 import org.jruby.util.unsafe.UnsafeFactory;
-import org.perf4j.LoggingStopWatch;
-import org.perf4j.StopWatch;
 
 /**
  * The Ruby object represents the top-level of a JRuby "instance" in a given VM.
@@ -2435,17 +2433,23 @@ public final class Ruby {
     // Modern variant of parseFile function above
     public ParseResult parseFile(String file, InputStream in, DynamicScope scope, int lineNumber) {
         addLoadParseToStats();
-        
+        System.out.println(file);
         if(RubyInstanceConfig.IR_READING) {
             try {
-                // Get IR from .ir file
-                File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
-                InputStream irIn = new FileInputStream(irFile);
-                
-                StopWatch stopWatch = new LoggingStopWatch(".ir -> IR");
-                IRScope irScope = IRReader.read(irIn, this);
-                stopWatch.stop();
-                return irScope;
+                InputStream irIn = null;
+                try {
+                    // Get IR from .ir file
+                    File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
+                    irIn = new FileInputStream(irFile);
+                    IRReadingContext.INSTANCE.start(".ir -> IR");
+                    IRScope irScope = IRReader.read(irIn, this);
+                    IRReadingContext.INSTANCE.stop();
+                    return irScope;
+                } finally {
+                    if (irIn != null) {
+                        irIn.close();
+                    }
+                }
             } catch (Exception e) {
                 System.out.println(e);
                 // If something gone wrong with ir -
@@ -2453,9 +2457,9 @@ public final class Ruby {
             }
             
         } else { // Read .rb file
-            StopWatch stopWatch = new LoggingStopWatch(".rb -> AST");
+            IRReadingContext.INSTANCE.start(".rb -> AST");
             Node ast = parseFileFromMainAndGetAST(in, file, scope);
-            stopWatch.stop();
+            IRReadingContext.INSTANCE.stop();
             
             return ast;
         }
@@ -2473,20 +2477,28 @@ public final class Ruby {
         
         if(RubyInstanceConfig.IR_READING) {
             try {
-                File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
-                InputStream irIn = new FileInputStream(irFile);
-                StopWatch stopWatch = new LoggingStopWatch(".ir -> IR");
-                IRScope irScope = IRReader.read(irIn, this);
-                stopWatch.stop();
-                return irScope;
+                InputStream irIn = null;
+                try {
+                    // Get IR from .ir file
+                    File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
+                    irIn = new FileInputStream(irFile);
+                    IRReadingContext.INSTANCE.start(".ir -> IR");
+                    IRScope irScope = IRReader.read(irIn, this);
+                    IRReadingContext.INSTANCE.stop();
+                    return irScope;
+                } finally {
+                    if (irIn != null) {
+                        irIn.close();
+                    }
+                }
             } catch (Exception e) {
                 System.out.println(e);
                 return parseFileFromMainAndGetAST(in, file, scope);
             }
         } else {
-            StopWatch stopWatch = new LoggingStopWatch(".rb -> AST");
+            IRReadingContext.INSTANCE.start(".rb -> AST");
             Node ast = parseFileFromMainAndGetAST(in, file, scope);
-            stopWatch.stop();
+            IRReadingContext.INSTANCE.stop();
             
             return ast;
         }

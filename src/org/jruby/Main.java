@@ -54,6 +54,7 @@ import java.util.Properties;
 import org.jruby.exceptions.MainExitException;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.exceptions.ThreadKill;
+import org.jruby.ir.persistence.read.IRReadingContext;
 import org.jruby.platform.Platform;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -189,7 +190,6 @@ public class Main {
      * @param args command-line args, provided by the JVM.
      */
     public static void main(String[] args) {
-        StopWatch stopWatch = new LoggingStopWatch("Alltogether");
         doGCJCheck();
         
         Main main = new Main(true);
@@ -210,7 +210,7 @@ public class Main {
             }
             System.exit(1);
         } finally {
-            stopWatch.stop();
+            System.out.println("Total time: " + IRReadingContext.INSTANCE.getTotalTime());
         }
         
     }

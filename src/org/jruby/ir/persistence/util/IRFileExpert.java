@@ -30,7 +30,7 @@ public enum IRFileExpert {
         if (endOfFileName > 0) {
             fileNameWithoutExtension = fileName.substring(startOfFileName, endOfFileName);
         } else {
-            fileNameWithoutExtension = fileName;
+            fileNameWithoutExtension = fileName.substring(startOfFileName);
         }
 
         String irFileName = fileNameWithoutExtension + IR_FILE_EXTENSION;

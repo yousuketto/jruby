@@ -6,8 +6,7 @@ import org.jruby.RubyInstanceConfig;
 import org.jruby.ast.RootNode;
 import org.jruby.ir.persistence.IRPersistenceException;
 import org.jruby.ir.persistence.persist.IRPersister;
-import org.perf4j.LoggingStopWatch;
-import org.perf4j.StopWatch;
+import org.jruby.ir.persistence.read.IRReadingContext;
 
 /**
  * Abstract class that contains general logic for both IR Compiler and IR
@@ -29,15 +28,15 @@ public abstract class IRTranslator<R, S> {
                 
                 RootNode rootNode = (RootNode) parseResult;
                 if (isIRPersistenceRequired()) {
-                    StopWatch stopWatch = new LoggingStopWatch("AST -> IR");
+                    IRReadingContext.INSTANCE.start("AST -> IR");
                     producedIRScope = produceIrScope(runtime, rootNode, false);
-                    stopWatch.stop();
+                    IRReadingContext.INSTANCE.stop();
                     IRPersister.persist(producedIRScope);
                     result = translationSpecificLogic(runtime, producedIRScope, specificObject);
                 } else {
-                    StopWatch stopWatch = new LoggingStopWatch("AST -> IR");
+                    IRReadingContext.INSTANCE.start("AST -> IR");
                     producedIRScope = produceIrScope(runtime, rootNode, false);
-                    stopWatch.stop();
+                    IRReadingContext.INSTANCE.stop();
                     result = translationSpecificLogic(runtime, producedIRScope, specificObject);
                 }                
                 

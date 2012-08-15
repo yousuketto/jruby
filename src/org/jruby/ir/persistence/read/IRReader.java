@@ -11,11 +11,13 @@ import org.jruby.ir.persistence.read.parser.PersistedIRParser;
 
 public class IRReader {
 
+    private static final PersistedIRParser parser = new PersistedIRParser();
+
     public static IRScope read(InputStream is, Ruby runtime) throws IRPersistenceException {
         try {
-            PersistedIRScanner input = new PersistedIRScanner(is);
-            PersistedIRParser parser = new PersistedIRParser();
-            IRParsingContext context = new IRParsingContext(runtime);
+            final PersistedIRScanner input = new PersistedIRScanner(is);
+            final IRParsingContext context = new IRParsingContext(runtime);
+            
             parser.init(context);
             return (IRScope) parser.parse(input);
         } catch (Exception e) {
