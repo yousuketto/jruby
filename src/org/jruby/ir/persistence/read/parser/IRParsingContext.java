@@ -8,15 +8,16 @@ import org.jruby.ir.IRManager;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.operands.Label;
 import org.jruby.ir.operands.TemporaryVariable;
+import org.jruby.ir.persistence.util.IRScopeNameExpert;
 
 public class IRParsingContext {
     
-    private Ruby runtime;
-    private Map<String, IRScope> scopesByNames = new HashMap<String, IRScope>();
+    private final Ruby runtime;
+    private final Map<String, IRScope> scopesByNames = new HashMap<String, IRScope>();
     private IRScope toplevelScope;
     private IRScope currentScope;
-    private Map<String, TemporaryVariable> variablesByNames = new HashMap<String, TemporaryVariable>();
-    private Map<String, Label> labelsByNames = new HashMap<String, Label>();
+    private final Map<String, TemporaryVariable> variablesByNames = new HashMap<String, TemporaryVariable>();
+    private final Map<String, Label> labelsByNames = new HashMap<String, Label>();
     
     public IRParsingContext(Ruby runtime) {
         this.runtime = runtime;
@@ -30,12 +31,18 @@ public class IRParsingContext {
         return runtime.getIRManager();
     }
     
-    public void addToScopes(IRScope scope) {
-        scopesByNames.put(scope.getName()+":"+scope.getLineNumber(), scope);
+    public boolean isContainsScope(String disambiguatedScopeName) {
+        return scopesByNames.containsKey(disambiguatedScopeName);
     }
     
-    public IRScope getScopeByName(String name) {
-        return scopesByNames.get(name);
+    public void addToScopes(IRScope scope) {
+        final String disambiguatedScopeName = IRScopeNameExpert.INSTANCE.getDisambiguatedScopeName(scope);
+        
+        scopesByNames.put(disambiguatedScopeName, scope);
+    }
+    
+    public IRScope getScopeByName(String disambiguatedScopeName) {
+        return scopesByNames.get(disambiguatedScopeName);
     }
 
     public IRScope getCurrentScope() {

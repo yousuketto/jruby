@@ -44,6 +44,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -109,6 +110,7 @@ import org.jruby.ir.Compiler;
 import org.jruby.ir.IRManager;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.interpreter.Interpreter;
+import org.jruby.ir.persistence.IRPersistenceException;
 import org.jruby.ir.persistence.read.IRReader;
 import org.jruby.ir.persistence.read.IRReadingContext;
 import org.jruby.ir.persistence.util.IRFileExpert;
@@ -2426,7 +2428,7 @@ public final class Ruby {
     // Obsolete parseFile function    
     public Node parseFile(InputStream in, String file, DynamicScope scope, int lineNumber) {
         addLoadParseToStats();
-        return parseFileAndGetAST(in, file, scope, lineNumber, false);
+        return parseRbAndGetAST(in, file, scope, lineNumber, false);
         
     }
     
@@ -2436,29 +2438,16 @@ public final class Ruby {
         System.out.println(file);
         if(RubyInstanceConfig.IR_READING) {
             try {
-                InputStream irIn = null;
-                try {
-                    // Get IR from .ir file
-                    File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
-                    irIn = new FileInputStream(irFile);
-                    IRReadingContext.INSTANCE.start(".ir -> IR");
-                    IRScope irScope = IRReader.read(irIn, this);
-                    IRReadingContext.INSTANCE.stop();
-                    return irScope;
-                } finally {
-                    if (irIn != null) {
-                        irIn.close();
-                    }
-                }
+                return parseIRAndGetIRScope(file);
             } catch (Exception e) {
                 System.out.println(e);
                 // If something gone wrong with ir -
-                return parseFileAndGetAST(in, file, scope, lineNumber, false);
+                return parseRbAndGetAST(in, file, scope, lineNumber, false);
             }
             
         } else { // Read .rb file
             IRReadingContext.INSTANCE.start(".rb -> AST");
-            Node ast = parseFileFromMainAndGetAST(in, file, scope);
+            Node ast = parseRbAndGetAST(in, file, scope, lineNumber, false);
             IRReadingContext.INSTANCE.stop();
             
             return ast;
@@ -2477,20 +2466,7 @@ public final class Ruby {
         
         if(RubyInstanceConfig.IR_READING) {
             try {
-                InputStream irIn = null;
-                try {
-                    // Get IR from .ir file
-                    File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
-                    irIn = new FileInputStream(irFile);
-                    IRReadingContext.INSTANCE.start(".ir -> IR");
-                    IRScope irScope = IRReader.read(irIn, this);
-                    IRReadingContext.INSTANCE.stop();
-                    return irScope;
-                } finally {
-                    if (irIn != null) {
-                        irIn.close();
-                    }
-                }
+                return parseIRAndGetIRScope(file);
             } catch (Exception e) {
                 System.out.println(e);
                 return parseFileFromMainAndGetAST(in, file, scope);
@@ -2503,12 +2479,30 @@ public final class Ruby {
             return ast;
         }
     }
-    
-    private Node parseFileFromMainAndGetAST(InputStream in, String file, DynamicScope scope) {
-        return parseFileAndGetAST(in, file, scope, 0, true);
+
+    private ParseResult parseIRAndGetIRScope(String file) throws FileNotFoundException,
+            IRPersistenceException, IOException {
+        InputStream irIn = null;
+        try {
+            // Get IR from .ir file
+            File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
+            irIn = new FileInputStream(irFile);
+            IRReadingContext.INSTANCE.start(".ir -> IR");
+            IRScope irScope = IRReader.read(irIn, this);
+            IRReadingContext.INSTANCE.stop();
+            return irScope;
+        } finally {
+            if (irIn != null) {
+                irIn.close();
+            }
+        }
     }
     
-    private Node parseFileAndGetAST(InputStream in, String file, DynamicScope scope, int lineNumber, boolean isFromMain) {
+    private Node parseFileFromMainAndGetAST(InputStream in, String file, DynamicScope scope) {
+        return parseRbAndGetAST(in, file, scope, 0, true);
+    }
+    
+    private Node parseRbAndGetAST(InputStream in, String file, DynamicScope scope, int lineNumber, boolean isFromMain) {
         return parser.parse(file, in, scope, new ParserConfiguration(this,
                 lineNumber, false, false, true, isFromMain, config));
     }

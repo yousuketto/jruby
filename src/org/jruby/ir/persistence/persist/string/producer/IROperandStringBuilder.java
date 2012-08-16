@@ -7,7 +7,7 @@ public class IROperandStringBuilder extends AbstractIRStringBuilder<Operand> {
     private static final String PARAMETER_SEPARATOR = ", ";
     private static final String PARAMETER_LIST_END_MARKER = "}";
 
-    public IROperandStringBuilder(StringBuilder parentBuilder) {
+    public IROperandStringBuilder(AbstractIRStringBuilder parentBuilder) {
         super(parentBuilder);
     }
 
@@ -27,6 +27,6 @@ public class IROperandStringBuilder extends AbstractIRStringBuilder<Operand> {
     }
 
     public void appendOperandType(Operand operand) {
-        builder.append(operand.getOperandType());
+        appendVerbatim(operand.getOperandType());
     }
 }

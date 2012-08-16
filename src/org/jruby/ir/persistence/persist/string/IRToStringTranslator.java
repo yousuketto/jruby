@@ -3,6 +3,7 @@ package org.jruby.ir.persistence.persist.string;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.instructions.Instr;
 import org.jruby.ir.operands.Operand;
+import org.jruby.ir.persistence.persist.string.producer.AbstractIRStringBuilder;
 
 
 public class IRToStringTranslator {
@@ -26,12 +27,12 @@ public class IRToStringTranslator {
     
     // Following methods are used from inside StringBuilder's
     // They were added to preserve single instance of StringBuilder
-    public static void continueTranslation(StringBuilder builder, Operand operand) {
+    public static void continueTranslation(AbstractIRStringBuilder builder, Operand operand) {
         IROperandStringExtractor stringExtractor = IROperandStringExtractor.createInstance(builder);
         stringExtractor.produceString(operand);
     }
     
-    public static void continueTranslation(StringBuilder builder, Instr instr) {
+    public static void continueTranslation(AbstractIRStringBuilder builder, Instr instr) {
         IRInstrStringExtractor stringExtractor = IRInstrStringExtractor.createInstance(builder);
         stringExtractor.produceString(instr);
     }

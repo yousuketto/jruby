@@ -45,9 +45,5 @@ public enum OperandType {
     // Unused instruction, its here for consistency
     ATTRIBUTE
     ;
-    
-    public String toString() {
-        return name().toLowerCase();
-    };
 
 }

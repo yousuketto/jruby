@@ -6,39 +6,52 @@ public enum IRFileExpert {
     INSTANCE;
 
     private static final String IR_FILE_EXTENSION = ".ir";
-    private static final String IR_FOLDER = "ir";
     private static final String EXTENSION_SEPARATOR = ".";
 
-    private static final File IR_ROOT_FOLDER = new File(System.getProperty("user.home"), IR_FOLDER);
+    private static final String IR_FOLDER_NAME = "ir";
+    private static final File IR_ROOT_FOLDER = new File(System.getProperty("user.home"), IR_FOLDER_NAME);
 
-    public File getIRFileInIntendedPlace(String fileName) {
+    public File getIRFileInIntendedPlace(final String fileName) {
         
-        fileName = fileName.replaceAll("file:", "");
-        File rbFile = new File(fileName);
-        fileName = rbFile.getAbsolutePath();
+        final String absolutePathToRbFile = getAbsolutePathToFile(fileName);
 
-        int startOfFileName = fileName.lastIndexOf(File.separator) + 1;
+        final int startOfFileName = absolutePathToRbFile.lastIndexOf(File.separator) + 1;
+        
+        final File irFolder = createIRFolderHierarchy(absolutePathToRbFile, startOfFileName);
+        final String irFileName = getIRFileName(absolutePathToRbFile, startOfFileName);
+
+        return new File(irFolder, irFileName);
+        
+    }
+
+    private String getAbsolutePathToFile(final String fileName) {
+        final String normalizedFileName = fileName.replaceAll("file:", "");
+        final File rbFile = new File(normalizedFileName);
+        
+        return rbFile.getAbsolutePath();
+    }
+    
+    private File createIRFolderHierarchy(final String absolutePathToRbFile,
+            final int startOfFileName) {
         File irFolder = IR_ROOT_FOLDER;
         if (startOfFileName > 0) {
-            String fileFolderPath = fileName.substring(0, startOfFileName);
+            String fileFolderPath = absolutePathToRbFile.substring(0, startOfFileName);
             irFolder = new File(irFolder, fileFolderPath);
         }
         irFolder.mkdirs();
+        return irFolder;
+    }
 
-        int endOfFileName = fileName.lastIndexOf(EXTENSION_SEPARATOR);
+    private String getIRFileName(final String absolutePathToRbFile, final int startOfFileName) {
+        final int endOfFileName = absolutePathToRbFile.lastIndexOf(EXTENSION_SEPARATOR);
         String fileNameWithoutExtension;
         if (endOfFileName > 0) {
-            fileNameWithoutExtension = fileName.substring(startOfFileName, endOfFileName);
+            fileNameWithoutExtension = absolutePathToRbFile.substring(startOfFileName, endOfFileName);
         } else {
-            fileNameWithoutExtension = fileName.substring(startOfFileName);
+            fileNameWithoutExtension = absolutePathToRbFile.substring(startOfFileName);
         }
-
-        String irFileName = fileNameWithoutExtension + IR_FILE_EXTENSION;
-
-        File file = new File(irFolder, irFileName);
-
-        return file;
-        
+        final String irFileName = fileNameWithoutExtension + IR_FILE_EXTENSION;
+        return irFileName;
     }
 
 }

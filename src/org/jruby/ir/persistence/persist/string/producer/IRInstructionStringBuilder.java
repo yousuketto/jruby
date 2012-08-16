@@ -14,7 +14,7 @@ public class IRInstructionStringBuilder extends AbstractIRStringBuilder<Instr> {
     private static final String DEAD_MARKER = "[DEAD]";
     private static final String HAS_UNUSED_RESULT_MARKER = "[DEAD-RESULT]";
 
-    public IRInstructionStringBuilder(StringBuilder parentBuilder) {
+    public IRInstructionStringBuilder(AbstractIRStringBuilder parentBuilder) {
         super(parentBuilder);
     }
 
@@ -33,20 +33,21 @@ public class IRInstructionStringBuilder extends AbstractIRStringBuilder<Instr> {
         return PARAMETER_LIST_END_MARKER;
     }
 
-    public void appendPrefix(Instr instr) {
+    public void appendPrefix(final Instr instr) {
         if (instr instanceof ResultInstr) {
-            Variable result = ((ResultInstr) instr).getResult();
-            builder.append(result).append(EQUAL);
+            final Variable result = ((ResultInstr) instr).getResult();
+            appendVerbatim(result);
+            appendVerbatim(EQUAL);
         }
-        builder.append(instr.getOperation());
+        appendVerbatim(instr.getOperation().name());
     }
 
-    public void appendMarkers(Instr instr) {
+    public void appendMarkers(final Instr instr) {
         if (instr.hasUnusedResult()) {
-            builder.append(HAS_UNUSED_RESULT_MARKER);
+            appendVerbatim(HAS_UNUSED_RESULT_MARKER);
         }
         if (instr.isDead()) {
-            builder.append(DEAD_MARKER);
+            appendVerbatim(DEAD_MARKER);
         }
     }
 }

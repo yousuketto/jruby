@@ -3,8 +3,13 @@ package org.jruby.ir.persistence.persist.string.producer;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.persistence.persist.string.IRToStringTranslator;
+import org.jruby.ir.persistence.util.IRScopeNameExpert;
+import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.IRStaticScope;
 import org.jruby.parser.IRStaticScopeType;
+import org.jruby.runtime.Arity;
+import org.jruby.util.KCode;
+import org.jruby.util.RegexpOptions;
 
 public abstract class AbstractIRStringBuilder<T> {
     
@@ -18,14 +23,14 @@ public abstract class AbstractIRStringBuilder<T> {
     private final String PARAMETER_SEPARATOR = getParameterSeparator();
     private final String PARAMETER_LIST_END_MARKER = getParameterListEndMarker();
 
-    protected final StringBuilder builder;
+    private final StringBuilder builder;
 
     // Take StringBuilder from parent or create it if there is no parent
-    AbstractIRStringBuilder(StringBuilder constructedBuilder) {
-        if (constructedBuilder == null) {
+    AbstractIRStringBuilder(AbstractIRStringBuilder parent) {
+        if (parent == null) {
             builder = new StringBuilder();
         } else {
-            builder = constructedBuilder;
+            builder = parent.builder;
         }
     }
 
@@ -35,7 +40,7 @@ public abstract class AbstractIRStringBuilder<T> {
 
     abstract String getParameterListEndMarker();
 
-    public void appendParameters(Object... parameters) {
+    public void appendParameters(final Object... parameters) {
         builder.append(PARAMETER_LIST_START_MARKER);
 
         for (int i = 0; i < parameters.length; i++) {
@@ -43,18 +48,20 @@ public abstract class AbstractIRStringBuilder<T> {
                 builder.append(PARAMETER_SEPARATOR);
             }
 
-            Object parameter = parameters[i];
+            final Object parameter = parameters[i];
             appendParameter(parameter);
         }
 
         builder.append(PARAMETER_LIST_END_MARKER);
     }
 
-    private void appendParameter(Object parameter) {
+    private void appendParameter(final Object parameter) {
         
         // We need these ugly instanceof's because the choice of
         // which overloading to invoke is made at compile time
         // so we can't simply write appendParameter(String string) etc.
+        // TODO: Maybe we have to get rid of that varargs method
+        // and use real builder approach (e.g. builder.appendOperand(op).appendString(str)... ) 
         if (parameter instanceof Operand) {
             appendOperandParameter((Operand) parameter);
 
@@ -62,9 +69,12 @@ public abstract class AbstractIRStringBuilder<T> {
             appendEscapedString((String) parameter);
 
         } else if (parameter instanceof Number) {
-            appendParameterWithoutModifications(parameter);
+            appendVerbatim(parameter);
         } else if (parameter instanceof Boolean) {
-            appendParameterWithoutModifications(parameter);
+            appendVerbatim(parameter);
+        } else if (parameter instanceof Enum) {
+            appendEnum((Enum) parameter);
+            
         } else if (parameter instanceof Object[]) {
             appendArrayParameter((Object[]) parameter);
 
@@ -77,26 +87,51 @@ public abstract class AbstractIRStringBuilder<T> {
         } else if (parameter == null) {
             builder.append(parameter);
             
+        } else if (parameter instanceof ISourcePosition) {
+            appendISourcePossition((ISourcePosition) parameter);
+            
+        } else if (parameter instanceof Arity) {
+            appendArity((Arity) parameter);
+            
+        } else if (parameter instanceof RegexpOptions) {
+            appendRegexpOptions((RegexpOptions) parameter);
+            
         } else {
             appendOtherParameter(parameter);
 
         }
     }
 
-    private void appendOperandParameter(Operand operand) {
-        IRToStringTranslator.continueTranslation(builder, operand);
+    private void appendEnum(Enum enumInstance) {
+        String name = enumInstance.name();
+        
+        appendEscapedString(name);        
     }
 
-    void appendEscapedString(String string) {
-        String escapedStringValue = string.replaceAll(DOUBLE_QUOTES, ESCAPED_DOUBLE_QUOTES);
+    private void appendRegexpOptions(RegexpOptions options) {
+        final KCode kCode = options.getKCode();
+        final boolean kcodeDefault = options.isKcodeDefault();
+        
+        appendOtherParameter(kCode);
+        builder.append(PARAMETER_SEPARATOR);
+        appendVerbatim(kcodeDefault);
+    }
+
+    private void appendOperandParameter(final Operand operand) {
+        IRToStringTranslator.continueTranslation(this, operand);
+    }
+
+    void appendEscapedString(final String string) {
+        final String escapedStringValue = string.replaceAll(DOUBLE_QUOTES, ESCAPED_DOUBLE_QUOTES);
+        
         builder.append(DOUBLE_QUOTES).append(escapedStringValue).append(DOUBLE_QUOTES);
     }
     
-    private void appendParameterWithoutModifications(Object parameter) {
-        builder.append(parameter);
+    void appendVerbatim(final Object value) {
+        builder.append(value);
     }
     
-    private void appendArrayParameter(Object[] array) {
+    private void appendArrayParameter(final Object[] array) {
         builder.append(ARRAY_START_MARKER);
         
         for (int i = 0; i < array.length; i++) {
@@ -104,30 +139,46 @@ public abstract class AbstractIRStringBuilder<T> {
                 builder.append(PARAMETER_SEPARATOR);
             }
             
-            Object parameter = array[i];
+            final Object parameter = array[i];
             appendParameter(parameter);
         }
         
         builder.append(ARRAY_END_MARKER);
     }
 
-    private void appendIRScopeParameter(IRScope scope) {
-        appendEscapedString(scope.getName()+":"+scope.getLineNumber());
+    private void appendIRScopeParameter(final IRScope scope) {
+        final String disambiguatedScopeName = IRScopeNameExpert.INSTANCE.getDisambiguatedScopeName(scope);
+        
+        appendEscapedString(disambiguatedScopeName);
     }
     
-    private void appendStaticScopeParameter(IRStaticScope staticScope) {
-        IRStaticScopeType type = staticScope.getType();
-        String[] variables = staticScope.getVariables();
-        int requiredArgs = staticScope.getRequiredArgs();
+    private void appendStaticScopeParameter(final IRStaticScope staticScope) {
+        final IRStaticScopeType type = staticScope.getType();
+        final String[] variables = staticScope.getVariables();
+        final int requiredArgs = staticScope.getRequiredArgs();
         
         appendOtherParameter(type);
         builder.append(PARAMETER_SEPARATOR);
         appendArrayParameter(variables);
         builder.append(PARAMETER_SEPARATOR);
-        appendParameterWithoutModifications(requiredArgs);
+        appendVerbatim(requiredArgs);
     }
 
-    private void appendOtherParameter(Object parameter) {
+    private void appendISourcePossition(final ISourcePosition position) {
+        final String file = position.getFile();
+        final int line = position.getLine();
+        
+        appendEscapedString(file);
+        appendVerbatim(line);
+    }
+
+    private void appendArity(Arity parameter) {
+        int value = parameter.getValue();
+        
+        appendVerbatim(value);
+    }
+
+    private void appendOtherParameter(final Object parameter) {
         appendEscapedString(parameter.toString());
     }
     

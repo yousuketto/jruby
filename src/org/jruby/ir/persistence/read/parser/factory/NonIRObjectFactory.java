@@ -1,4 +1,4 @@
-package org.jruby.ir.persistence.read.parser;
+package org.jruby.ir.persistence.read.parser.factory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,11 +59,11 @@ public enum NonIRObjectFactory {
     INSTANCE;
     
     public Operation createOperation(String name) {
-        return Operation.valueOf(name.toUpperCase());
+        return Operation.valueOf(name);
     }
     
     public OperandType createOperandType(String name) {
-        return OperandType.valueOf(name.toUpperCase());
+        return OperandType.valueOf(name);
     }
     
     public SpecializedInstType createSpecilizedInstrType(String specializedInstName) {
@@ -218,7 +218,7 @@ public enum NonIRObjectFactory {
     }
     
     public Reason createReason(String reasonString) {
-        return Reason.valueOf(reasonString.toUpperCase());
+        return Reason.valueOf(reasonString);
     }
 
     public KCode createKcode(String kcodeName) {

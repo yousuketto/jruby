@@ -47,8 +47,8 @@ import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.UnexecutableNil;
 import org.jruby.ir.operands.WrappedIRClosure;
+import org.jruby.ir.persistence.persist.string.producer.AbstractIRStringBuilder;
 import org.jruby.ir.persistence.persist.string.producer.IROperandStringBuilder;
-import org.jruby.util.KCode;
 import org.jruby.util.RegexpOptions;
 
 class IROperandStringExtractor extends IRVisitor {
@@ -64,18 +64,18 @@ class IROperandStringExtractor extends IRVisitor {
         IROperandStringBuilder stringProducer = new IROperandStringBuilder(null);
         return new IROperandStringExtractor(stringProducer);
     }
-    static IROperandStringExtractor createInstance(StringBuilder builder) {
+    static IROperandStringExtractor createInstance(AbstractIRStringBuilder builder) {
         IROperandStringBuilder stringProducer = new IROperandStringBuilder(builder);
         return new IROperandStringExtractor(stringProducer);
     }
     
-    public String extract(Operand operand) {
+    public String extract(final Operand operand) {
         produceString(operand);
         
         return stringProducer.getResultString();
     }
     
-    public void produceString(Operand operand) {
+    public void produceString(final Operand operand) {
         stringProducer.appendOperandType(operand);
 
         operand.visit(this);
@@ -84,33 +84,33 @@ class IROperandStringExtractor extends IRVisitor {
  // Operands
 
     // Operands without parameters
-    public void Nil(Nil nil) {}
-    public void ObjectClass(ObjectClass objectclass) {}
-    public void Self(Self self) {}
-    public void StandardError(StandardError standarderror) {}
-    public void UndefinedValue(UndefinedValue undefinedvalue) {}
-    public void UnexecutableNil(UnexecutableNil unexecutablenil) {}
+    public void Nil(final Nil nil) {}
+    public void ObjectClass(final ObjectClass objectclass) {}
+    public void Self(final Self self) {}
+    public void StandardError(final StandardError standarderror) {}
+    public void UndefinedValue(final UndefinedValue undefinedvalue) {}
+    public void UnexecutableNil(final UnexecutableNil unexecutablenil) {}
     
     // Operands that have arrays as parameters
     
     // If we simply pass array directly to appendParameters
     //  than it will be unwrapped
     //  we want to pass single parameters which type is Operand[]
-    public void Array(Array array) {
-        Operand[] elts = array.getElts();        
+    public void Array(final Array array) {
+        final Operand[] elts = array.getElts();        
         
         stringProducer.appendParameters(new Object[] { elts });
     }
     
-    public void BacktickString(BacktickString backtickstring) {
-        List<Operand> pieces = backtickstring.pieces;
+    public void BacktickString(final BacktickString backtickstring) {
+        final List<Operand> pieces = backtickstring.pieces;
         
         stringProducer.appendParameters(new Object[] { pieces.toArray() });
     }
 
-    public void CompoundString(CompoundString compoundstring) {
-        List<Operand> pieces = compoundstring.getPieces();
-        Encoding encoding = compoundstring.getEncoding();
+    public void CompoundString(final CompoundString compoundstring) {
+        final List<Operand> pieces = compoundstring.getPieces();
+        final Encoding encoding = compoundstring.getEncoding();
         
         // No need to wrap pieces array here,
         // 2 parameters are passed,
@@ -118,13 +118,13 @@ class IROperandStringExtractor extends IRVisitor {
         stringProducer.appendParameters(pieces.toArray(), encoding);
     }
 
-    public void Hash(Hash hash) {
+    public void Hash(final Hash hash) {
         List<Operand[]> keyValuePairArrays = Collections.emptyList();
         if (!hash.isBlank()) {
-            List<KeyValuePair> pairs = hash.pairs;
+            final List<KeyValuePair> pairs = hash.pairs;
             keyValuePairArrays = new ArrayList<Operand[]>(pairs.size());
             for (KeyValuePair keyValuePair : pairs) {
-                Operand[] keyValuePairArray = { keyValuePair.getKey(), keyValuePair.getValue() };
+                final Operand[] keyValuePairArray = { keyValuePair.getKey(), keyValuePair.getValue() };
                 keyValuePairArrays.add(keyValuePairArray);
             }
         }        
@@ -133,108 +133,106 @@ class IROperandStringExtractor extends IRVisitor {
 
     // Operands that takes another operands as parameters    
     
-    public void AsString(AsString asstring) {
-        Operand source = asstring.getSource();
+    public void AsString(final AsString asstring) {
+        final Operand source = asstring.getSource();
         
         stringProducer.appendParameters(source);
     }
     
-    public void CompoundArray(CompoundArray compoundarray) {
-        Operand a1 = compoundarray.getA1();
-        Operand a2 = compoundarray.getA2();
-        boolean argsPush = compoundarray.isArgsPush();
+    public void CompoundArray(final CompoundArray compoundarray) {
+        final Operand a1 = compoundarray.getA1();
+        final Operand a2 = compoundarray.getA2();
+        final boolean argsPush = compoundarray.isArgsPush();
         
         stringProducer.appendParameters(a1, a2, argsPush);
     }
 
-    public void DynamicSymbol(DynamicSymbol dynamicsymbol) {
-        CompoundString symbolName = dynamicsymbol.getSymbolName();
+    public void DynamicSymbol(final DynamicSymbol dynamicsymbol) {
+        final CompoundString symbolName = dynamicsymbol.getSymbolName();
         
         stringProducer.appendParameters(symbolName);
     }
 
-    public void MethodHandle(MethodHandle methodhandle) {
-        Operand receiver = methodhandle.getReceiver();
-        Operand methodNameOperand = methodhandle.getMethodNameOperand();
+    public void MethodHandle(final MethodHandle methodhandle) {
+        final Operand receiver = methodhandle.getReceiver();
+        final Operand methodNameOperand = methodhandle.getMethodNameOperand();
         
         stringProducer.appendParameters(receiver, methodNameOperand);
     }
 
-    public void Range(Range range) {
-        Operand begin = range.getBegin();
-        Operand end = range.getEnd();
-        boolean exclusive = range.isExclusive();
+    public void Range(final Range range) {
+        final Operand begin = range.getBegin();
+        final Operand end = range.getEnd();
+        final boolean exclusive = range.isExclusive();
         
         stringProducer.appendParameters(begin, end, exclusive);
     }
 
-    public void Regexp(Regexp regexp) {
-        Operand regexpOperand = regexp.getRegexp();
-        RegexpOptions options = regexp.options;
-        KCode kCode = options.getKCode();
-        boolean kcodeDefault = options.isKcodeDefault();
+    public void Regexp(final Regexp regexp) {
+        final Operand regexpOperand = regexp.getRegexp();
+        final RegexpOptions options = regexp.options;        
         
-        stringProducer.appendParameters(regexpOperand, kCode, kcodeDefault);
+        stringProducer.appendParameters(regexpOperand, options);
     }
 
-    public void Splat(Splat splat) {
-        Operand array = splat.getArray();
+    public void Splat(final Splat splat) {
+        final Operand array = splat.getArray();
         
         stringProducer.appendParameters(array);
     }
 
-    public void SValue(SValue svalue) {
-        Operand array = svalue.getArray();
+    public void SValue(final SValue svalue) {
+        final Operand array = svalue.getArray();
         
         stringProducer.appendParameters(array);
     }
     
     // Operands that takes IRScope as parameter
     //  actually, all we need to persist is name of scope, by IRPersisterHelper will deal with this
-    public void CurrentScope(CurrentScope currentscope) {
-        IRScope scope = currentscope.getScope();
+    public void CurrentScope(final CurrentScope currentscope) {
+        final IRScope scope = currentscope.getScope();
         
         stringProducer.appendParameters(scope);
     }
 
-    public void ScopeModule(ScopeModule scopemodule) {
-        IRScope scope = scopemodule.getScope();
+    public void ScopeModule(final ScopeModule scopemodule) {
+        final IRScope scope = scopemodule.getScope();
         
         stringProducer.appendParameters(scope);
     }
 
-    public void WrappedIRClosure(WrappedIRClosure wrappedirclosure) {
-        IRClosure closure = wrappedirclosure.getClosure();
+    public void WrappedIRClosure(final WrappedIRClosure wrappedirclosure) {
+        final IRClosure closure = wrappedirclosure.getClosure();
         
         stringProducer.appendParameters(closure);
     }
     
     // Parameters that takes string(or char) as parameters
-    public void Backref(Backref backref) {
-        char type = backref.type;
+    public void Backref(final Backref backref) {
+        final char type = backref.type;
         
         stringProducer.appendParameters(type);
     }
 
-    public void StringLiteral(StringLiteral stringliteral) {
-        String string = stringliteral.string;
+    public void StringLiteral(final StringLiteral stringliteral) {
+        final String string = stringliteral.string;
         
         stringProducer.appendParameters(string);
     }
 
-    public void Symbol(Symbol symbol) {
-        String name = symbol.getName();
+    public void Symbol(final Symbol symbol) {
+        final String name = symbol.getName();
         
         stringProducer.appendParameters(name);
     }
 
-    public void GlobalVariable(GlobalVariable globalvariable) {        
-        String name = globalvariable.getName();
+    public void GlobalVariable(final GlobalVariable globalvariable) {        
+        final String name = globalvariable.getName();
         
         stringProducer.appendParameters(name);
     }
 
-    public void IRException(IRException irexception) {
+    public void IRException(final IRException irexception) {
         String type = null;
         
         if (irexception == IRException.NEXT_LocalJumpError) type = "NEXT";
@@ -242,83 +240,82 @@ class IROperandStringExtractor extends IRVisitor {
         else if (irexception == IRException.RETURN_LocalJumpError) type = "RETURN";
         else if (irexception == IRException.REDO_LocalJumpError) type = "REDO";
         else if (irexception == IRException.RETRY_LocalJumpError) type = "RETRY";
-        else {/* TODO: Currently there is no other exception types, but if they will be introduced than we need to support them
-                        Throw RuntimeException here?
-         */
+        else {
+            throw new UnsupportedOperationException(irexception.toString());
         }
         
         stringProducer.appendParameters(type);
     }
 
-    public void Label(Label label) {
-        String labelValue = label.label;
+    public void Label(final Label label) {
+        final String labelValue = label.label;
         
         stringProducer.appendParameters(labelValue);
     }
 
-    public void MethAddr(MethAddr methaddr) {
-        String name = methaddr.getName();
+    public void MethAddr(final MethAddr methaddr) {
+        final String name = methaddr.getName();
         
         stringProducer.appendParameters(name);
     }
 
     // Operands that takes java objects from standard library(or primitive types) as parameters
     //  exception for string types 
-    public void Bignum(Bignum bignum) {
-        BigInteger value = bignum.value;
+    public void Bignum(final Bignum bignum) {
+        final BigInteger value = bignum.value;
         
         stringProducer.appendParameters(value);
     }
 
-    public void BooleanLiteral(BooleanLiteral booleanliteral) {
-        boolean bool = booleanliteral.isTrue();
+    public void BooleanLiteral(final BooleanLiteral booleanliteral) {
+        final boolean bool = booleanliteral.isTrue();
         
         stringProducer.appendParameters(bool);
     }
 
-    public void ClosureLocalVariable(ClosureLocalVariable closurelocalvariable) {
+    public void ClosureLocalVariable(final ClosureLocalVariable closurelocalvariable) {
         commonForLocalVariables(closurelocalvariable);
     }
 
-    public void LocalVariable(LocalVariable localvariable) {
+    public void LocalVariable(final LocalVariable localvariable) {
         commonForLocalVariables(localvariable);
     }
     
-    private void commonForLocalVariables(LocalVariable localVariable) {
-        String name = localVariable.getName();
-        int scopeDepth = localVariable.getScopeDepth();
+    private void commonForLocalVariables(final LocalVariable localVariable) {
+        final String name = localVariable.getName();
+        final int scopeDepth = localVariable.getScopeDepth();
         
         stringProducer.appendParameters(name, scopeDepth);
     }
 
-    public void Fixnum(Fixnum fixnum) {
-        Long value = fixnum.value;
+    public void Fixnum(final Fixnum fixnum) {
+        final Long value = fixnum.value;
         
         stringProducer.appendParameters(value);
     }
 
-    public void Float(org.jruby.ir.operands.Float flote) {
-        Double value = flote.value;
+    public void Float(final org.jruby.ir.operands.Float flote) {
+        final Double value = flote.value;
         
         stringProducer.appendParameters(value);
     }   
 
-    public void NthRef(NthRef nthref) {
-        int matchNumber = nthref.matchNumber;
+    public void NthRef(final NthRef nthref) {
+        final int matchNumber = nthref.matchNumber;
         
         stringProducer.appendParameters(matchNumber);
     }
 
-    public void TemporaryVariable(TemporaryVariable temporaryvariable) {
+    public void TemporaryVariable(final TemporaryVariable temporaryvariable) {
         commonForTemproraryVariable(temporaryvariable);
     }
 
-    public void TemporaryClosureVariable(TemporaryClosureVariable temporaryclosurevariable) {
+    public void TemporaryClosureVariable(final TemporaryClosureVariable temporaryclosurevariable) {
         commonForTemproraryVariable(temporaryclosurevariable);
     }
 
-    private void commonForTemproraryVariable(TemporaryVariable temporaryVariable) {
-        String name = temporaryVariable.getName();
+    private void commonForTemproraryVariable(final TemporaryVariable temporaryVariable) {
+        final String name = temporaryVariable.getName();
         
         stringProducer.appendParameters(name);
     }

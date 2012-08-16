@@ -8,18 +8,20 @@ import java.io.OutputStreamWriter;
 public enum FileIO {
     INSTANCE;
 
-    public void writeToFile(File file, String containment) throws IOException {
-        FileOutputStream fileOutputStream = new FileOutputStream(file);
+    public void writeToFile(final File file, final String containment) throws IOException {
+        final FileOutputStream fileOutputStream = new FileOutputStream(file);
+        
         writeToFileCommon(containment, fileOutputStream);
     }
 
-    public void writeToFile(String fileName, String containment) throws IOException {
-        File file = new File(fileName);
-        FileOutputStream fileOutputStream = new FileOutputStream(file);
+    public void writeToFile(final String fileName, final String containment) throws IOException {
+        final File file = new File(fileName);
+        final FileOutputStream fileOutputStream = new FileOutputStream(file);
+        
         writeToFileCommon(containment, fileOutputStream);
     }
 
-    private void writeToFileCommon(String containment, FileOutputStream fos) throws IOException {
+    private void writeToFileCommon(final String containment, final FileOutputStream fos) throws IOException {
         OutputStreamWriter outputStreamWriter = null;
         try {
             outputStreamWriter = new OutputStreamWriter(fos);

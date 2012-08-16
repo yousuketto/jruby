@@ -1,4 +1,4 @@
-package org.jruby.ir.persistence.read.parser;
+package org.jruby.ir.persistence.read.parser.factory;
 
 import org.jcodings.Encoding;
 import org.jruby.RubyModule;
@@ -126,6 +126,8 @@ import org.jruby.ir.operands.StringLiteral;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.Variable;
+import org.jruby.ir.persistence.read.parser.IRParsingContext;
+import org.jruby.ir.persistence.read.parser.ParametersIterator;
 import org.jruby.ir.persistence.read.parser.dummy.InstrWithParams;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.CallType;
@@ -921,9 +923,7 @@ public class IRInstructionFactory {
     
     private BuildLambdaInstr createBuildLambda(final Variable result, final ParametersIterator paramsIterator) {
         final IRClosure lambdaBody = (IRClosure) paramsIterator.nextScope();
-        final String fileName = paramsIterator.nextString();
-        final int line = paramsIterator.nextInt();
-        final ISourcePosition possition = NonIRObjectFactory.INSTANCE.createSourcePosition(fileName, line);
+        final ISourcePosition possition = paramsIterator.nextISourcePossition();
 
         return new BuildLambdaInstr(result, lambdaBody, possition);
     }
@@ -1110,7 +1110,7 @@ public class IRInstructionFactory {
     private ReceiveOptArgBase createReceiveOptArg(final Variable result, final ParametersIterator paramsIterator) {
         final int index = paramsIterator.nextInt();
         
-        if (paramsIterator.hasNext()) { 
+        if (paramsIterator.hasNext()) { // ReceiveOptArgInstr has more parameters in 1.9
             final int minArgsLength = paramsIterator.nextInt();
             return new ReceiveOptArgInstr19(result, index, minArgsLength);
         } else {
@@ -1121,7 +1121,7 @@ public class IRInstructionFactory {
     private ReceiveRestArgBase createReceiveRestArg(final Variable result, final ParametersIterator paramsIterator) {
         final int argIndex = paramsIterator.nextInt();
         
-        if(paramsIterator.hasNext()) {
+        if(paramsIterator.hasNext()) { // ReceiveRestArgInstr has more parameters in 1.9
             final int totalRequiredArgs = paramsIterator.nextInt();
             final int totalOptArgs = paramsIterator.nextInt();
             return new ReceiveRestArgInstr19(result, argIndex, totalRequiredArgs, totalOptArgs);

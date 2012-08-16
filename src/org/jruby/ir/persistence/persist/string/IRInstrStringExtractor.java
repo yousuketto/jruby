@@ -131,6 +131,7 @@ import org.jruby.ir.operands.MethodHandle;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.StringLiteral;
 import org.jruby.ir.operands.Variable;
+import org.jruby.ir.persistence.persist.string.producer.AbstractIRStringBuilder;
 import org.jruby.ir.persistence.persist.string.producer.IRInstructionStringBuilder;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.CallType;
@@ -139,7 +140,7 @@ class IRInstrStringExtractor extends IRVisitor {
     
     private final IRInstructionStringBuilder stringProducer;
     
-    private IRInstrStringExtractor(IRInstructionStringBuilder stringProducer) {
+    private IRInstrStringExtractor(final IRInstructionStringBuilder stringProducer) {
         this.stringProducer = stringProducer;
     }
     
@@ -148,18 +149,18 @@ class IRInstrStringExtractor extends IRVisitor {
         IRInstructionStringBuilder stringProducer = new IRInstructionStringBuilder(null);
         return new IRInstrStringExtractor(stringProducer);
     }    
-    static IRInstrStringExtractor createInstance(StringBuilder builder) {
+    static IRInstrStringExtractor createInstance(AbstractIRStringBuilder builder) {
         IRInstructionStringBuilder stringProducer = new IRInstructionStringBuilder(builder);
         return new IRInstrStringExtractor(stringProducer);
     }
     
-    public String extract(Instr instr) {
+    public String extract(final Instr instr) {
         produceString(instr);
         
         return stringProducer.getResultString();
     }
     
-    public void produceString(Instr instr) {
+    public void produceString(final Instr instr) {
         stringProducer.appendPrefix(instr);
 
         instr.visit(this);
@@ -183,71 +184,71 @@ class IRInstrStringExtractor extends IRVisitor {
     
     // Branch Instructions
 
-    public void BEQInstr(BEQInstr beqinstr) {
+    public void BEQInstr(final BEQInstr beqinstr) {
         commonForBranchInstrWithArg2(beqinstr);
     }
 
-    public void BNEInstr(BNEInstr bneinstr) {
+    public void BNEInstr(final BNEInstr bneinstr) {
         commonForBranchInstrWithArg2(bneinstr);
     }
 
-    private void commonForBranchInstrWithArg2(BranchInstr branchInstr) {
-        Operand arg1 = branchInstr.getArg1();
-        Operand arg2 = branchInstr.getArg2();
-        Label jumpTarget = branchInstr.getJumpTarget();
+    private void commonForBranchInstrWithArg2(final BranchInstr branchInstr) {
+        final Operand arg1 = branchInstr.getArg1();
+        final Operand arg2 = branchInstr.getArg2();
+        final Label jumpTarget = branchInstr.getJumpTarget();
         
         stringProducer.appendParameters(arg1, arg2, jumpTarget);
     }
 
-    public void BFalseInstr(BFalseInstr bfalseinstr) {
+    public void BFalseInstr(final BFalseInstr bfalseinstr) {
         commonForBranchInstrWithoutArg2(bfalseinstr);
     }
 
-    public void BNilInstr(BNilInstr bnilinstr) {
+    public void BNilInstr(final BNilInstr bnilinstr) {
         commonForBranchInstrWithoutArg2(bnilinstr);
     }
 
-    public void BTrueInstr(BTrueInstr btrueinstr) {
+    public void BTrueInstr(final BTrueInstr btrueinstr) {
         commonForBranchInstrWithoutArg2(btrueinstr);
     }
 
-    public void BUndefInstr(BUndefInstr bundefinstr) {
+    public void BUndefInstr(final BUndefInstr bundefinstr) {
         commonForBranchInstrWithoutArg2(bundefinstr);
     }
 
-    private void commonForBranchInstrWithoutArg2(BranchInstr branchInstr) {
-        Operand arg1 = branchInstr.getArg1();
-        Label jumpTarget = branchInstr.getJumpTarget();
+    private void commonForBranchInstrWithoutArg2(final BranchInstr branchInstr) {
+        final Operand arg1 = branchInstr.getArg1();
+        final Label jumpTarget = branchInstr.getJumpTarget();
         
         stringProducer.appendParameters(arg1, jumpTarget);
     }
 
     // Call Instructions
 
-    public void CallInstr(CallInstr callinstr) {
+    public void CallInstr(final CallInstr callinstr) {
         commonForUnspecializedGeneralCallInstr(callinstr);
     }
     
-    public void NoResultCallInstr(NoResultCallInstr noresultcallinstr) {
+    public void NoResultCallInstr(final NoResultCallInstr noresultcallinstr) {
         commonForUnspecializedGeneralCallInstr(noresultcallinstr);
     }
 
-    private void commonForUnspecializedGeneralCallInstr(CallBase callBase) {
-        List<Object> parameters = getParametersForGeneralCallInstr(callBase);
+    private void commonForUnspecializedGeneralCallInstr(final CallBase callBase) {
+        final List<Object> parameters = getParametersForGeneralCallInstr(callBase);
         
-        Operand closure = callBase.getClosure();        
+        final Operand closure = callBase.getClosure();        
         parameters.add(closure);
         
         stringProducer.appendParameters(parameters.toArray());
     }
     
-    private List<Object> getParametersForGeneralCallInstr(CallBase callBase) {
-        List<Object> parameters = new ArrayList<Object>(5);
+    private List<Object> getParametersForGeneralCallInstr(final CallBase callBase) {
+        final List<Object> parameters = new ArrayList<Object>(5);
         
-        Operand receiver = callBase.getReceiver();
-        CallType callType = callBase.getCallType();
-        MethAddr methodAddr = callBase.getMethodAddr();
-        Operand[] callArgs = callBase.getCallArgs();
+        final Operand receiver = callBase.getReceiver();
+        final CallType callType = callBase.getCallType();
+        final MethAddr methodAddr = callBase.getMethodAddr();
+        final Operand[] callArgs = callBase.getCallArgs();
         
         Collections.addAll(parameters, receiver, callType, methodAddr, callArgs);
         
@@ -256,117 +257,118 @@ class IRInstrStringExtractor extends IRVisitor {
 
     // specialized CallInstr
     public void OneFixnumArgNoBlockCallInstr(
-            OneFixnumArgNoBlockCallInstr onefixnumargnoblockcallinstr) {
+            final OneFixnumArgNoBlockCallInstr onefixnumargnoblockcallinstr) {
         commonForSpecializedGeneralCallInstr(onefixnumargnoblockcallinstr, SpecializedInstType.ONE_FIXNUM);
     }
 
     public void OneOperandArgNoBlockCallInstr(
-            OneOperandArgNoBlockCallInstr oneoperandargnoblockcallinstr) {
+            final OneOperandArgNoBlockCallInstr oneoperandargnoblockcallinstr) {
         commonForSpecializedGeneralCallInstr(oneoperandargnoblockcallinstr, SpecializedInstType.ONE_OPERAND);
     }
 
     public void ZeroOperandArgNoBlockCallInstr(
-            ZeroOperandArgNoBlockCallInstr zerooperandargnoblockcallinstr) {
+            final ZeroOperandArgNoBlockCallInstr zerooperandargnoblockcallinstr) {
         commonForSpecializedGeneralCallInstr(zerooperandargnoblockcallinstr, SpecializedInstType.ZERO_OPERAND);
     }    
 
     // specialized NoResultCallInstr
     public void OneOperandArgNoBlockNoResultCallInstr(
-            OneOperandArgNoBlockNoResultCallInstr oneoperandargnoblocknoresultcallinstr) {
+            final OneOperandArgNoBlockNoResultCallInstr oneoperandargnoblocknoresultcallinstr) {
         commonForSpecializedGeneralCallInstr(oneoperandargnoblocknoresultcallinstr, SpecializedInstType.ONE_OPERAND);
     }
 
     private void commonForSpecializedGeneralCallInstr(
-            CallBase callInstr, SpecializedInstType type) {
-        List<Object> parameters = getParametersForGeneralCallInstr(callInstr);
+            final CallBase callInstr, final SpecializedInstType type) {
+        final List<Object> parameters = getParametersForGeneralCallInstr(callInstr);
         parameters.add(type);
         
         stringProducer.appendParameters(parameters.toArray());
     }
 
-    public void AttrAssignInstr(AttrAssignInstr attrassigninstr) {
-        List<Object> parameters = getCommonParametersForAttrAssign(attrassigninstr);
+    public void AttrAssignInstr(final AttrAssignInstr attrassigninstr) {
+        final List<Object> parameters = getCommonParametersForAttrAssign(attrassigninstr);
+        
         stringProducer.appendParameters(parameters.toArray());
     }
 
     // Specialized AttrAssignInstr
     public void OneArgOperandAttrAssignInstr(
-            OneArgOperandAttrAssignInstr oneargoperandattrassigninstr) {
-        List<Object> parameters = getCommonParametersForAttrAssign(oneargoperandattrassigninstr);
+            final OneArgOperandAttrAssignInstr oneargoperandattrassigninstr) {
+        final List<Object> parameters = getCommonParametersForAttrAssign(oneargoperandattrassigninstr);
         parameters.add(SpecializedInstType.ONE_OPERAND);
         
         stringProducer.appendParameters(parameters);
     }
 
-    private List<Object> getCommonParametersForAttrAssign(AttrAssignInstr attrassigninstr) {        
-        List<Object> parameters = new ArrayList<Object>(4);
+    private List<Object> getCommonParametersForAttrAssign(final AttrAssignInstr attrassigninstr) {        
+        final List<Object> parameters = new ArrayList<Object>(4);
         
-        Operand receiver = attrassigninstr.getReceiver();
-        MethAddr methodAddr = attrassigninstr.getMethodAddr();
-        Operand[] callArgs = attrassigninstr.getCallArgs();
+        final Operand receiver = attrassigninstr.getReceiver();
+        final MethAddr methodAddr = attrassigninstr.getMethodAddr();
+        final Operand[] callArgs = attrassigninstr.getCallArgs();
         
         Collections.addAll(parameters, receiver, methodAddr, callArgs);
         
         return parameters;
     }
 
-    public void ClassSuperInstr(ClassSuperInstr classsuperinstr) {        
+    public void ClassSuperInstr(final ClassSuperInstr classsuperinstr) {        
         commonForResolvedSupeInstr(classsuperinstr, SuperInstrType.CLASS);        
     }
     
-    public void InstanceSuperInstr(InstanceSuperInstr instancesuperinstr) {
+    public void InstanceSuperInstr(final InstanceSuperInstr instancesuperinstr) {
         commonForResolvedSupeInstr(instancesuperinstr, SuperInstrType.INSTANCE);
     }
 
-    private void commonForResolvedSupeInstr(CallInstr superInstr, SuperInstrType type) {
-        Operand receiver = superInstr.getReceiver();
-        MethAddr methodAddr = superInstr.getMethodAddr();
-        Operand[] callArgs = superInstr.getCallArgs();
-        Operand closure = superInstr.getClosure();
+    private void commonForResolvedSupeInstr(final CallInstr superInstr, final SuperInstrType type) {
+        final Operand receiver = superInstr.getReceiver();
+        final MethAddr methodAddr = superInstr.getMethodAddr();
+        final Operand[] callArgs = superInstr.getCallArgs();
+        final Operand closure = superInstr.getClosure();
         
         stringProducer.appendParameters(type, receiver, methodAddr, callArgs, closure);
     }
 
-    public void ConstMissingInstr(ConstMissingInstr constmissinginstr) {
-        Operand receiver = constmissinginstr.getReceiver();
-        String missingConst = constmissinginstr.getMissingConst();
+    public void ConstMissingInstr(final ConstMissingInstr constmissinginstr) {
+        final Operand receiver = constmissinginstr.getReceiver();
+        final String missingConst = constmissinginstr.getMissingConst();
         
         stringProducer.appendParameters(receiver, missingConst);
     }    
 
-    public void UnresolvedSuperInstr(UnresolvedSuperInstr unresolvedsuperinstr) {
-        Operand receiver = unresolvedsuperinstr.getReceiver();
-        Operand[] callArgs = unresolvedsuperinstr.getCallArgs();
-        Operand closure = unresolvedsuperinstr.getClosure();
+    public void UnresolvedSuperInstr(final UnresolvedSuperInstr unresolvedsuperinstr) {
+        final Operand receiver = unresolvedsuperinstr.getReceiver();
+        final Operand[] callArgs = unresolvedsuperinstr.getCallArgs();
+        final Operand closure = unresolvedsuperinstr.getClosure();
         
         stringProducer.appendParameters(SuperInstrType.UNRESOLVED, receiver, callArgs, closure);
     }
 
-    public void ZSuperInstr(ZSuperInstr zsuperinstr) {
-        Operand receiver = zsuperinstr.getReceiver();
-        Operand closure = zsuperinstr.getClosure();
+    public void ZSuperInstr(final ZSuperInstr zsuperinstr) {
+        final Operand receiver = zsuperinstr.getReceiver();
+        final Operand closure = zsuperinstr.getClosure();
         
         stringProducer.appendParameters(receiver, closure);
     }
 
     // Get Instructions
 
-    public void GetClassVariableInstr(GetClassVariableInstr getclassvariableinstr) {
+    public void GetClassVariableInstr(final GetClassVariableInstr getclassvariableinstr) {
         coomonForMostGetInstr(getclassvariableinstr);
     }
 
-    public void GetFieldInstr(GetFieldInstr getfieldinstr) {
+    public void GetFieldInstr(final GetFieldInstr getfieldinstr) {
         coomonForMostGetInstr(getfieldinstr);
     }
 
-    private void coomonForMostGetInstr(GetInstr getInstr) {
-        Operand source = getInstr.getSource();
-        String ref = getInstr.getRef();
+    private void coomonForMostGetInstr(final GetInstr getInstr) {
+        final Operand source = getInstr.getSource();
+        final String ref = getInstr.getRef();
         
         stringProducer.appendParameters(source, ref);
     }
 
-    public void GetGlobalVariableInstr(GetGlobalVariableInstr getglobalvariableinstr) {
+    public void GetGlobalVariableInstr(final GetGlobalVariableInstr getglobalvariableinstr) {
         Operand source = getglobalvariableinstr.getSource();
         
         stringProducer.appendParameters(source);
@@ -374,78 +376,80 @@ class IRInstrStringExtractor extends IRVisitor {
 
     // Jump Instructions
 
-    public void JumpIndirectInstr(JumpIndirectInstr jumpindirectinstr) {
-        Variable jumpTarget = jumpindirectinstr.getJumpTarget();
+    public void JumpIndirectInstr(final JumpIndirectInstr jumpindirectinstr) {
+        final Variable jumpTarget = jumpindirectinstr.getJumpTarget();
         
         stringProducer.appendParameters(jumpTarget);
     }
 
-    public void JumpInstr(JumpInstr jumpinstr) {
-        Label jumpTarget = jumpinstr.getJumpTarget();
+    public void JumpInstr(final JumpInstr jumpinstr) {
+        final Label jumpTarget = jumpinstr.getJumpTarget();
         
         stringProducer.appendParameters(jumpTarget);
     }
 
     // Label Instruction
-    public void LabelInstr(LabelInstr labelinstr) {
-        Label label = labelinstr.getLabel();        
+    public void LabelInstr(final LabelInstr labelinstr) {
+        final Label label = labelinstr.getLabel();        
         
         stringProducer.appendParameters(label);
     }
 
     // Put instructions
 
-    public void PutClassVariableInstr(PutClassVariableInstr putclassvariableinstr) {
+    public void PutClassVariableInstr(final PutClassVariableInstr putclassvariableinstr) {
         commonForMostPutInstr(putclassvariableinstr);
     }
 
-    public void PutConstInstr(PutConstInstr putconstinstr) {
+    public void PutConstInstr(final PutConstInstr putconstinstr) {
         commonForMostPutInstr(putconstinstr);
     }
 
-    public void PutFieldInstr(PutFieldInstr putfieldinstr) {
+    public void PutFieldInstr(final PutFieldInstr putfieldinstr) {
         commonForMostPutInstr(putfieldinstr);
     }
 
-    public void PutGlobalVarInstr(PutGlobalVarInstr putglobalvarinstr) {
-        GlobalVariable target = (GlobalVariable) putglobalvarinstr.getTarget();
-        String varName = target.getName();
-        Operand value = putglobalvarinstr.getValue();
+    public void PutGlobalVarInstr(final PutGlobalVarInstr putglobalvarinstr) {
+        final GlobalVariable target = (GlobalVariable) putglobalvarinstr.getTarget();
+        final String varName = target.getName();
+        final Operand value = putglobalvarinstr.getValue();
         
         stringProducer.appendParameters(varName, value);
     }
 
-    private void commonForMostPutInstr(PutInstr putInstr) {
-        Operand target = putInstr.getTarget();
-        String ref = putInstr.getRef();
-        Operand value = putInstr.getValue();
+    private void commonForMostPutInstr(final PutInstr putInstr) {
+        final Operand target = putInstr.getTarget();
+        final String ref = putInstr.getRef();
+        final Operand value = putInstr.getValue();
         
         stringProducer.appendParameters(target, ref, value);
     }
 
     // Subclasses of MultipleAsgnBaseInstr
 
-    public void ReqdArgMultipleAsgnInstr(ReqdArgMultipleAsgnInstr reqdargmultipleasgninstr) {
-        List<Object> parameters = getCommonParametersForMultipleAsgnBase(reqdargmultipleasgninstr);
+    public void ReqdArgMultipleAsgnInstr(final ReqdArgMultipleAsgnInstr reqdargmultipleasgninstr) {
+        final List<Object> parameters = getCommonParametersForMultipleAsgnBase(reqdargmultipleasgninstr);
+        
         parameters.add(reqdargmultipleasgninstr.getPreArgsCount());
         parameters.add(reqdargmultipleasgninstr.getPostArgsCount());
         
         stringProducer.appendParameters(parameters.toArray());
     }
 
-    public void RestArgMultipleAsgnInstr(RestArgMultipleAsgnInstr restargmultipleasgninstr) {
-        List<Object> parameters = getCommonParametersForMultipleAsgnBase(restargmultipleasgninstr);
+    public void RestArgMultipleAsgnInstr(final RestArgMultipleAsgnInstr restargmultipleasgninstr) {
+        final List<Object> parameters = getCommonParametersForMultipleAsgnBase(restargmultipleasgninstr);
+        
         parameters.add(restargmultipleasgninstr.getPreArgsCount());
         parameters.add(restargmultipleasgninstr.getPostArgsCount());
         
         stringProducer.appendParameters(parameters.toArray());
     }
 
-    private List<Object> getCommonParametersForMultipleAsgnBase(MultipleAsgnBase multipleAsgnBase) {
-        List<Object> parameters = new ArrayList<Object>(4);
+    private List<Object> getCommonParametersForMultipleAsgnBase(final MultipleAsgnBase multipleAsgnBase) {
+        final List<Object> parameters = new ArrayList<Object>(4);
         
-        Operand array = multipleAsgnBase.getArray();
-        int index = multipleAsgnBase.getIndex();
+        final Operand array = multipleAsgnBase.getArray();
+        final int index = multipleAsgnBase.getIndex();
         
         Collections.addAll(parameters, array, index);
         
@@ -454,55 +458,55 @@ class IRInstrStringExtractor extends IRVisitor {
 
     // Subclasses of DefinedObjectNameInstr
 
-    public void ClassVarIsDefinedInstr(ClassVarIsDefinedInstr classvarisdefinedinstr) {
+    public void ClassVarIsDefinedInstr(final ClassVarIsDefinedInstr classvarisdefinedinstr) {
         commonForAllDefinedObjectName(classvarisdefinedinstr);
     }
 
     public void GetDefinedConstantOrMethodInstr(
-            GetDefinedConstantOrMethodInstr getdefinedconstantormethodinstr) {
+            final GetDefinedConstantOrMethodInstr getdefinedconstantormethodinstr) {
         commonForAllDefinedObjectName(getdefinedconstantormethodinstr);
     }
 
-    public void HasInstanceVarInstr(HasInstanceVarInstr hasinstancevarinstr) {
+    public void HasInstanceVarInstr(final HasInstanceVarInstr hasinstancevarinstr) {
         commonForAllDefinedObjectName(hasinstancevarinstr);
     }
 
-    public void IsMethodBoundInstr(IsMethodBoundInstr ismethodboundinstr) {
+    public void IsMethodBoundInstr(final IsMethodBoundInstr ismethodboundinstr) {
         commonForAllDefinedObjectName(ismethodboundinstr);
     }
 
-    public void MethodDefinedInstr(MethodDefinedInstr methoddefinedinstr) {
+    public void MethodDefinedInstr(final MethodDefinedInstr methoddefinedinstr) {
         commonForAllDefinedObjectName(methoddefinedinstr);
     }
 
-    public void MethodIsPublicInstr(MethodIsPublicInstr methodispublicinstr) {
+    public void MethodIsPublicInstr(final MethodIsPublicInstr methodispublicinstr) {
         commonForAllDefinedObjectName(methodispublicinstr);
     }
 
-    private void commonForAllDefinedObjectName(DefinedObjectNameInstr definedObjectNameInstr) {
-        Operand object = definedObjectNameInstr.getObject();
-        StringLiteral name = definedObjectNameInstr.getName();
+    private void commonForAllDefinedObjectName(final DefinedObjectNameInstr definedObjectNameInstr) {
+        final Operand object = definedObjectNameInstr.getObject();
+        final StringLiteral name = definedObjectNameInstr.getName();
         
         stringProducer.appendParameters(object, name);
     }
 
-    public void AliasInstr(AliasInstr aliasinstr) {
-        Variable receiver = aliasinstr.getReceiver();
-        Operand newName = aliasinstr.getNewName();
-        Operand oldName = aliasinstr.getOldName();
+    public void AliasInstr(final AliasInstr aliasinstr) {
+        final Variable receiver = aliasinstr.getReceiver();
+        final Operand newName = aliasinstr.getNewName();
+        final Operand oldName = aliasinstr.getOldName();
         
         stringProducer.appendParameters(receiver, newName, oldName);
     }
 
-    public void BreakInstr(BreakInstr breakinstr) {
-        Operand returnValue = breakinstr.getReturnValue();
-        IRScope scopeToReturnTo = breakinstr.getScopeToReturnTo();
+    public void BreakInstr(final BreakInstr breakinstr) {
+        final Operand returnValue = breakinstr.getReturnValue();
+        final IRScope scopeToReturnTo = breakinstr.getScopeToReturnTo();
         
         stringProducer.appendParameters(returnValue, scopeToReturnTo);
     }
 
-    public void CheckArgsArrayArityInstr(CheckArgsArrayArityInstr checkargsarrayarityinstr) {
-        Operand argsArray = checkargsarrayarityinstr.getArgsArray();
+    public void CheckArgsArrayArityInstr(final CheckArgsArrayArityInstr checkargsarrayarityinstr) {
+        final Operand argsArray = checkargsarrayarityinstr.getArgsArray();
         int required = checkargsarrayarityinstr.required;
         int opt = checkargsarrayarityinstr.opt;
         int rest = checkargsarrayarityinstr.rest;
@@ -510,346 +514,344 @@ class IRInstrStringExtractor extends IRVisitor {
         stringProducer.appendParameters(argsArray, required, opt, rest);
     }
 
-    public void CheckArityInstr(CheckArityInstr checkarityinstr) {
-        int required = checkarityinstr.required;
-        int opt = checkarityinstr.opt;
-        int rest = checkarityinstr.rest;
+    public void CheckArityInstr(final CheckArityInstr checkarityinstr) {
+        final int required = checkarityinstr.required;
+        final int opt = checkarityinstr.opt;
+        final int rest = checkarityinstr.rest;
         
         stringProducer.appendParameters(required, opt, rest);
     }
 
-    public void ClosureReturnInstr(ClosureReturnInstr closurereturninstr) {
-        Operand returnValue = closurereturninstr.getReturnValue();
+    public void ClosureReturnInstr(final ClosureReturnInstr closurereturninstr) {
+        final Operand returnValue = closurereturninstr.getReturnValue();
         
         stringProducer.appendParameters(returnValue);
     }
 
-    public void CopyInstr(CopyInstr copyinstr) {
-        Operand source = copyinstr.getSource();
+    public void CopyInstr(final CopyInstr copyinstr) {
+        final Operand source = copyinstr.getSource();
         
         stringProducer.appendParameters(source);
     }
 
-    public void DefineClassInstr(DefineClassInstr defineclassinstr) {
-        IRClassBody newIRClassBody = defineclassinstr.getNewIRClassBody();
-        Operand container = defineclassinstr.getContainer();
-        Operand superClass = defineclassinstr.getSuperClass();
+    public void DefineClassInstr(final DefineClassInstr defineclassinstr) {
+        final IRClassBody newIRClassBody = defineclassinstr.getNewIRClassBody();
+        final Operand container = defineclassinstr.getContainer();
+        final Operand superClass = defineclassinstr.getSuperClass();
         
         stringProducer.appendParameters(newIRClassBody, container, superClass);
     }
 
-    public void DefineClassMethodInstr(DefineClassMethodInstr defineclassmethodinstr) {
-        Operand container = defineclassmethodinstr.getContainer();
-        IRMethod method = defineclassmethodinstr.getMethod();
+    public void DefineClassMethodInstr(final DefineClassMethodInstr defineclassmethodinstr) {
+        final Operand container = defineclassmethodinstr.getContainer();
+        final IRMethod method = defineclassmethodinstr.getMethod();
         
         stringProducer.appendParameters(container, method);
     }
 
-    public void DefineInstanceMethodInstr(DefineInstanceMethodInstr defineinstancemethodinstr) {
-        Operand container = defineinstancemethodinstr.getContainer();
-        IRMethod method = defineinstancemethodinstr.getMethod();
+    public void DefineInstanceMethodInstr(final DefineInstanceMethodInstr defineinstancemethodinstr) {
+        final Operand container = defineinstancemethodinstr.getContainer();
+        final IRMethod method = defineinstancemethodinstr.getMethod();
         
         stringProducer.appendParameters(container, method);
     }
 
-    public void DefineMetaClassInstr(DefineMetaClassInstr definemetaclassinstr) {
-        IRModuleBody metaClassBody = definemetaclassinstr.getMetaClassBody();
-        Operand object = definemetaclassinstr.getObject();
+    public void DefineMetaClassInstr(final DefineMetaClassInstr definemetaclassinstr) {
+        final IRModuleBody metaClassBody = definemetaclassinstr.getMetaClassBody();
+        final Operand object = definemetaclassinstr.getObject();
         
         stringProducer.appendParameters(metaClassBody, object);
     }
 
-    public void DefineModuleInstr(DefineModuleInstr definemoduleinstr) {
-        IRModuleBody newIRModuleBody = definemoduleinstr.getNewIRModuleBody();
-        Operand container = definemoduleinstr.getContainer();
+    public void DefineModuleInstr(final DefineModuleInstr definemoduleinstr) {
+        final IRModuleBody newIRModuleBody = definemoduleinstr.getNewIRModuleBody();
+        final Operand container = definemoduleinstr.getContainer();
         
         stringProducer.appendParameters(newIRModuleBody, container);
     }
 
-    public void EnsureRubyArrayInstr(EnsureRubyArrayInstr ensurerubyarrayinstr) {
-        Operand object = ensurerubyarrayinstr.getObject();
+    public void EnsureRubyArrayInstr(final EnsureRubyArrayInstr ensurerubyarrayinstr) {
+        final Operand object = ensurerubyarrayinstr.getObject();
         
         stringProducer.appendParameters(object);
     }
 
-    public void EQQInstr(EQQInstr eqqinstr) {
-        Operand arg1 = eqqinstr.getArg1();
-        Operand arg2 = eqqinstr.getArg2();
+    public void EQQInstr(final EQQInstr eqqinstr) {
+        final Operand arg1 = eqqinstr.getArg1();
+        final Operand arg2 = eqqinstr.getArg2();
         
         stringProducer.appendParameters(arg1, arg2);
     }
 
     public void ExceptionRegionStartMarkerInstr(
-            ExceptionRegionStartMarkerInstr exceptionregionstartmarkerinstr) {
-        Label begin =  exceptionregionstartmarkerinstr.begin;
-        Label end =  exceptionregionstartmarkerinstr.end;
-        Label firstRescueBlockLabel =  exceptionregionstartmarkerinstr.firstRescueBlockLabel;
-        Label ensureBlockLabel = exceptionregionstartmarkerinstr.ensureBlockLabel;
+            final ExceptionRegionStartMarkerInstr exceptionregionstartmarkerinstr) {
+        final Label begin =  exceptionregionstartmarkerinstr.begin;
+        final Label end =  exceptionregionstartmarkerinstr.end;
+        final Label firstRescueBlockLabel =  exceptionregionstartmarkerinstr.firstRescueBlockLabel;
+        final Label ensureBlockLabel = exceptionregionstartmarkerinstr.ensureBlockLabel;
         
         stringProducer.appendParameters(begin, end, firstRescueBlockLabel, ensureBlockLabel);
     }
 
     public void GetClassVarContainerModuleInstr(
-            GetClassVarContainerModuleInstr getclassvarcontainermoduleinstr) {
-        Operand startingScope = getclassvarcontainermoduleinstr.getStartingScope();
-        Operand object = getclassvarcontainermoduleinstr.getObject();
+            final GetClassVarContainerModuleInstr getclassvarcontainermoduleinstr) {
+        final Operand startingScope = getclassvarcontainermoduleinstr.getStartingScope();
+        final Operand object = getclassvarcontainermoduleinstr.getObject();
         
         stringProducer.appendParameters(startingScope, object);
     }
 
-    public void GVarAliasInstr(GVarAliasInstr gvaraliasinstr) {
-        Operand newName = gvaraliasinstr.getNewName();
-        Operand oldName = gvaraliasinstr.getOldName();
+    public void GVarAliasInstr(final GVarAliasInstr gvaraliasinstr) {
+        final Operand newName = gvaraliasinstr.getNewName();
+        final Operand oldName = gvaraliasinstr.getOldName();
         
         stringProducer.appendParameters(newName, oldName);
     }
 
-    public void InheritanceSearchConstInstr(InheritanceSearchConstInstr inheritancesearchconstinstr) {
-        Operand currentModule = inheritancesearchconstinstr.getCurrentModule();
-        String constName = inheritancesearchconstinstr.getConstName();
-        boolean noPrivateConsts = inheritancesearchconstinstr.isNoPrivateConsts();
+    public void InheritanceSearchConstInstr(final InheritanceSearchConstInstr inheritancesearchconstinstr) {
+        final Operand currentModule = inheritancesearchconstinstr.getCurrentModule();
+        final String constName = inheritancesearchconstinstr.getConstName();
+        final boolean noPrivateConsts = inheritancesearchconstinstr.isNoPrivateConsts();
         
         stringProducer.appendParameters(currentModule, constName, noPrivateConsts);
     }
 
-    public void InstanceOfInstr(InstanceOfInstr instanceofinstr) {
-        Operand object = instanceofinstr.getObject();
-        String className = instanceofinstr.getClassName();
+    public void InstanceOfInstr(final InstanceOfInstr instanceofinstr) {
+        final Operand object = instanceofinstr.getObject();
+        final String className = instanceofinstr.getClassName();
         
         stringProducer.appendParameters(object, className);
     }
 
-    public void LexicalSearchConstInstr(LexicalSearchConstInstr lexicalsearchconstinstr) {
-        Operand definingScope = lexicalsearchconstinstr.getDefiningScope();
-        String constName = lexicalsearchconstinstr.getConstName();
+    public void LexicalSearchConstInstr(final LexicalSearchConstInstr lexicalsearchconstinstr) {
+        final Operand definingScope = lexicalsearchconstinstr.getDefiningScope();
+        final String constName = lexicalsearchconstinstr.getConstName();
         
         stringProducer.appendParameters(definingScope, constName);
     }
 
-    public void LineNumberInstr(LineNumberInstr linenumberinstr) {
-        int lineNumber = linenumberinstr.lineNumber;
+    public void LineNumberInstr(final LineNumberInstr linenumberinstr) {
+        final int lineNumber = linenumberinstr.lineNumber;
         
         stringProducer.appendParameters(lineNumber);
     }
 
-    public void LoadLocalVarInstr(LoadLocalVarInstr loadlocalvarinstr) {
-        IRScope scope = loadlocalvarinstr.getScope();
-        LocalVariable localVar = loadlocalvarinstr.getLocalVar();
+    public void LoadLocalVarInstr(final LoadLocalVarInstr loadlocalvarinstr) {
+        final IRScope scope = loadlocalvarinstr.getScope();
+        final LocalVariable localVar = loadlocalvarinstr.getLocalVar();
         
         stringProducer.appendParameters(scope, localVar);
     }
 
-    public void Match2Instr(Match2Instr match2instr) {
-        Operand receiver = match2instr.getReceiver();
-        Operand arg = match2instr.getArg();
+    public void Match2Instr(final Match2Instr match2instr) {
+        final Operand receiver = match2instr.getReceiver();
+        final Operand arg = match2instr.getArg();
         
         stringProducer.appendParameters(receiver, arg);
     }
 
-    public void Match3Instr(Match3Instr match3instr) {
-        Operand receiver = match3instr.getReceiver();
-        Operand arg = match3instr.getArg();
+    public void Match3Instr(final Match3Instr match3instr) {
+        final Operand receiver = match3instr.getReceiver();
+        final Operand arg = match3instr.getArg();
         
         stringProducer.appendParameters(receiver, arg);
     }
 
-    public void MatchInstr(MatchInstr matchinstr) {
-        Operand receiver = matchinstr.getReceiver();
+    public void MatchInstr(final MatchInstr matchinstr) {
+        final Operand receiver = matchinstr.getReceiver();
         
         stringProducer.appendParameters(receiver);
     }
 
-    public void MethodLookupInstr(MethodLookupInstr methodlookupinstr) {
-        MethodHandle methodHandle = methodlookupinstr.getMethodHandle();
+    public void MethodLookupInstr(final MethodLookupInstr methodlookupinstr) {
+        final MethodHandle methodHandle = methodlookupinstr.getMethodHandle();
         
         stringProducer.appendParameters(methodHandle);
     }
 
-    public void ModuleVersionGuardInstr(ModuleVersionGuardInstr moduleversionguardinstr) {
-        Operand candidateObj = moduleversionguardinstr.getCandidateObj();
-        int expectedVersion = moduleversionguardinstr.getExpectedVersion();
-        String name = moduleversionguardinstr.getModule().getName();
-        Label failurePathLabel = moduleversionguardinstr.getFailurePathLabel();
+    public void ModuleVersionGuardInstr(final ModuleVersionGuardInstr moduleversionguardinstr) {
+        final Operand candidateObj = moduleversionguardinstr.getCandidateObj();
+        final int expectedVersion = moduleversionguardinstr.getExpectedVersion();
+        final String name = moduleversionguardinstr.getModule().getName();
+        final Label failurePathLabel = moduleversionguardinstr.getFailurePathLabel();
         
         stringProducer.appendParameters(candidateObj, expectedVersion, name, failurePathLabel);
     }
 
-    public void NotInstr(NotInstr notinstr) {
-        Operand arg = notinstr.getArg();
+    public void NotInstr(final NotInstr notinstr) {
+        final Operand arg = notinstr.getArg();
         
         stringProducer.appendParameters(arg);
     }
 
-    public void OptArgMultipleAsgnInstr(OptArgMultipleAsgnInstr optargmultipleasgninstr) {
-        Operand array = optargmultipleasgninstr.getArray();
-        int index = optargmultipleasgninstr.getIndex();
-        int minArgsLength = optargmultipleasgninstr.getMinArgsLength();
+    public void OptArgMultipleAsgnInstr(final OptArgMultipleAsgnInstr optargmultipleasgninstr) {
+        final Operand array = optargmultipleasgninstr.getArray();
+        final int index = optargmultipleasgninstr.getIndex();
+        final int minArgsLength = optargmultipleasgninstr.getMinArgsLength();
         
         stringProducer.appendParameters(array, index, minArgsLength);
     }
 
-    public void ProcessModuleBodyInstr(ProcessModuleBodyInstr processmodulebodyinstr) {
-        Operand moduleBody = processmodulebodyinstr.getModuleBody();
+    public void ProcessModuleBodyInstr(final ProcessModuleBodyInstr processmodulebodyinstr) {
+        final Operand moduleBody = processmodulebodyinstr.getModuleBody();
         
         stringProducer.appendParameters(moduleBody);
     }
 
-    public void PushBindingInstr(PushBindingInstr pushbindinginstr) {
-        IRScope scope = pushbindinginstr.getScope();
+    public void PushBindingInstr(final PushBindingInstr pushbindinginstr) {
+        final IRScope scope = pushbindinginstr.getScope();
         
         stringProducer.appendParameters(scope);
     }
 
-    public void RaiseArgumentErrorInstr(RaiseArgumentErrorInstr raiseargumenterrorinstr) {
-        int required = raiseargumenterrorinstr.getRequired();
-        int opt = raiseargumenterrorinstr.getOpt();
-        int rest = raiseargumenterrorinstr.getRest();
-        int numArgs = raiseargumenterrorinstr.getNumArgs();
+    public void RaiseArgumentErrorInstr(final RaiseArgumentErrorInstr raiseargumenterrorinstr) {
+        final int required = raiseargumenterrorinstr.getRequired();
+        final int opt = raiseargumenterrorinstr.getOpt();
+        final int rest = raiseargumenterrorinstr.getRest();
+        final int numArgs = raiseargumenterrorinstr.getNumArgs();
         
         stringProducer.appendParameters(required, opt, rest, numArgs);
     }
 
-    public void ReceiveExceptionInstr(ReceiveExceptionInstr receiveexceptioninstr) {
-        boolean checkType = receiveexceptioninstr.isCheckType();
+    public void ReceiveExceptionInstr(final ReceiveExceptionInstr receiveexceptioninstr) {
+        final boolean checkType = receiveexceptioninstr.isCheckType();
         
         stringProducer.appendParameters(checkType);
     }
 
-    public void ReceivePreReqdArgInstr(ReceivePreReqdArgInstr receiveprereqdarginstr) {
-        int argIndex = receiveprereqdarginstr.getArgIndex();
+    public void ReceivePreReqdArgInstr(final ReceivePreReqdArgInstr receiveprereqdarginstr) {
+        final int argIndex = receiveprereqdarginstr.getArgIndex();
         
         stringProducer.appendParameters(argIndex);
     }
 
-    public void RecordEndBlockInstr(RecordEndBlockInstr recordendblockinstr) {
-        IRClosure endBlockClosure = recordendblockinstr.getEndBlockClosure();
+    public void RecordEndBlockInstr(final RecordEndBlockInstr recordendblockinstr) {
+        final IRClosure endBlockClosure = recordendblockinstr.getEndBlockClosure();
         
         stringProducer.appendParameters(endBlockClosure);
     }
 
-    public void RescueEQQInstr(RescueEQQInstr rescueeqqinstr) {
-        Operand arg1 = rescueeqqinstr.getArg1();
-        Operand arg2 = rescueeqqinstr.getArg2();
+    public void RescueEQQInstr(final RescueEQQInstr rescueeqqinstr) {
+        final Operand arg1 = rescueeqqinstr.getArg1();
+        final Operand arg2 = rescueeqqinstr.getArg2();
         
         stringProducer.appendParameters(arg1, arg2);
     }
 
-    public void ReturnInstr(ReturnInstr returninstr) {
-        Operand returnValue = returninstr.getReturnValue();
-        IRMethod methodToReturnFrom = returninstr.methodToReturnFrom;
+    public void ReturnInstr(final ReturnInstr returninstr) {
+        final Operand returnValue = returninstr.getReturnValue();
+        final IRMethod methodToReturnFrom = returninstr.methodToReturnFrom;
         
         stringProducer.appendParameters(returnValue, methodToReturnFrom);
     }
 
-    public void SearchConstInstr(SearchConstInstr searchconstinstr) {
-        String constName = searchconstinstr.getConstName();
-        Operand startingScope = searchconstinstr.getStartingScope();
-        boolean noPrivateConsts = searchconstinstr.isNoPrivateConsts();
+    public void SearchConstInstr(final SearchConstInstr searchconstinstr) {
+        final String constName = searchconstinstr.getConstName();
+        final Operand startingScope = searchconstinstr.getStartingScope();
+        final boolean noPrivateConsts = searchconstinstr.isNoPrivateConsts();
         
         stringProducer.appendParameters(constName, startingScope, noPrivateConsts);
     }
 
-    public void SetReturnAddressInstr(SetReturnAddressInstr setreturnaddressinstr) {
-        Label returnAddr = setreturnaddressinstr.getReturnAddr();
+    public void SetReturnAddressInstr(final SetReturnAddressInstr setreturnaddressinstr) {
+        final Label returnAddr = setreturnaddressinstr.getReturnAddr();
         
         stringProducer.appendParameters(returnAddr);
     }
 
-    public void StoreLocalVarInstr(StoreLocalVarInstr storelocalvarinstr) {
-        Operand value = storelocalvarinstr.getValue();
-        IRScope scope = storelocalvarinstr.getScope();
-        LocalVariable localVar = storelocalvarinstr.getLocalVar();
+    public void StoreLocalVarInstr(final StoreLocalVarInstr storelocalvarinstr) {
+        final Operand value = storelocalvarinstr.getValue();
+        final IRScope scope = storelocalvarinstr.getScope();
+        final LocalVariable localVar = storelocalvarinstr.getLocalVar();
         
         stringProducer.appendParameters(value, scope, localVar);
     }
 
-    public void ThreadPollInstr(ThreadPollInstr threadpollinstr) {
-        boolean onBackEdge = threadpollinstr.onBackEdge;
+    public void ThreadPollInstr(final ThreadPollInstr threadpollinstr) {
+        final boolean onBackEdge = threadpollinstr.onBackEdge;
         
         stringProducer.appendParameters(onBackEdge);
     }
 
-    public void ThrowExceptionInstr(ThrowExceptionInstr throwexceptioninstr) {
-        Operand exceptionArg = throwexceptioninstr.getExceptionArg();
+    public void ThrowExceptionInstr(final ThrowExceptionInstr throwexceptioninstr) {
+        final Operand exceptionArg = throwexceptioninstr.getExceptionArg();
         
         stringProducer.appendParameters(exceptionArg);
     }
 
-    public void ToAryInstr(ToAryInstr toaryinstr) {
-        Operand array = toaryinstr.getArray();
+    public void ToAryInstr(final ToAryInstr toaryinstr) {
+        final Operand array = toaryinstr.getArray();
         BooleanLiteral dontToAryArrays = toaryinstr.getDontToAryArrays();
         
         stringProducer.appendParameters(array, dontToAryArrays);
     }
 
-    public void UndefMethodInstr(UndefMethodInstr undefmethodinstr) {
-        Operand methodName = undefmethodinstr.getMethodName();
+    public void UndefMethodInstr(final UndefMethodInstr undefmethodinstr) {
+        final Operand methodName = undefmethodinstr.getMethodName();
         
         stringProducer.appendParameters(methodName);
     }
 
-    public void YieldInstr(YieldInstr yieldinstr) {
-        Operand blockArg = yieldinstr.getBlockArg();
-        Operand yieldArg = yieldinstr.getYieldArg();
-        boolean unwrapArray = yieldinstr.isUnwrapArray();
+    public void YieldInstr(final YieldInstr yieldinstr) {
+        final Operand blockArg = yieldinstr.getBlockArg();
+        final Operand yieldArg = yieldinstr.getYieldArg();
+        final boolean unwrapArray = yieldinstr.isUnwrapArray();
         
         stringProducer.appendParameters(blockArg, yieldArg, unwrapArray);        
     }
 
-    public void GlobalIsDefinedInstr(GlobalIsDefinedInstr globalisdefinedinstr) {
-        StringLiteral name = globalisdefinedinstr.getName();
+    public void GlobalIsDefinedInstr(final GlobalIsDefinedInstr globalisdefinedinstr) {
+        final StringLiteral name = globalisdefinedinstr.getName();
         
         stringProducer.appendParameters(name);
     }
 
-    public void RestoreErrorInfoInstr(RestoreErrorInfoInstr restoreerrorinfoinstr) {
-        Operand arg = restoreerrorinfoinstr.getArg();
+    public void RestoreErrorInfoInstr(final RestoreErrorInfoInstr restoreerrorinfoinstr) {
+        final Operand arg = restoreerrorinfoinstr.getArg();
         
         stringProducer.appendParameters(arg);
     }
 
-    public void SuperMethodBoundInstr(SuperMethodBoundInstr supermethodboundinstr) {
-        Operand object = supermethodboundinstr.getObject();
+    public void SuperMethodBoundInstr(final SuperMethodBoundInstr supermethodboundinstr) {
+        final Operand object = supermethodboundinstr.getObject();
         
         stringProducer.appendParameters(object);
     }
 
     // ruby 1.8 specific
 
-    public void ReceiveOptArgInstr18(ReceiveOptArgInstr18 receiveoptarginstr) {
+    public void ReceiveOptArgInstr18(final ReceiveOptArgInstr18 receiveoptarginstr) {
         commonFarAllReceiveArgInstr18(receiveoptarginstr);
     }
 
-    public void ReceiveRestArgInstr18(ReceiveRestArgInstr18 receiverestarginstr) {
+    public void ReceiveRestArgInstr18(final ReceiveRestArgInstr18 receiverestarginstr) {
         commonFarAllReceiveArgInstr18(receiverestarginstr);
     }
 
-    private void commonFarAllReceiveArgInstr18(ReceiveArgBase receiveArgBase) {
-        int argIndex = receiveArgBase.getArgIndex();
+    private void commonFarAllReceiveArgInstr18(final ReceiveArgBase receiveArgBase) {
+        final int argIndex = receiveArgBase.getArgIndex();
         
         stringProducer.appendParameters(argIndex);
     }
 
     // ruby 1.9 specific
 
-    public void BuildLambdaInstr(BuildLambdaInstr buildlambdainstr) {
-        String lambdaBodyName = buildlambdainstr.getLambdaBodyName();
-        ISourcePosition position = buildlambdainstr.getPosition();
-        String file = position.getFile();
-        int line = position.getLine();
+    public void BuildLambdaInstr(final BuildLambdaInstr buildlambdainstr) {
+        final String lambdaBodyName = buildlambdainstr.getLambdaBodyName();
+        final ISourcePosition position = buildlambdainstr.getPosition();        
         
-        stringProducer.appendParameters(lambdaBodyName, file, line);
+        stringProducer.appendParameters(lambdaBodyName, position);
     }
 
-    public void GetEncodingInstr(GetEncodingInstr getencodinginstr) {
-        String charsetName = getencodinginstr.getEncoding().getCharsetName();
+    public void GetEncodingInstr(final GetEncodingInstr getencodinginstr) {
+        final String charsetName = getencodinginstr.getEncoding().getCharsetName();
         
         stringProducer.appendParameters(charsetName);
     }
 
-    public void ReceiveOptArgInstr19(ReceiveOptArgInstr19 receiveoptarginstr) {
-        int argIndex = receiveoptarginstr.getArgIndex();
-        int minArgsLength = receiveoptarginstr.minArgsLength;
+    public void ReceiveOptArgInstr19(final ReceiveOptArgInstr19 receiveoptarginstr) {
+        final int argIndex = receiveoptarginstr.getArgIndex();
+        final int minArgsLength = receiveoptarginstr.minArgsLength;
         
         stringProducer.appendParameters(argIndex, minArgsLength);
     }
@@ -862,10 +864,10 @@ class IRInstrStringExtractor extends IRVisitor {
         stringProducer.appendParameters(argIndex, preReqdArgsCount, postReqdArgsCount);
     }
 
-    public void ReceiveRestArgInstr19(ReceiveRestArgInstr19 receiverestarginstr) {
-        int argIndex = receiverestarginstr.getArgIndex();
-        int totalRequiredArgs = receiverestarginstr.getTotalRequiredArgs();
-        int totalOptArgs = receiverestarginstr.getTotalOptArgs();
+    public void ReceiveRestArgInstr19(final ReceiveRestArgInstr19 receiverestarginstr) {
+        final int argIndex = receiverestarginstr.getArgIndex();
+        final int totalRequiredArgs = receiverestarginstr.getTotalRequiredArgs();
+        final int totalOptArgs = receiverestarginstr.getTotalOptArgs();
         
         stringProducer.appendParameters(argIndex, totalRequiredArgs, totalOptArgs);
     }

@@ -1,4 +1,4 @@
-package org.jruby.ir.persistence.read.parser;
+package org.jruby.ir.persistence.read.parser.factory;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -49,6 +49,8 @@ import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.UnexecutableNil;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
+import org.jruby.ir.persistence.read.parser.IRParsingContext;
+import org.jruby.ir.persistence.read.parser.ParametersIterator;
 import org.jruby.util.KCode;
 import org.jruby.util.RegexpOptions;
 
@@ -310,6 +312,11 @@ public class IROperandFactory {
         }
     }
     
+    /**
+     * SIDE EFFECT: adds label to persistence context
+     * @param parametersIterator
+     * @return
+     */
     private Label createLabel(final ParametersIterator parametersIterator) {
         final String labelName = parametersIterator.nextString();
         
@@ -430,16 +437,22 @@ public class IROperandFactory {
     private Variable createTemporaryVariable(final ParametersIterator parametersIterator) {
         
         final String name = parametersIterator.nextString();
-        
+        // Temporary variables are always used in context of current scope
+        // there was no need to persist it, so get current
         final IRScope currentScope = context.getCurrentScope();
         
+        // Maybe its special one of special variables
         if (Variable.CURRENT_SCOPE.equals(name)) {
             return currentScope.getCurrentScopeVariable();
         } else if (Variable.CURRENT_MODULE.equals(name)) {
             return currentScope.getCurrentModuleVariable();
-        } else if (context.isContainsVariable(name)) {
+        }
+        // Lets search in context
+        else if (context.isContainsVariable(name)) {
             return context.getVariable(name);
-        } else {
+        } 
+        // Create a brand new one than put it into context for future reuse
+        else {
             final TemporaryVariable newTemporaryVariable = currentScope.getNewTemporaryVariable(name);
             context.addVariable(newTemporaryVariable);
             return newTemporaryVariable;
@@ -447,7 +460,7 @@ public class IROperandFactory {
     }
 
     private WrappedIRClosure createWrappedIRClosure(final ParametersIterator parametersIterator) {
-        final IRClosure closure = (IRClosure) parametersIterator.nextScope();
+        final IRClosure closure = parametersIterator.nextIRClosure();
         
         return new WrappedIRClosure(closure);
     }

@@ -4,28 +4,35 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.jruby.ir.IRClassBody;
+import org.jruby.ir.IRClosure;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.operands.Operand;
+import org.jruby.ir.persistence.read.parser.factory.NonIRObjectFactory;
+import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.IRStaticScope;
 import org.jruby.parser.IRStaticScopeFactory;
 import org.jruby.parser.IRStaticScopeType;
 import org.jruby.parser.StaticScope;
+import org.jruby.runtime.Arity;
+import org.jruby.util.KCode;
+import org.jruby.util.RegexpOptions;
 
 public class ParametersIterator {
     
-    private IRParsingContext context;
-    private Iterator<Object> parametersIterator;
+    private final IRParsingContext context;
+    private final Iterator<Object> parametersIterator;
     
-    public ParametersIterator(IRParsingContext context, List<Object> parameters) {
+    public ParametersIterator(final IRParsingContext context, final List<Object> parameters) {
         this.context = context;
         this.parametersIterator = parameters.iterator();
     }
     
-    public ParametersIterator(IRParsingContext context, Object parameter) {
-        List<Object> listWithSingleParam = new ArrayList<Object>(1);
+    public ParametersIterator(final IRParsingContext context, final Object parameter) {
+        final List<Object> listWithSingleParam = new ArrayList<Object>(1);
         listWithSingleParam.add(parameter);
-        this.parametersIterator = listWithSingleParam.iterator();
         
+        this.parametersIterator = listWithSingleParam.iterator();
         this.context = context;
     }
     
@@ -34,39 +41,43 @@ public class ParametersIterator {
     }
     
     public IRScope nextScope() {
-        String scopeName = nextString();       
+        final String scopeName = nextString(); 
         
-        IRScope scope = context.getScopeByName(scopeName);
-        if(scope == null) {            
-            if(scopeName != null && scopeName.startsWith("Object")) {
-                return context.getIRManager().getObject();
-            } else {
-                return null;
-            }
+        // Check if it is reference to special IRScope
+        if(scopeName == null) { 
+            // Scope sometimes may be null for some instructions, that's ok
+            return null;
+        } else if(context.isContainsScope(scopeName)) {
+            return context.getScopeByName(scopeName);
+        } else if(scopeName.startsWith(IRClassBody.OBJECT_CLASS_NAME)) { // It's reference to object
+            // We need to look into context first
+            // because there is a possibility that class 'Object' was defined in file 
+            return context.getIRManager().getObject();
         } else {
-            return scope;
+            throw new RuntimeException("Scope '" + scopeName + "' was not found");
         }
     }
     
+    public IRClosure nextIRClosure() {
+        return (IRClosure) nextScope();
+    }
+    
     public IRStaticScope nextStaticScope(IRScope lexicalParent) {
-        String typeString = nextString();
-        IRStaticScopeType type = NonIRObjectFactory.INSTANCE.createStaticScopeType(typeString);
+        final String typeString = nextString();
+        final IRStaticScopeType type = NonIRObjectFactory.INSTANCE.createStaticScopeType(typeString);
         
-        List<Object> namesList = nextList();
-        String[] names = new String[namesList.size()];
-        namesList.toArray(names);        
+        final String[] names = nextObjectArray();    
+        final int requiredArgs = nextInt();
         
         StaticScope parent = null;
         if(lexicalParent != null) {
             parent = lexicalParent.getStaticScope();
         }
         
-        IRStaticScope staticScope = IRStaticScopeFactory.newStaticScope(parent, type, names);
-        
-        int requiredArgs = nextInt();
-        
-        staticScope.setRequiredArgs(requiredArgs);
-        
+        final IRStaticScope staticScope = IRStaticScopeFactory.newStaticScope(parent, type, names);
+        // requiredArg are needed to be set when interpretation runs
+        // some code relies on value of requiredArg (e.g. Arity check)
+        staticScope.setRequiredArgs(requiredArgs);        
         
         return staticScope;
     }
@@ -77,12 +88,13 @@ public class ParametersIterator {
     
     public List<Operand> nextOperandList() {
         @SuppressWarnings("unchecked")
-        List<Operand> operands = (List<Operand>) (List<?>) nextList();
+        final List<Operand> operands = (List<Operand>) (List<?>) nextList();
         return operands;
     }
     
     public Operand[] nextOperandArray() {
-        List<Operand> argsList = nextOperandList();
+        final List<Operand> argsList = nextOperandList();
+        
         Operand[] args = null;
         if (argsList != null) {
             args = new Operand[argsList.size()];
@@ -95,20 +107,51 @@ public class ParametersIterator {
     
     public List<Object> nextList() {
         @SuppressWarnings("unchecked")
-        List<Object> parameters = (List<Object>) parametersIterator.next();        
+        final List<Object> parameters = (List<Object>) parametersIterator.next();        
         return parameters;
+    }
+    
+    private String[] nextObjectArray() {
+        final List<Object> namesList = nextList();
+        
+        String[] names = new String[namesList.size()];
+        namesList.toArray(names);
+        return names;
     }
 
     public boolean nextBoolean() {
-        String booleanString = nextString();
+        final String booleanString = nextString();
         
         return Boolean.parseBoolean(booleanString);
     }
     
     public int nextInt() {
-        String integerString = nextString();
+        final String integerString = nextString();
         
         return Integer.parseInt(integerString); 
+    }
+
+    public ISourcePosition nextISourcePossition() {
+        final String fileName = nextString();
+        final int line = nextInt();
+        
+        final ISourcePosition possition = NonIRObjectFactory.INSTANCE.createSourcePosition(fileName, line);
+        
+        return possition;
+    }
+
+    public Arity nextArity() {
+        int value = nextInt();
+        
+        return Arity.createArity(value);
+    }
+
+    public RegexpOptions nextRegexpOptions() {
+        final String kcodeName = nextString();
+        final boolean isKCodeDefault = nextBoolean();
+        final KCode kcode = NonIRObjectFactory.INSTANCE.createKcode(kcodeName);
+        
+        return new RegexpOptions(kcode, isKCodeDefault);
     }
     
     public Object next() {

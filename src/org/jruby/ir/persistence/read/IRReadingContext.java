@@ -28,8 +28,8 @@ public enum IRReadingContext {
     }
     
     public void stop() {
-        watch.stop();
         totalTime += watch.getElapsedTime();
+        watch.stop();
     }
     
     public long getTotalTime() {

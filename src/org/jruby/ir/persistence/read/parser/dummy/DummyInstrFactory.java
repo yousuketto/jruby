@@ -3,7 +3,7 @@ package org.jruby.ir.persistence.read.parser.dummy;
 import java.util.List;
 
 import org.jruby.ir.Operation;
-import org.jruby.ir.persistence.read.parser.NonIRObjectFactory;
+import org.jruby.ir.persistence.read.parser.factory.NonIRObjectFactory;
 
 public enum DummyInstrFactory {
     INSTANCE;

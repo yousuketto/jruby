@@ -54,7 +54,7 @@ LineTerminator = \r|\n|\r\n
 WhiteSpace = [ \t\f]
 
 /* Identifiers */
-Identifier = [:jletter:][:jletterdigit:]*
+Identifier = [A-Z][A-Z_1-9]*
 
 /* Boolean */
 BooleanLiteral = (true|false)

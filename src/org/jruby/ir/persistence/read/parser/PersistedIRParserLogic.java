@@ -11,6 +11,10 @@ import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.persistence.read.parser.dummy.DummyInstrFactory;
 import org.jruby.ir.persistence.read.parser.dummy.InstrWithParams;
+import org.jruby.ir.persistence.read.parser.factory.IRInstructionFactory;
+import org.jruby.ir.persistence.read.parser.factory.IROperandFactory;
+import org.jruby.ir.persistence.read.parser.factory.IRScopeFactory;
+import org.jruby.ir.persistence.read.parser.factory.NonIRObjectFactory;
 
 import beaver.Symbol;
 
