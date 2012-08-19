@@ -131,8 +131,8 @@ import org.jruby.ir.operands.MethodHandle;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.StringLiteral;
 import org.jruby.ir.operands.Variable;
-import org.jruby.ir.persistence.persist.string.producer.AbstractIRStringBuilder;
-import org.jruby.ir.persistence.persist.string.producer.IRInstructionStringBuilder;
+import org.jruby.ir.persistence.persist.string.builder.AbstractIRStringBuilder;
+import org.jruby.ir.persistence.persist.string.builder.IRInstructionStringBuilder;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.CallType;
 

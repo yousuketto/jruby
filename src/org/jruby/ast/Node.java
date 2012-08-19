@@ -90,6 +90,10 @@ public abstract class Node implements ISourcePositionHolder, ParseResult {
         this.position = position;
     }
     
+    public String getFileName() {
+        return position.getFile();
+    }
+    
     public abstract Object accept(NodeVisitor visitor);
     public abstract List<Node> childNodes();
 

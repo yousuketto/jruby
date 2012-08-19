@@ -7,7 +7,7 @@ import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScopeType;
 import org.jruby.ir.IRScriptBody;
 import org.jruby.ir.instructions.Instr;
-import org.jruby.ir.persistence.persist.string.producer.IRScopeStringBuilder;
+import org.jruby.ir.persistence.persist.string.builder.IRScopeStringBuilder;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
 

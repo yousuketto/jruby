@@ -6,8 +6,6 @@
 
 %import "org.jruby.ir.operands.Operand";
 
-%import "org.jruby.ir.persistence.read.parser.dummy.InstrWithParams";
-
 %class "PersistedIRParser";
 
 %terminals BOOLEAN, ID, STRING, FIXNUM, FLOAT;
@@ -25,8 +23,6 @@
 %typeof param, NULL = "Object";
 
 %typeof scope_info, scope_descriptor = "IRScope";
-
-%typeof instr_with_params = "InstrWithParams";
 
 %goal scopes;
 
@@ -90,7 +86,11 @@ instruction
 
 simple_instr
     =    ID.id                          {: return logic.createInstrWithoutParams(id); :}
-    |    instr_with_params.instr        {: return logic.createInstrWithParams(instr); :}
+    // Originally it was 'instr_with_params' and instr_with_params was used 
+    // also in return instructions, but as for now number of reduce's
+    // decreases significantly, performance was chosen over DRY principle here 
+    |    ID.id LPAREN parameter_list.list RPAREN        
+                                        {: return logic.createInstrWithParams(id, list); :}
     ;
      
 abstract_result_instr
@@ -101,13 +101,10 @@ abstract_result_instr
 result_instr
     =    operand.var EQ ID.id
                                         {: return logic.createReturnInstrWithNoParams(var, id); :}
-    |    operand.var EQ instr_with_params.instr
-                                        {: return logic.createReturnInstrWithParams(var, instr); :}
-    ;
-    
-instr_with_params
-    =    ID.id LPAREN parameter_list.list RPAREN
-                                        {: return logic.createInstrWithParams(id, list); :}
+    // Originally it was 'operand.var EQ instr_with_params', but as for now number of reduce's
+    // decreases significantly, performance was chosen over DRY principle here  
+    |    operand.var EQ ID.id LPAREN parameter_list.list RPAREN
+                                        {: return logic.createReturnInstrWithParams(var, id, list); :}
     ;
 
 /* Parameters of instruction */ 

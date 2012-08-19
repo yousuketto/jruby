@@ -27,25 +27,32 @@ import org.jruby.ir.persistence.read.parser.PersistedIRParser.Terminals;
 %column
 
 %{
-        StringBuilder string = new StringBuilder();
+
+        {
+            // Make them start from 1's
+            yyline++;
+            yycolumn++;
+        }
+        
+        private final StringBuilder string = new StringBuilder();
 
         private Symbol token (short id) {
-	        return new Symbol(id, yyline + 1, yycolumn + 1, yylength(), yytext());
+	        return new Symbol(id, yyline, yycolumn, yylength(), yytext());
         }
 
         private Symbol token (short id, Object value) {
-	        return new Symbol(id, yyline + 1, yycolumn + 1, yylength(), value);
+	        return new Symbol(id, yyline, yycolumn, yylength(), value);
         }
         
         private void appendToString() {
-                string.append( yytext() );
+            string.append( yytext() );
         }
     
-        private Symbol finishStringAs(short id) {
-                yybegin(YYINITIAL); 
-                String value = string.toString();
-                string.setLength(0);
-                return token(id, value);
+        private Symbol finishString() {
+            yybegin(YYINITIAL); 
+            String value = string.toString();
+            string.setLength(0);
+            return token(Terminals.STRING, value);
         }
 
 %}
@@ -113,12 +120,12 @@ StringCharacter = [^\"\\]
 }
 
 <STRING> {
-    \"                                           { return finishStringAs(Terminals.STRING); }
-    \\\"                                         { string.append('\"'); }
-    \\                                           { string.append('\\'); }
+    \"                                           { return finishString(); }
+    \\\"                                         { string.append("\""); }
+    \\                                           { string.append("\\"); }
 
     {StringCharacter}+                           { appendToString(); }
 }
 
 /* error fallback */
-.|\n                                             { throw new Scanner.Exception(yyline + 1, yycolumn + 1, "unrecognized character '" + yytext() + "'"); }
+.|\n                                             { throw new Scanner.Exception(yyline, yycolumn, "unrecognized character '" + yytext() + "'"); }

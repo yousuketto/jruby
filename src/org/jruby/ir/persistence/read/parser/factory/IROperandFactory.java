@@ -51,7 +51,6 @@ import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
 import org.jruby.ir.persistence.read.parser.IRParsingContext;
 import org.jruby.ir.persistence.read.parser.ParametersIterator;
-import org.jruby.util.KCode;
 import org.jruby.util.RegexpOptions;
 
 public class IROperandFactory {
@@ -85,6 +84,7 @@ public class IROperandFactory {
     
     private Nil createNil() {
         final IRManager irManager = context.getIRManager();
+        
         return irManager.getNil();
     }
     
@@ -192,8 +192,7 @@ public class IROperandFactory {
     }
     
     private Backref createBackref(final ParametersIterator parametersIterator) {
-        final String typeString = parametersIterator.nextString();
-        final char t = typeString.charAt(0);
+        final char t = parametersIterator.nextChar();
         
         return new Backref(t);
     }
@@ -205,8 +204,7 @@ public class IROperandFactory {
     }
     
     private Bignum createBignum(final ParametersIterator parametersIterator) {
-        final String bignumString = parametersIterator.nextString();
-        final BigInteger value = new BigInteger(bignumString);
+        BigInteger value = parametersIterator.nextBigInteger();
         
         return new Bignum(value);
     }
@@ -215,6 +213,7 @@ public class IROperandFactory {
         final IRManager irManager = context.getIRManager();
         final boolean isTrue = parametersIterator.nextBoolean();
         
+        // Boolean literal must be taken from IRManager
         BooleanLiteral booleanLiteral = null;
         if(isTrue) {
             booleanLiteral = irManager.getTrue();
@@ -234,9 +233,7 @@ public class IROperandFactory {
     
     private CompoundString createCompoundString(final ParametersIterator parametersIterator) {
         final List<Operand> pieces = parametersIterator.nextOperandList();
-        
-        final String encodingName = parametersIterator.nextString();
-        final Encoding encoding = NonIRObjectFactory.INSTANCE.createEncoding(encodingName);
+        final Encoding encoding = parametersIterator.nextEncoding();
         
         return new CompoundString(pieces, encoding);
     }
@@ -248,21 +245,20 @@ public class IROperandFactory {
     }
     
     private DynamicSymbol createDynamicSymbol(final ParametersIterator parametersIterator) {
-        final CompoundString compoundString = (CompoundString) parametersIterator.next();
+        final CompoundString compoundString = parametersIterator.nextCompoundString();
         
         return new DynamicSymbol(compoundString);
     }
     
     private Fixnum createFixnum(final ParametersIterator parametersIterator) {
-        final String valueString = parametersIterator.nextString();
-        final Long value = Long.valueOf(valueString);
+        final Long value = parametersIterator.nextLong();
         
         return new Fixnum(value);
     }
     
     private org.jruby.ir.operands.Float createFloat(final ParametersIterator parametersIterator) {
-        final String valueString = parametersIterator.nextString();
-        final Double value = Double.valueOf(valueString);
+        final Double value = parametersIterator.nextDouble();
+        
         return new Float(value);
     }
 
@@ -272,6 +268,9 @@ public class IROperandFactory {
         return new GlobalVariable(name);
     }
     
+    // This is the messiest implementation among operands(and instructions)
+    // It looks like HASH{[[key1, value1], [key2, value2]]} so we need to iterate through
+    // the top level list which contains keyValuePair's persisted as list as well... ugh 
     private Hash createHash(final ParametersIterator parametersIterator) {
         final List<KeyValuePair> pairs = new ArrayList<KeyValuePair>();
         
@@ -292,9 +291,8 @@ public class IROperandFactory {
         return new Hash(pairs);
     }
     
-    private IRException createIRException(final ParametersIterator parametersIterator) {
-        final String reasonString = parametersIterator.nextString();        
-        final Reason reason = NonIRObjectFactory.INSTANCE.createReason(reasonString);
+    private IRException createIRException(final ParametersIterator parametersIterator) {       
+        final Reason reason = parametersIterator.nextReason();
         
         switch (reason) {
         case BREAK:
@@ -308,7 +306,7 @@ public class IROperandFactory {
         case RETURN:
             return IRException.RETURN_LocalJumpError;
         default:
-            throw new UnsupportedOperationException(reasonString);
+            throw new UnsupportedOperationException(reason.toString());
         }
     }
     
@@ -344,7 +342,7 @@ public class IROperandFactory {
         }
         final IRScope currentScope = context.getCurrentScope();
         
-        Label newLabel = currentScope.getNewLabel(prefix);
+        final Label newLabel = currentScope.getNewLabel(prefix);
         
         // Add to context for future reuse
         context.addLabel(labelName, newLabel);
@@ -394,12 +392,8 @@ public class IROperandFactory {
     }
     
     private Regexp createRegexp(final ParametersIterator parametersIterator) {
-        final Operand regexp = parametersIterator.nextOperand();        
-        final String kcodeName = parametersIterator.nextString();
-        final boolean isKCodeDefault = parametersIterator.nextBoolean();        
-        final KCode kcode = NonIRObjectFactory.INSTANCE.createKcode(kcodeName);
-        
-        final RegexpOptions options = new RegexpOptions(kcode, isKCodeDefault);
+        final Operand regexp = parametersIterator.nextOperand();    
+        final RegexpOptions options = parametersIterator.nextRegexpOptions();
         
         return new Regexp(regexp, options);
     }
@@ -441,7 +435,7 @@ public class IROperandFactory {
         // there was no need to persist it, so get current
         final IRScope currentScope = context.getCurrentScope();
         
-        // Maybe its special one of special variables
+        // Check if its one of special variables
         if (Variable.CURRENT_SCOPE.equals(name)) {
             return currentScope.getCurrentScopeVariable();
         } else if (Variable.CURRENT_MODULE.equals(name)) {

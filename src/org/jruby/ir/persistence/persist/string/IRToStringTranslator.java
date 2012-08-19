@@ -3,7 +3,7 @@ package org.jruby.ir.persistence.persist.string;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.instructions.Instr;
 import org.jruby.ir.operands.Operand;
-import org.jruby.ir.persistence.persist.string.producer.AbstractIRStringBuilder;
+import org.jruby.ir.persistence.persist.string.builder.AbstractIRStringBuilder;
 
 
 public class IRToStringTranslator {

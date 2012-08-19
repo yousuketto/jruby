@@ -47,8 +47,8 @@ import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.UnexecutableNil;
 import org.jruby.ir.operands.WrappedIRClosure;
-import org.jruby.ir.persistence.persist.string.producer.AbstractIRStringBuilder;
-import org.jruby.ir.persistence.persist.string.producer.IROperandStringBuilder;
+import org.jruby.ir.persistence.persist.string.builder.AbstractIRStringBuilder;
+import org.jruby.ir.persistence.persist.string.builder.IROperandStringBuilder;
 import org.jruby.util.RegexpOptions;
 
 class IROperandStringExtractor extends IRVisitor {

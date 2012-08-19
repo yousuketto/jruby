@@ -6,11 +6,10 @@ import java.util.List;
 
 import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScopeType;
+import org.jruby.ir.Operation;
 import org.jruby.ir.instructions.Instr;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Variable;
-import org.jruby.ir.persistence.read.parser.dummy.DummyInstrFactory;
-import org.jruby.ir.persistence.read.parser.dummy.InstrWithParams;
 import org.jruby.ir.persistence.read.parser.factory.IRInstructionFactory;
 import org.jruby.ir.persistence.read.parser.factory.IROperandFactory;
 import org.jruby.ir.persistence.read.parser.factory.IRScopeFactory;
@@ -26,11 +25,10 @@ public class PersistedIRParserLogic {
     private final IROperandFactory operandFactory;
     
     private static final NonIRObjectFactory NON_IR_OBJECT_FACTORY = NonIRObjectFactory.INSTANCE;
-    private static final DummyInstrFactory DUMMY_INSTR_FACTORY = DummyInstrFactory.INSTANCE;
     
     private final IRParsingContext context;
 
-    PersistedIRParserLogic(IRParsingContext context) {
+    PersistedIRParserLogic(final IRParsingContext context) {
         this.context = context;
         
         scopeBuilder = new IRScopeFactory(context);
@@ -44,7 +42,7 @@ public class PersistedIRParserLogic {
         return new Symbol(scope);
     }
     
-    Symbol createScope(String typeString, List<Object> parameters) {
+    Symbol createScope(final String typeString, final List<Object> parameters) {
         final IRScopeType type = NON_IR_OBJECT_FACTORY.createScopeType(typeString);
         final IRScope irScope = scopeBuilder.createScope(type, parameters);
         
@@ -53,7 +51,7 @@ public class PersistedIRParserLogic {
         return new Symbol(irScope);
     }
     
-    Symbol addToScope(IRScope scope, List<Instr> instrs) {
+    Symbol addToScope(final IRScope scope, final List<Instr> instrs) {
         // we need to iterate throw scopes
         // because IRScope#addInst has obvious side effect and for that reason
         // so we can't just use IRScope#getInsts and assign it to instrs 
@@ -64,62 +62,72 @@ public class PersistedIRParserLogic {
         return new Symbol(scope);
     }
     
-    Symbol enterScope(String name) {
+    Symbol enterScope(final String name) {
         final IRScope scope = context.getScopeByName(name);
         context.setCurrentScope(scope);
+        
         return new Symbol(scope);
     }
     
-    Symbol addFirstInstruction(Instr i) {
+    Symbol addFirstInstruction(final Instr i) {
         final List<Object> lst = new ArrayList<Object>();
         lst.add(i);
+        
         return new Symbol(lst);
     }
     
-    Symbol addFollowingInstructions(List<Instr> lst, Instr i, Symbol _symbol_lst) {
+    Symbol addFollowingInstructions(final List<Instr> lst, final Instr i, final Symbol _symbol_lst) {
         lst.add(i);
+        
         return _symbol_lst;
     }
     
-    Symbol markAsDeadIfNeeded(Symbol instrSymbol, Symbol marker) {
+    Symbol markAsDeadIfNeeded(final Symbol instrSymbol, final Symbol marker) {
         if(marker.value != null) {
-            Instr currentInstr =  (Instr) instrSymbol.value;
+            final Instr currentInstr =  (Instr) instrSymbol.value;
             currentInstr.markDead();
         }
+        
         return instrSymbol;
     }
     
-    Symbol createInstrWithoutParams(String operationName) {
-        Instr instr = instrFactory.createInstrWithoutParams(operationName);
+    Symbol createInstrWithoutParams(final String operationName) {
+        final Instr instr = instrFactory.createInstrWithoutParams(operationName);
+        
         return new Symbol(instr);
     }
     
-    Symbol createInstrWithParams(InstrWithParams dummy) {
-        Instr instr = instrFactory.createInstrWithParams(dummy);
+    Symbol createInstrWithParams(final String id, final List<Object> parameters) {
+        final Operation operation = NON_IR_OBJECT_FACTORY.createOperation(id);
+        final ParametersIterator parametersIterator = new ParametersIterator(context, parameters);
+        
+        final Instr instr = instrFactory.createInstrWithParams(operation, parametersIterator);
+        
         return new Symbol(instr);
     }
     
-    Symbol markHasUnusedResultIfNeeded(Symbol instrSymbol, Symbol marker) {
+    Symbol markHasUnusedResultIfNeeded(final Symbol instrSymbol, final Symbol marker) {
         if(marker.value != null) {
-            Instr currentInstr =  (Instr) instrSymbol.value;
+            final Instr currentInstr =  (Instr) instrSymbol.value;
             currentInstr.markUnusedResult();
         }
+        
         return instrSymbol;
     }
     
-    Symbol createReturnInstrWithNoParams(Operand result, String operationName) {
-        Instr instr = instrFactory.createReturnInstrWithNoParams((Variable) result, operationName);
+    Symbol createReturnInstrWithNoParams(final Operand result, final String operationName) {
+        final Instr instr = instrFactory.createReturnInstrWithNoParams((Variable) result, operationName);
+        
         return new Symbol(instr);
     }
     
-    Symbol createReturnInstrWithParams(Operand result, InstrWithParams dummy) {
-        Instr instr = instrFactory.createReturnInstrWithParams((Variable) result, dummy);
+    Symbol createReturnInstrWithParams(final Operand result, final String id, final List<Object> parameters) {
+        final Operation operation = NON_IR_OBJECT_FACTORY.createOperation(id);
+        final ParametersIterator parametersIterator = new ParametersIterator(context, parameters);
+        
+        final Instr instr = instrFactory.createReturnInstrWithParams((Variable) result, operation, parametersIterator);
+        
         return new Symbol(instr);
-    }
-    
-    Symbol createInstrWithParams(String name, List<Object> params) {
-        InstrWithParams dummy = DUMMY_INSTR_FACTORY.createInstrWithParam(name, params);
-        return new Symbol(dummy);
     }
     
     Symbol createNull() {
@@ -130,17 +138,18 @@ public class PersistedIRParserLogic {
         if(params == null) {
             params = Collections.emptyList();
         }
+        
         return new Symbol(params);
     }
     
-    Symbol createOperandWithoutParameters(String operandName) {
-        Operand operand = operandFactory.createOperandWithoutParameters(operandName);
+    Symbol createOperandWithoutParameters(final String operandName) {
+        final Operand operand = operandFactory.createOperandWithoutParameters(operandName);
         
         return new Symbol(operand);
     }
     
-    Symbol createOperandWithParameters(String operandName, List<Object> params) {
-        Operand operand = operandFactory.createOperandWithParameters(operandName, params);
+    Symbol createOperandWithParameters(final String operandName, final List<Object> params) {
+        final Operand operand = operandFactory.createOperandWithParameters(operandName, params);
         
         return new Symbol(operand);
     }

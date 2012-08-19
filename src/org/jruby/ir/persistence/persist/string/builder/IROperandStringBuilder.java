@@ -1,4 +1,4 @@
-package org.jruby.ir.persistence.persist.string.producer;
+package org.jruby.ir.persistence.persist.string.builder;
 
 import org.jruby.ir.operands.Operand;
 

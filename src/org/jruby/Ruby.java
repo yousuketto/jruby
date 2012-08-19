@@ -112,8 +112,8 @@ import org.jruby.ir.IRScope;
 import org.jruby.ir.interpreter.Interpreter;
 import org.jruby.ir.persistence.IRPersistenceException;
 import org.jruby.ir.persistence.read.IRReader;
-import org.jruby.ir.persistence.read.IRReadingContext;
 import org.jruby.ir.persistence.util.IRFileExpert;
+import org.jruby.ir.persistence.util.ProfilingContext;
 import org.jruby.javasupport.JavaSupport;
 import org.jruby.javasupport.util.RuntimeHelpers;
 import org.jruby.management.BeanManager;
@@ -124,6 +124,7 @@ import org.jruby.management.ParserStats;
 import org.jruby.parser.IRStaticScopeFactory;
 import org.jruby.parser.Parser;
 import org.jruby.parser.ParserConfiguration;
+import org.jruby.parser.ParsingFacade;
 import org.jruby.parser.StaticScopeFactory;
 import org.jruby.platform.Platform;
 import org.jruby.runtime.Binding;
@@ -222,7 +223,6 @@ public final class Ruby {
         this.kcode              = config.getKCode();
         this.beanManager        = BeanManagerFactory.create(this, config.isManagementEnabled());
         this.jitCompiler        = new JITCompiler(this);
-        this.parserStats        = new ParserStats(this);
         
         Random myRandom;
         try {
@@ -233,9 +233,10 @@ public final class Ruby {
         }
         this.random = myRandom;
         this.hashSeed = this.random.nextInt();
+        this.parsingFacade = new ParsingFacade(this);
         
         this.beanManager.register(new Config(this));
-        this.beanManager.register(parserStats);
+        this.beanManager.register(parsingFacade.getParserStats());
         this.beanManager.register(new ClassCache(this));
         this.beanManager.register(new org.jruby.management.Runtime(this));
 
@@ -484,10 +485,6 @@ public final class Ruby {
         }
         
         ParseResult parseResult = parseFromMain(filename, inputStream);
-        
-        if (RubyInstanceConfig.IR_PERSISTENCE) {
-            IRReadingContext.INSTANCE.setFileName(filename);
-        }
         
         // done with the stream, shut it down
         try {inputStream.close();} catch (IOException ioe) {}
@@ -840,7 +837,7 @@ public final class Ruby {
     }
 
     public Parser getParser() {
-        return parser;
+        return parsingFacade.getASTParser();
     }
     
     public BeanManager getBeanManager() {
@@ -2415,7 +2412,7 @@ public final class Ruby {
     }
 
     
-    // Obsolete parseFile function 
+    // Obsolete parseFile function, swallowing deprecation for now 
     public Node parseFile(InputStream in, String file, DynamicScope scope) {
         return parseFile(in, file, scope, 0);
     }
@@ -2425,122 +2422,50 @@ public final class Ruby {
         return parseFile(file, in, scope, 0);
     }
     
-    // Obsolete parseFile function    
+    // Obsolete parseFile function, swallowing deprecation for now    
+    @SuppressWarnings("deprecation")
     public Node parseFile(InputStream in, String file, DynamicScope scope, int lineNumber) {
-        addLoadParseToStats();
-        return parseRbAndGetAST(in, file, scope, lineNumber, false);
+        return parsingFacade.parseFile(in, file, scope, lineNumber);
         
     }
     
     // Modern variant of parseFile function above
     public ParseResult parseFile(String file, InputStream in, DynamicScope scope, int lineNumber) {
-        addLoadParseToStats();
-        System.out.println(file);
-        if(RubyInstanceConfig.IR_READING) {
-            try {
-                return parseIRAndGetIRScope(file);
-            } catch (Exception e) {
-                System.out.println(e);
-                // If something gone wrong with ir -
-                return parseRbAndGetAST(in, file, scope, lineNumber, false);
-            }
-            
-        } else { // Read .rb file
-            IRReadingContext.INSTANCE.start(".rb -> AST");
-            Node ast = parseRbAndGetAST(in, file, scope, lineNumber, false);
-            IRReadingContext.INSTANCE.stop();
-            
-            return ast;
-        }
+        return parsingFacade.parseFile(file, in, scope, lineNumber);
     }    
     
     // Obsolete parseFileFromMain function
+    @SuppressWarnings("deprecation")
     public Node parseFileFromMain(InputStream in, String file, DynamicScope scope) {
-        addLoadParseToStats();
-        return parseFileFromMainAndGetAST(in, file, scope);
+        return parsingFacade.parseFileFromMain(in, file, scope);
     }
     
     // Modern variant of parseFileFromMain function above
     public ParseResult parseFileFromMain(String file, InputStream in, DynamicScope scope) {
-        addLoadParseToStats();
-        
-        if(RubyInstanceConfig.IR_READING) {
-            try {
-                return parseIRAndGetIRScope(file);
-            } catch (Exception e) {
-                System.out.println(e);
-                return parseFileFromMainAndGetAST(in, file, scope);
-            }
-        } else {
-            IRReadingContext.INSTANCE.start(".rb -> AST");
-            Node ast = parseFileFromMainAndGetAST(in, file, scope);
-            IRReadingContext.INSTANCE.stop();
-            
-            return ast;
-        }
-    }
-
-    private ParseResult parseIRAndGetIRScope(String file) throws FileNotFoundException,
-            IRPersistenceException, IOException {
-        InputStream irIn = null;
-        try {
-            // Get IR from .ir file
-            File irFile = IRFileExpert.INSTANCE.getIRFileInIntendedPlace(file);
-            irIn = new FileInputStream(irFile);
-            IRReadingContext.INSTANCE.start(".ir -> IR");
-            IRScope irScope = IRReader.read(irIn, this);
-            IRReadingContext.INSTANCE.stop();
-            return irScope;
-        } finally {
-            if (irIn != null) {
-                irIn.close();
-            }
-        }
+        return parsingFacade.parseFileFromMain(file, in, scope);
     }
     
-    private Node parseFileFromMainAndGetAST(InputStream in, String file, DynamicScope scope) {
-        return parseRbAndGetAST(in, file, scope, 0, true);
-    }
-    
-    private Node parseRbAndGetAST(InputStream in, String file, DynamicScope scope, int lineNumber, boolean isFromMain) {
-        return parser.parse(file, in, scope, new ParserConfiguration(this,
-                lineNumber, false, false, true, isFromMain, config));
-    }
-    
-    
-
     public Node parseInline(InputStream in, String file, DynamicScope scope) {
-        addEvalParseToStats();
-        ParserConfiguration parserConfig = new ParserConfiguration(this, 0, false, true, false,
-               config);
-        if (is1_9) parserConfig.setDefaultEncoding(getEncodingService().getLocaleEncoding());
-        return parser.parse(file, in, scope, parserConfig);
+        return parsingFacade.parseInline(in, file, scope);
     }
 
     public Node parseEval(String content, String file, DynamicScope scope, int lineNumber) {
-        addEvalParseToStats();
-        return parser.parse(file, content.getBytes(), scope, new ParserConfiguration(this,
-                lineNumber, false, false, false, false, config));
+        return parsingFacade.parseEval(content, file, scope, lineNumber);
     }
 
     @Deprecated
     public Node parse(String content, String file, DynamicScope scope, int lineNumber, 
             boolean extraPositionInformation) {
-        return parser.parse(file, content.getBytes(), scope, new ParserConfiguration(this,
-                lineNumber, extraPositionInformation, false, true, config));
+        return parsingFacade.parse(content, file, scope, lineNumber, extraPositionInformation);
     }
     
     public Node parseEval(ByteList content, String file, DynamicScope scope, int lineNumber) {
-        addEvalParseToStats();
-        return parser.parse(file, content, scope, new ParserConfiguration(this,
-                   lineNumber, false, false, false, config));
+        return parsingFacade.parseEval(content, file, scope, lineNumber);
     }
     
     public Node parse(ByteList content, String file, DynamicScope scope, int lineNumber, 
             boolean extraPositionInformation) {
-        addJRubyModuleParseToStats();
-        return parser.parse(file, content, scope, new ParserConfiguration(this,
-            lineNumber, extraPositionInformation, false, true, config));       
+        return parsingFacade.parse(content, file, scope, lineNumber, extraPositionInformation);       
     }
 
     public ThreadService getThreadService() {
@@ -2658,10 +2583,6 @@ public final class Ruby {
             if (wrap) {
                 // toss an anonymous module into the search path
                 ((RootNode) parseResult).getStaticScope().setModule(RubyModule.newModule(this));
-            }
-            
-            if (RubyInstanceConfig.IR_PERSISTENCE) {
-                IRReadingContext.INSTANCE.setFileName(scriptName);
             }
             
             runInterpreter(context, parseResult, self);
@@ -4298,21 +4219,7 @@ public final class Ruby {
 
     public void setFFI(FFI ffi) {
         this.ffi = ffi;
-    }
-    
-    // Parser stats methods
-    private void addLoadParseToStats() {
-        if (parserStats != null) parserStats.addLoadParse();
-    }
-    
-    private void addEvalParseToStats() {
-        if (parserStats != null) parserStats.addEvalParse();
-    }
-    
-    private void addJRubyModuleParseToStats() {
-        if (parserStats != null) parserStats.addJRubyModuleParse();
-    }
-    
+    }    
 
     @Deprecated
     public int getSafeLevel() {
@@ -4428,9 +4335,6 @@ public final class Ruby {
     
     // Management/monitoring
     private BeanManager beanManager;
-
-    // Parser stats
-    private ParserStats parserStats;
     
     // Compilation
     private final JITCompiler jitCompiler;
@@ -4455,8 +4359,8 @@ public final class Ruby {
         }
     }
 
-    private final Parser parser = new Parser(this);
-
+    private ParsingFacade parsingFacade;
+    
     private LoadService loadService;
 
     private Encoding defaultInternalEncoding, defaultExternalEncoding;

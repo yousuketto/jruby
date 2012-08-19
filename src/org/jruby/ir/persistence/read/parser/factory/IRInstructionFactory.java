@@ -128,7 +128,6 @@ import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.persistence.read.parser.IRParsingContext;
 import org.jruby.ir.persistence.read.parser.ParametersIterator;
-import org.jruby.ir.persistence.read.parser.dummy.InstrWithParams;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.CallType;
 
@@ -178,9 +177,7 @@ public class IRInstructionFactory {
         return new PushFrameInstr();
     }
 
-    public Instr createInstrWithParams(final InstrWithParams instr) {
-        final Operation operation = instr.getOperation();
-        final ParametersIterator paramsIterator = new ParametersIterator(context, instr.getParameters());
+    public Instr createInstrWithParams(final Operation operation, final ParametersIterator paramsIterator) {
         switch (operation) {
         case CLOSURE_RETURN:
             return createClosureReturn(paramsIterator);
@@ -257,19 +254,19 @@ public class IRInstructionFactory {
     }
     
     private JumpInstr createJump(final ParametersIterator paramsIterator) {
-        final Label target = (Label) paramsIterator.next();
+        final Label target = paramsIterator.nextLabel();
         
         return new JumpInstr(target);
     }
 
     private JumpIndirectInstr createJumpInderect(final ParametersIterator paramsIterator) {
-        final Variable target = (Variable) paramsIterator.next();
+        final Variable target = paramsIterator.nextVariable();
 
         return new JumpIndirectInstr(target);
     }
     
     private LabelInstr createLabel(final ParametersIterator paramsIterator) {
-        final Label label = (Label) paramsIterator.next();
+        final Label label = paramsIterator.nextLabel();
         
         return new LabelInstr(label);
     }
@@ -295,7 +292,7 @@ public class IRInstructionFactory {
 
     private AliasInstr createAlias(final ParametersIterator paramsIterator) {
         
-        final Variable receiver = (Variable) paramsIterator.next();
+        final Variable receiver = paramsIterator.nextVariable();
         final Operand newName = paramsIterator.nextOperand();
         final Operand oldName = paramsIterator.nextOperand();
 
@@ -305,7 +302,7 @@ public class IRInstructionFactory {
     
     private AttrAssignInstr createAttrAssign(final ParametersIterator paramsIterator) {        
         final Operand receiver =  paramsIterator.nextOperand();
-        final MethAddr methAddr = (MethAddr) paramsIterator.next();        
+        final MethAddr methAddr = paramsIterator.nextMethAddr();        
         final Operand[] args = paramsIterator.nextOperandArray();
 
         if(paramsIterator.hasNext()) {
@@ -317,8 +314,7 @@ public class IRInstructionFactory {
 
     private AttrAssignInstr createSpecializedAttrAssign(final ParametersIterator paramsIterator,
             final Operand receiver, final MethAddr methAddr, final Operand[] args) {
-        final String specializedInstName = paramsIterator.nextString();
-        final SpecializedInstType specializedInstType = NonIRObjectFactory.INSTANCE.createSpecilizedInstrType(specializedInstName);
+        final SpecializedInstType specializedInstType = paramsIterator.nextSpecializedInstType();
         
         final AttrAssignInstr attrAssignInstr = new AttrAssignInstr(receiver, methAddr, args);
         
@@ -327,14 +323,14 @@ public class IRInstructionFactory {
             return new OneArgOperandAttrAssignInstr(attrAssignInstr);
             
         default:
-            throw new UnsupportedOperationException(specializedInstName);    
+            throw new UnsupportedOperationException(specializedInstType.toString());    
         }
     }
 
     private BranchInstr createBEQ(final ParametersIterator paramsIterator) {
         final Operand arg1 = paramsIterator.nextOperand();
         final Operand arg2 = paramsIterator.nextOperand();
-        final Label target = (Label) paramsIterator.next();
+        final Label target = paramsIterator.nextLabel();
 
         return BEQInstr.create(arg1, arg2, target);
     }
@@ -342,7 +338,7 @@ public class IRInstructionFactory {
     private BranchInstr createBFalse(final ParametersIterator paramsIterator) {
         final Operand arg1 = paramsIterator.nextOperand();
         final Operand arg2 = context.getIRManager().getFalse();
-        final Label target = (Label) paramsIterator.next();
+        final Label target = paramsIterator.nextLabel();
 
         return BEQInstr.create(arg1, arg2, target);
     }
@@ -350,7 +346,7 @@ public class IRInstructionFactory {
     private BranchInstr createBTrue(final ParametersIterator paramsIterator) {
         final Operand arg1 = paramsIterator.nextOperand();
         final Operand arg2 = context.getIRManager().getTrue();
-        final Label target = (Label) paramsIterator.next();
+        final Label target = paramsIterator.nextLabel();
 
         return BEQInstr.create(arg1, arg2, target);
     }
@@ -358,7 +354,7 @@ public class IRInstructionFactory {
     private BranchInstr createBNil(final ParametersIterator paramsIterator) {
         final Operand arg1 = paramsIterator.nextOperand();
         final Operand arg2 = context.getIRManager().getNil();
-        final Label target = (Label) paramsIterator.next();
+        final Label target = paramsIterator.nextLabel();
 
         return BEQInstr.create(arg1, arg2, target);
     }
@@ -366,7 +362,7 @@ public class IRInstructionFactory {
     private BranchInstr createBUndef(final ParametersIterator paramsIterator) {
         final Operand arg1 = paramsIterator.nextOperand();
         final Operand arg2 = UndefinedValue.UNDEFINED;
-        final Label target = (Label) paramsIterator.next();
+        final Label target = paramsIterator.nextLabel();
 
         return BEQInstr.create(arg1, arg2, target);
     }
@@ -374,7 +370,7 @@ public class IRInstructionFactory {
     private BranchInstr createBNE(final ParametersIterator paramsIterator) {
         final Operand arg1 = paramsIterator.nextOperand();
         final Operand arg2 = paramsIterator.nextOperand();
-        final Label target = (Label) paramsIterator.next();
+        final Label target = paramsIterator.nextLabel();
 
         return BNEInstr.create(arg1, arg2, target);
     }
@@ -405,7 +401,7 @@ public class IRInstructionFactory {
 
     private Instr createDefineMethod(final ParametersIterator paramsIterator, boolean isInstanceMethod) {
         final Operand container = paramsIterator.nextOperand();
-        final IRMethod method = (IRMethod) paramsIterator.nextScope();
+        final IRMethod method = paramsIterator.nextIRMethod();
 
         if (isInstanceMethod) {
             return new DefineInstanceMethodInstr(container, method);
@@ -415,14 +411,10 @@ public class IRInstructionFactory {
     }
     
     private ExceptionRegionStartMarkerInstr createExceptionRegionStartMarker(final ParametersIterator paramsIterator) {
-        final Label begin = (Label) paramsIterator.next();
-        final Label end = (Label) paramsIterator.next();
-        final Label firstRescueBlockLabel = (Label) paramsIterator.next();
-        
-        Label ensureBlockLabel = null;
-        if(paramsIterator.hasNext()) {
-            ensureBlockLabel = (Label) paramsIterator.next();
-        }
+        final Label begin = paramsIterator.nextLabel();
+        final Label end = paramsIterator.nextLabel();
+        final Label firstRescueBlockLabel = paramsIterator.nextLabel();
+        final Label ensureBlockLabel = paramsIterator.nextLabel();
         
         return new ExceptionRegionStartMarkerInstr(begin, end, ensureBlockLabel, firstRescueBlockLabel);
     }
@@ -437,19 +429,18 @@ public class IRInstructionFactory {
     private StoreLocalVarInstr createStoreLocalVar(final ParametersIterator paramsIterator) {
         final Operand value = paramsIterator.nextOperand();
         final IRScope scope = paramsIterator.nextScope();
-        final LocalVariable lvar = (LocalVariable) paramsIterator.next();
+        final LocalVariable lvar = paramsIterator.nextLocalVariable();
 
         return new StoreLocalVarInstr(value, scope, lvar);
     }
     
-    private NoResultCallInstr createNoResultCall(Operation operation, final ParametersIterator paramsIterator) {
+    private NoResultCallInstr createNoResultCall(final Operation operation, final ParametersIterator paramsIterator) {
         final Operand receiver = paramsIterator.nextOperand();
-        final String callTypeString = paramsIterator.nextString();
-        final CallType callType = NonIRObjectFactory.INSTANCE.createCallType(callTypeString);
-        final MethAddr methAddr = (MethAddr) paramsIterator.next();
+        final CallType callType = paramsIterator.nextCallType();
+        final MethAddr methAddr = paramsIterator.nextMethAddr();
         final Operand[] args = paramsIterator.nextOperandArray();
-        final Object parameter = paramsIterator.next();
         
+        final Object parameter = paramsIterator.next();
         if (parameter instanceof Operand) {
             final Operand closure = (Operand) parameter;
             return new NoResultCallInstr(operation, callType, methAddr, receiver, args, closure);
@@ -464,7 +455,7 @@ public class IRInstructionFactory {
         
     }
 
-    private NoResultCallInstr createSpecializedNoResultCall(Operation operation,
+    private NoResultCallInstr createSpecializedNoResultCall(final Operation operation,
             final Operand receiver, final CallType callType, final MethAddr methAddr,
             final Operand[] args, final Object parameter) {
         final String specializedInstName = (String) parameter;
@@ -490,7 +481,7 @@ public class IRInstructionFactory {
         return new PutGlobalVarInstr(varName, value);
     }
 
-    private PutInstr createPutInstrOtherThanGlobalVar(Operation operation, final ParametersIterator paramsIterator) {
+    private PutInstr createPutInstrOtherThanGlobalVar(final Operation operation, final ParametersIterator paramsIterator) {
 
         final Operand target = paramsIterator.nextOperand();
         final String ref = paramsIterator.nextString();
@@ -518,13 +509,14 @@ public class IRInstructionFactory {
     
     private ReturnInstr createReturn(final ParametersIterator paramsIterator) {
         final Operand rv = paramsIterator.nextOperand();
-        final IRMethod methodToReturn = (IRMethod) paramsIterator.nextScope();
+        final IRMethod methodToReturn = paramsIterator.nextIRMethod();
 
         return new ReturnInstr(rv, methodToReturn);
     }
 
     public Instr createReturnInstrWithNoParams(final Variable result, final String operationName) {
         final Operation operation = NonIRObjectFactory.INSTANCE.createOperation(operationName);
+        
         switch (operation) {
         case BACKREF_IS_MATCH_DATA:
             return createBackrefIsMatchData(result);
@@ -568,9 +560,7 @@ public class IRInstructionFactory {
         return new ReceiveClosureInstr(result);
     }    
 
-    public Instr createReturnInstrWithParams(final Variable result, final InstrWithParams instr) {
-        final Operation operation = instr.getOperation();
-        final ParametersIterator paramsIterator = new ParametersIterator(context, instr.getParameters());
+    public Instr createReturnInstrWithParams(final Variable result, final Operation operation, final ParametersIterator paramsIterator) {
         switch (operation) {
         case COPY:
             return createCopy(result, paramsIterator);
@@ -692,8 +682,7 @@ public class IRInstructionFactory {
     }
 
     private GetEncodingInstr createGetEncoding(final Variable result, final ParametersIterator paramsIterator) {
-        final String encodingName = paramsIterator.nextString();
-        final Encoding encoding = NonIRObjectFactory.INSTANCE.createEncoding(encodingName);
+        final Encoding encoding = paramsIterator.nextEncoding();
 
         return new GetEncodingInstr(result, encoding);
     }
@@ -705,7 +694,7 @@ public class IRInstructionFactory {
     }
 
     private GlobalIsDefinedInstr createGlobalIsDefined(final Variable result, final ParametersIterator paramsIterator) {
-        final StringLiteral name = (StringLiteral) paramsIterator.next();
+        final StringLiteral name = paramsIterator.nextStringLiteral();
 
         return new GlobalIsDefinedInstr(result, name);
     }
@@ -717,7 +706,7 @@ public class IRInstructionFactory {
     }
 
     private MethodLookupInstr createMethodLookup(final Variable result, final ParametersIterator paramsIterator) {
-        final MethodHandle mh = (MethodHandle) paramsIterator.next();
+        final MethodHandle mh = paramsIterator.nextMethodHandle();
 
         return new MethodLookupInstr(result, mh);
     }
@@ -754,13 +743,13 @@ public class IRInstructionFactory {
 
     private RecordEndBlockInstr createRecordEndBlock(final Variable result, final ParametersIterator paramsIterator) {
         final IRScope declaringScope = context.getCurrentScope();        
-        final IRClosure endBlockClosure = (IRClosure) paramsIterator.nextScope();
+        final IRClosure endBlockClosure = paramsIterator.nextIRClosure();
 
         return new RecordEndBlockInstr(declaringScope, endBlockClosure);
     }
 
     private SetReturnAddressInstr createSetReturnAddress(final Variable result, final ParametersIterator paramsIterator) {
-        final Label l = (Label) paramsIterator.next();
+        final Label l = paramsIterator.nextLabel();
 
         return new SetReturnAddressInstr(result, l);
     }
@@ -780,11 +769,11 @@ public class IRInstructionFactory {
     private CallInstr createCall(final Variable result, final ParametersIterator paramsIterator) {
         
         final Operand receiver = paramsIterator.nextOperand();
-        final String callTypString = paramsIterator.nextString();
-        final CallType callType = CallType.valueOf(callTypString);
+        final CallType callType = paramsIterator.nextCallType();
 
-        final MethAddr methAddr = (MethAddr) paramsIterator.next();        
+        final MethAddr methAddr = paramsIterator.nextMethAddr();        
         final Operand[] args = paramsIterator.nextOperandArray();
+        
         final Object parameter = paramsIterator.next();
         if (parameter instanceof Operand) {
             final Operand closure = (Operand) parameter;
@@ -838,7 +827,7 @@ public class IRInstructionFactory {
     }
 
     private DefineClassInstr createDefineClass(final Variable result, final ParametersIterator paramsIterator) {
-        final IRClassBody irClassBody = (IRClassBody) paramsIterator.nextScope();
+        final IRClassBody irClassBody = paramsIterator.nextIRClassBody();
         final Operand container = paramsIterator.nextOperand();
         final Operand superClass = paramsIterator.nextOperand();
 
@@ -846,14 +835,14 @@ public class IRInstructionFactory {
     }
 
     private DefineMetaClassInstr createDefineMetaClass(final Variable result, final ParametersIterator paramsIterator) {
-        final IRModuleBody metaClassBody = (IRModuleBody) paramsIterator.nextScope();
+        final IRModuleBody metaClassBody = paramsIterator.nextIRModuleBody();
         final Operand object = paramsIterator.nextOperand();
 
         return new DefineMetaClassInstr(result, object, metaClassBody);
     }
 
     private DefineModuleInstr createDefineModule(final Variable result, final ParametersIterator paramsIterator) {
-        final IRModuleBody moduleBody = (IRModuleBody) paramsIterator.nextScope();
+        final IRModuleBody moduleBody = paramsIterator.nextIRModuleBody();
         final Operand container = paramsIterator.nextOperand();
 
         return new DefineModuleInstr(result, moduleBody, container);
@@ -884,7 +873,7 @@ public class IRInstructionFactory {
     private DefinedObjectNameInstr createDefinedObjectName(final Operation operation, final Variable result,
             final ParametersIterator paramsIterator) {
         final Operand object = paramsIterator.nextOperand();
-        final StringLiteral name = (StringLiteral) paramsIterator.next();
+        final StringLiteral name = paramsIterator.nextStringLiteral();
 
         switch (operation) {
         case CLASS_VAR_IS_DEFINED:
@@ -922,7 +911,7 @@ public class IRInstructionFactory {
     }
     
     private BuildLambdaInstr createBuildLambda(final Variable result, final ParametersIterator paramsIterator) {
-        final IRClosure lambdaBody = (IRClosure) paramsIterator.nextScope();
+        final IRClosure lambdaBody = paramsIterator.nextIRClosure();
         final ISourcePosition possition = paramsIterator.nextISourcePossition();
 
         return new BuildLambdaInstr(result, lambdaBody, possition);
@@ -938,7 +927,7 @@ public class IRInstructionFactory {
     private LoadLocalVarInstr createLoadLocalVar(final Variable result, final ParametersIterator paramsIterator) {
         final TemporaryVariable tempResult = (TemporaryVariable) result;
         final IRScope scope = paramsIterator.nextScope();
-        final LocalVariable lvar = (LocalVariable) paramsIterator.next();
+        final LocalVariable lvar = paramsIterator.nextLocalVariable();
 
         return new LoadLocalVarInstr(scope, tempResult, lvar);
     }
@@ -966,7 +955,7 @@ public class IRInstructionFactory {
         // FIXME?: persist module, module name is already persisted
         final RubyModule module = null;
 
-        final Label failurePathLabel = (Label) paramsIterator.next();
+        final Label failurePathLabel = paramsIterator.nextLabel();
 
         return new ModuleVersionGuardInstr(module, expectedVersion, candidateObj, failurePathLabel);
     }
@@ -1022,8 +1011,7 @@ public class IRInstructionFactory {
     }
 
     private CallInstr createSuperInstr(final Variable result, final ParametersIterator paramsIterator) {
-        final String superInstrTypeString = paramsIterator.nextString();
-        final SuperInstrType instrType = SuperInstrType.valueOf(superInstrTypeString);
+        final SuperInstrType instrType = paramsIterator.nextSuperInstrType();
         
         switch (instrType) {
         case CLASS:
@@ -1042,7 +1030,7 @@ public class IRInstructionFactory {
 
     private CallInstr createResolvedSuperInstr(final SuperInstrType type, final Variable result, final ParametersIterator paramsIterator) {
         final Operand definingModule = paramsIterator.nextOperand();
-        final MethAddr superMeth = (MethAddr) paramsIterator.next();
+        final MethAddr superMeth = paramsIterator.nextMethAddr();
         final Operand[] args = paramsIterator.nextOperandArray();
         final Operand closure = paramsIterator.nextOperand();
 
@@ -1060,12 +1048,8 @@ public class IRInstructionFactory {
     
     private UnresolvedSuperInstr createUnresolvedSuperInstr(final Variable result, final ParametersIterator paramsIterator) {
         final Operand receiver = paramsIterator.nextOperand();
-        final Operand[] args = paramsIterator.nextOperandArray();
-        
-        Operand closure = null;
-        if(paramsIterator.hasNext()) {
-            closure = paramsIterator.nextOperand();   
-        }
+        final Operand[] args = paramsIterator.nextOperandArray();        
+        final Operand closure = paramsIterator.nextOperand();
         
         return new UnresolvedSuperInstr(result, receiver, args, closure);
     }
@@ -1081,7 +1065,7 @@ public class IRInstructionFactory {
 
     private ToAryInstr createToAry(final Variable result, final ParametersIterator paramsIterator) {
         final Operand array = paramsIterator.nextOperand();
-        final BooleanLiteral dontToAryArrays = (BooleanLiteral) paramsIterator.next();
+        final BooleanLiteral dontToAryArrays = paramsIterator.nextBooleanLiteral();
 
         return new ToAryInstr(result, array, dontToAryArrays);
     }
@@ -1096,12 +1080,7 @@ public class IRInstructionFactory {
 
     private ZSuperInstr createZSuper(final Variable result, final ParametersIterator paramsIterator) {
         final Operand receiver = paramsIterator.nextOperand();
-        
-        // Closure cannot be null here?
-        Operand closure = null;
-        if(paramsIterator.hasNext()) {
-            closure = paramsIterator.nextOperand();
-        }
+        final Operand closure = paramsIterator.nextOperand();
 
         return new ZSuperInstr(result, receiver, closure);
     }

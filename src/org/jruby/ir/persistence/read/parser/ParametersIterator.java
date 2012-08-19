@@ -1,13 +1,28 @@
 package org.jruby.ir.persistence.read.parser;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.jcodings.Encoding;
+import org.jruby.RubyLocalJumpError.Reason;
 import org.jruby.ir.IRClassBody;
 import org.jruby.ir.IRClosure;
+import org.jruby.ir.IRMethod;
+import org.jruby.ir.IRModuleBody;
 import org.jruby.ir.IRScope;
+import org.jruby.ir.instructions.SuperInstrType;
+import org.jruby.ir.instructions.specialized.SpecializedInstType;
+import org.jruby.ir.operands.BooleanLiteral;
+import org.jruby.ir.operands.CompoundString;
+import org.jruby.ir.operands.Label;
+import org.jruby.ir.operands.LocalVariable;
+import org.jruby.ir.operands.MethAddr;
+import org.jruby.ir.operands.MethodHandle;
 import org.jruby.ir.operands.Operand;
+import org.jruby.ir.operands.StringLiteral;
+import org.jruby.ir.operands.Variable;
 import org.jruby.ir.persistence.read.parser.factory.NonIRObjectFactory;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.parser.IRStaticScope;
@@ -15,6 +30,7 @@ import org.jruby.parser.IRStaticScopeFactory;
 import org.jruby.parser.IRStaticScopeType;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
+import org.jruby.runtime.CallType;
 import org.jruby.util.KCode;
 import org.jruby.util.RegexpOptions;
 
@@ -37,7 +53,7 @@ public class ParametersIterator {
     }
     
     public Operand nextOperand() {
-        return (Operand) parametersIterator.next();
+        return (Operand) next();
     }
     
     public IRScope nextScope() {
@@ -61,6 +77,18 @@ public class ParametersIterator {
     public IRClosure nextIRClosure() {
         return (IRClosure) nextScope();
     }
+
+    public IRMethod nextIRMethod() {
+        return (IRMethod) nextScope();
+    }
+
+    public IRClassBody nextIRClassBody() {
+        return (IRClassBody) nextScope();
+    }
+
+    public IRModuleBody nextIRModuleBody() {
+        return (IRModuleBody) nextScope();
+    }
     
     public IRStaticScope nextStaticScope(IRScope lexicalParent) {
         final String typeString = nextString();
@@ -83,7 +111,32 @@ public class ParametersIterator {
     }
     
     public String nextString() {
-        return (String) parametersIterator.next();
+        return (String) next();
+    }
+    
+    public char nextChar() {
+        // Chars are persisted as strings
+        final String string = nextString();
+        
+        return string.charAt(0);
+    }
+    
+    public Long nextLong() {
+        final String valueString = nextString();
+        
+        return Long.valueOf(valueString);
+    }
+    
+    public Double nextDouble() {
+        final String valueString = nextString();
+        
+        return Double.valueOf(valueString);
+    }
+    
+    public BigInteger nextBigInteger() {
+        final String bignumString = nextString();
+        
+        return new BigInteger(bignumString);
     }
     
     public List<Operand> nextOperandList() {
@@ -160,6 +213,68 @@ public class ParametersIterator {
     
     public boolean hasNext() {
         return parametersIterator.hasNext();
+    }
+
+    public Encoding nextEncoding() {
+        final String encodingName = nextString();
+        
+        return NonIRObjectFactory.INSTANCE.createEncoding(encodingName);
+    }
+
+    public CompoundString nextCompoundString() {
+        return (CompoundString) next();
+    }
+    
+    public Reason nextReason() {
+        final String reasonString = nextString();
+        
+        return NonIRObjectFactory.INSTANCE.createReason(reasonString); 
+    }
+
+    public Label nextLabel() {
+        return (Label) next();
+    }
+
+    public Variable nextVariable() {
+        return (Variable) next();
+    }
+
+    public MethAddr nextMethAddr() {
+        return (MethAddr) next();
+    }
+    
+    public SpecializedInstType nextSpecializedInstType() {
+        final String specializedInstName = nextString();
+        
+        return NonIRObjectFactory.INSTANCE.createSpecilizedInstrType(specializedInstName);
+    }
+
+    public LocalVariable nextLocalVariable() {
+        return (LocalVariable) next();
+    }
+
+    public CallType nextCallType() {
+        final String callTypeString = nextString();
+        
+        return NonIRObjectFactory.INSTANCE.createCallType(callTypeString);
+    }
+
+    public StringLiteral nextStringLiteral() {
+        return (StringLiteral) next();
+    }
+
+    public MethodHandle nextMethodHandle() {
+        return (MethodHandle) next();
+    }
+
+    public SuperInstrType nextSuperInstrType() {
+        final String superInstrTypeString = nextString();
+        
+        return  SuperInstrType.valueOf(superInstrTypeString);
+    }
+
+    public BooleanLiteral nextBooleanLiteral() {
+        return (BooleanLiteral) next();
     }
 
 }

@@ -5,40 +5,117 @@ import java.io.File;
 public enum IRFileExpert {
     INSTANCE;
 
+    
     private static final String IR_FILE_EXTENSION = ".ir";
     private static final String EXTENSION_SEPARATOR = ".";
 
+    private static final String USER_HOME = "user.home";
+    private static final String ENV_VARIABLE_NAME = "IR_HOME";
     private static final String IR_FOLDER_NAME = "ir";
-    private static final File IR_ROOT_FOLDER = new File(System.getProperty("user.home"), IR_FOLDER_NAME);
-
-    public File getIRFileInIntendedPlace(final String fileName) {
+    
+    private static final File IR_ROOT_FOLDER;
+    
+    static {
+        /* Find out IR_ROOT_FOLDER */
         
-        final String absolutePathToRbFile = getAbsolutePathToFile(fileName);
+        // Try to find among environment variables
+        final String pathFromEnvVariable = System.getenv(ENV_VARIABLE_NAME);
+        
+        final boolean correctEnvironmentVariableIsSet = ( pathFromEnvVariable != null ) && ( new File(pathFromEnvVariable).isDirectory() );
+        final String irRootParentFolder;
+        if (correctEnvironmentVariableIsSet) {
+            irRootParentFolder = pathFromEnvVariable;
+        } else { // Than ir folder will be situated in user home directory
+            irRootParentFolder = System.getProperty(USER_HOME);            
+        }
+        
+        IR_ROOT_FOLDER = new File(irRootParentFolder, IR_FOLDER_NAME);
+        
+    }
+    
+    public void rememberModificationTimeForIr(final String fileName) {
+        final File rbFile = getRbFile(fileName);
+        final File irFile = getIrFileByRbFile(rbFile, false);
+        
+        irFile.setLastModified(rbFile.lastModified());
+    }
+    
+    public boolean persistedIrIsUpToDateForRbFile(final String fileName) {         
+         final File rbFile = getRbFile(fileName);
+         final File irFile = getIrFileByRbFile(rbFile, false);
+         
+         if(irFile.exists() && irFile.lastModified() == rbFile.lastModified()) {
+             return true;
+         } else {
+             return false;
+         }
+    }
+    
+    public File getIrFileByRbFileForPersistence(final String fileName) {
+        final File rbFile = getRbFile(fileName);
+        
+        return getIrFileByRbFile(rbFile, true);
+    }
+    
+    public File getIrFileForReading(final String fileName) {
+        final File rbFile = getRbFile(fileName);
+        
+        return getIrFileByRbFile(rbFile, false);
+    }
+    
+    private File getIrFileByRbFile(final File rbFile, boolean isPersistence) {
+        String absolutePathToRbFile = rbFile.getAbsolutePath();
 
         final int startOfFileName = absolutePathToRbFile.lastIndexOf(File.separator) + 1;
         
-        final File irFolder = createIRFolderHierarchy(absolutePathToRbFile, startOfFileName);
+        final File irFolder;
+        if (isPersistence) {
+            irFolder = createIrFolderHierarchyIfNeeded(absolutePathToRbFile, startOfFileName);
+        } else {
+            irFolder = getIrFolderHierarchy(absolutePathToRbFile, startOfFileName);
+        }
+        
         final String irFileName = getIRFileName(absolutePathToRbFile, startOfFileName);
-
-        return new File(irFolder, irFileName);
+        
+        final File irFile = new File(irFolder, irFileName);
+        
+        return irFile;
         
     }
 
-    private String getAbsolutePathToFile(final String fileName) {
-        final String normalizedFileName = fileName.replaceAll("file:", "");
-        final File rbFile = new File(normalizedFileName);
-        
-        return rbFile.getAbsolutePath();
+    private File getRbFile(final String fileName) {
+        final String normalizedFileName = normalizeFilePath(fileName);
+        return new File(normalizedFileName);
+    }
+
+    private String normalizeFilePath(final String fileName) {
+        if (fileName.startsWith("file:")) {
+            // remove 'file:' marker
+            final int indexOfFirstMeaningfulLetter = 5;
+            return fileName.substring(indexOfFirstMeaningfulLetter);
+        } else {
+            return fileName;
+        }
     }
     
-    private File createIRFolderHierarchy(final String absolutePathToRbFile,
+    private File createIrFolderHierarchyIfNeeded(final String absolutePathToRbFile,
             final int startOfFileName) {
+        
+        File irFolder = getIrFolderHierarchy(absolutePathToRbFile, startOfFileName);
+        
+        if (!irFolder.exists()) {
+            irFolder.mkdirs();
+        }
+        
+        return irFolder;
+    }
+
+    private File getIrFolderHierarchy(final String absolutePathToRbFile, final int startOfFileName) {
         File irFolder = IR_ROOT_FOLDER;
         if (startOfFileName > 0) {
             String fileFolderPath = absolutePathToRbFile.substring(0, startOfFileName);
             irFolder = new File(irFolder, fileFolderPath);
         }
-        irFolder.mkdirs();
         return irFolder;
     }
 
@@ -50,8 +127,7 @@ public enum IRFileExpert {
         } else {
             fileNameWithoutExtension = absolutePathToRbFile.substring(startOfFileName);
         }
-        final String irFileName = fileNameWithoutExtension + IR_FILE_EXTENSION;
-        return irFileName;
+        return fileNameWithoutExtension + IR_FILE_EXTENSION;
     }
 
 }
