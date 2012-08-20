@@ -31,13 +31,12 @@ public class DalvikBytecodeAdapter {
     
     public void push(Long l) {
         loadLocal(0);
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "fixnum", new TypeId[]{TypeId.get(ThreadContext.class)}, Bootstrap.fixnum(), l);
+        DalvikCallHelper.fixnum(adapter, l);
     }
     
     public void push(ByteList bl) {
         loadLocal(0);
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "string", new TypeId[]{TypeId.get(ThreadContext.class)}, 
-                Bootstrap.string(), new String(bl.bytes(), RubyEncoding.ISO), bl.getEncoding().getIndex());
+        DalvikCallHelper.string(adapter, bl);
     }
     
     /**
@@ -68,13 +67,13 @@ public class DalvikBytecodeAdapter {
     
     public void invokeOther(String name, int arity) {
         TypeId[] types = params(TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class), TypeId.get(IRubyObject.class), arity);
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "invoke:" + JavaNameMangler.mangleMethodName(name), 
+        DalvikCallHelper.invokeOther(TypeId.get(IRubyObject.class), "invoke:" + JavaNameMangler.mangleMethodName(name),
                 types, Bootstrap.invoke());
     }
     
     public void invokeSelf(String name, int arity) {
-        TypeId[] types = params(TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class), TypeId.get(IRubyObject.class), arity);
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "invokeSelf:" + JavaNameMangler.mangleMethodName(name), types, Bootstrap.invokeSelf());
+        TypeId[] types = params(TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class), TypeId.get(String.class), TypeId.get(IRubyObject.class), arity);
+        DalvikCallHelper.invokeSelf(adapter, TypeId.get(IRubyObject.class), JavaNameMangler.mangleMethodName(name), types);
     }
     
     public void invokeSuper(String name, int arity) {
@@ -197,6 +196,15 @@ public class DalvikBytecodeAdapter {
         Arrays.fill(types, typFill);
         types[0] = typ1;
         types[1] = typ2;
+        return types;
+    }
+
+    public static TypeId[] params(TypeId typ1, TypeId typ2, TypeId typ3, TypeId typFill, int times) {
+        TypeId[] types = new TypeId[times + 3];
+        Arrays.fill(types, typFill);
+        types[0] = typ1;
+        types[1] = typ2;
+        types[2] = typ3;
         return types;
     }
     
