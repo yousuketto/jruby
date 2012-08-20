@@ -2,9 +2,11 @@ package org.jruby.ir.persistence.util;
 
 import java.io.File;
 
+import org.jruby.platform.Platform;
+import org.jruby.util.SafePropertyAccessor;
+
 public enum IRFileExpert {
     INSTANCE;
-
     
     private static final String IR_FILE_EXTENSION = ".ir";
     private static final String EXTENSION_SEPARATOR = ".";
@@ -19,14 +21,25 @@ public enum IRFileExpert {
         /* Find out IR_ROOT_FOLDER */
         
         // Try to find among environment variables
-        final String pathFromEnvVariable = System.getenv(ENV_VARIABLE_NAME);
+        final String pathFromEnvVariable = SafePropertyAccessor.getenv(ENV_VARIABLE_NAME);
         
         final boolean correctEnvironmentVariableIsSet = ( pathFromEnvVariable != null ) && ( new File(pathFromEnvVariable).isDirectory() );
         final String irRootParentFolder;
         if (correctEnvironmentVariableIsSet) {
             irRootParentFolder = pathFromEnvVariable;
         } else { // Than ir folder will be situated in user home directory
-            irRootParentFolder = System.getProperty(USER_HOME);            
+            if (Platform.IS_WINDOWS) { // (see http://bugs.sun.com/view_bug.do?bug_id=4787931)
+                String homeDrive = System.getenv("HOMEDRIVE");
+                String homePath = System.getenv("HOMEPATH");
+                if (homeDrive != null && homePath != null) {
+                    irRootParentFolder = (homeDrive + homePath).replace('\\', '/');
+                } else {
+                    irRootParentFolder = SafePropertyAccessor.getProperty(USER_HOME);
+                }
+                
+            } else {
+                irRootParentFolder = SafePropertyAccessor.getProperty(USER_HOME);
+            }
         }
         
         IR_ROOT_FOLDER = new File(irRootParentFolder, IR_FOLDER_NAME);
