@@ -49,15 +49,15 @@ import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.UnexecutableNil;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
-import org.jruby.ir.persistence.read.parser.IRParsingContext;
+import org.jruby.ir.persistence.read.parser.IRFileParsingContext;
 import org.jruby.ir.persistence.read.parser.ParametersIterator;
 import org.jruby.util.RegexpOptions;
 
 public class IROperandFactory {
     
-    private final IRParsingContext context;
+    private final IRFileParsingContext context;
 
-    public IROperandFactory(IRParsingContext context) {
+    public IROperandFactory(IRFileParsingContext context) {
         this.context = context;
     }
     

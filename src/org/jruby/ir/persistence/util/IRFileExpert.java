@@ -32,9 +32,12 @@ public enum IRFileExpert {
         IR_ROOT_FOLDER = new File(irRootParentFolder, IR_FOLDER_NAME);
         
     }
-    
-    public void rememberModificationTimeForIr(final String fileName) {
-        final File rbFile = getRbFile(fileName);
+ 
+    /** 
+     * Must be called after writing ir file to disk, otherwise it won't change mtime of file
+     */
+    public void rememberModificationTimeForIr(final String rbFilePath) {
+        final File rbFile = getRbFile(rbFilePath);
         final File irFile = getIrFileByRbFile(rbFile, false);
         
         irFile.setLastModified(rbFile.lastModified());

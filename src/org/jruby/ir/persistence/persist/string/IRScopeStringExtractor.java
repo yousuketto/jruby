@@ -139,6 +139,13 @@ class IRScopeStringExtractor {
         }
     }
     
+    // All instruction blocks are looks like:
+    // "${scopeName}"
+    //  ${instr1}
+    //  ${instr2}
+    //  ...
+    //  ${instrn}
+    //
     private void appendScopeInstructionsBlock(final IRScope irScope) {
         stringProducer.appendScopeName(irScope);        
         stringProducer.finishLine();

@@ -51,9 +51,7 @@ public class ParsingFacade {
     // Modern variant of parseFile function from above
     public ParseResult parseFile(String file, InputStream in, DynamicScope scope, int lineNumber) {
         addLoadParseToStats();
-        if(RubyInstanceConfig.IR_PERSISTENCE_PROFILE) {
-             System.out.println(file);
-        }
+        ProfilingContext.INSTANCE.enterFile(file);
         if(RubyInstanceConfig.IR_READING) {
             try {
                 return parseIRAndGetIRScope(file);

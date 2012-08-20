@@ -136,6 +136,10 @@ import org.jruby.ir.persistence.persist.string.builder.IRInstructionStringBuilde
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.CallType;
 
+/**
+ * Extracts string representation of IR instruction
+ * All strings are one-liners
+ */
 class IRInstrStringExtractor extends IRVisitor {
     
     private final IRInstructionStringBuilder stringProducer;
@@ -160,6 +164,7 @@ class IRInstrStringExtractor extends IRVisitor {
         return stringProducer.getResultString();
     }
     
+    // Used when string has no to be returned
     public void produceString(final Instr instr) {
         stringProducer.appendPrefix(instr);
 

@@ -26,9 +26,9 @@ public class PersistedIRParserLogic {
     
     private static final NonIRObjectFactory NON_IR_OBJECT_FACTORY = NonIRObjectFactory.INSTANCE;
     
-    private final IRParsingContext context;
+    private final IRFileParsingContext context;
 
-    PersistedIRParserLogic(final IRParsingContext context) {
+    PersistedIRParserLogic(final IRFileParsingContext context) {
         this.context = context;
         
         scopeBuilder = new IRScopeFactory(context);

@@ -10,16 +10,19 @@ import org.jruby.ir.operands.Label;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.persistence.util.IRScopeNameExpert;
 
-public class IRParsingContext {
+public class IRFileParsingContext {
     
     private final Ruby runtime;
-    private final Map<String, IRScope> scopesByNames = new HashMap<String, IRScope>();
     private IRScope toplevelScope;
     private IRScope currentScope;
+    
+    // Values of these maps may be used later, so we need to preserve them for future reuse
+    // otherwise distinct objects would be created which would cause interpretation to fail
+    private final Map<String, IRScope> scopesByNames = new HashMap<String, IRScope>();
     private final Map<String, TemporaryVariable> variablesByNames = new HashMap<String, TemporaryVariable>();
     private final Map<String, Label> labelsByNames = new HashMap<String, Label>();
     
-    public IRParsingContext(Ruby runtime) {
+    public IRFileParsingContext(Ruby runtime) {
         this.runtime = runtime;
     }
     
@@ -49,6 +52,11 @@ public class IRParsingContext {
         return currentScope;
     }
 
+    /**
+     * SIDE EFFECT: sets top level scope if there was no top level scope,
+     * so it's assumed that current scope is top level
+     * @param currentScope
+     */
     public void setCurrentScope(IRScope currentScope) {
         if(toplevelScope == null) {
             this.toplevelScope = currentScope;

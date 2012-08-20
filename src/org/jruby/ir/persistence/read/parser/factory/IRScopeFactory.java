@@ -12,7 +12,7 @@ import org.jruby.ir.IRModuleBody;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScopeType;
 import org.jruby.ir.IRScriptBody;
-import org.jruby.ir.persistence.read.parser.IRParsingContext;
+import org.jruby.ir.persistence.read.parser.IRFileParsingContext;
 import org.jruby.ir.persistence.read.parser.ParametersIterator;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Arity;
@@ -21,9 +21,9 @@ public class IRScopeFactory {
 
     private static final String SCRIPT_BODY_PSEUDO_CLASS_NAME = "_file_";
     
-    private final IRParsingContext context;
+    private final IRFileParsingContext context;
     
-    public IRScopeFactory(IRParsingContext context) {
+    public IRScopeFactory(IRFileParsingContext context) {
         this.context = context;
     }
 

@@ -101,8 +101,7 @@ abstract_result_instr
 result_instr
     =    operand.var EQ ID.id
                                         {: return logic.createReturnInstrWithNoParams(var, id); :}
-    // Originally it was 'operand.var EQ instr_with_params', but as for now number of reduce's
-    // decreases significantly, performance was chosen over DRY principle here  
+    // Originally it was 'operand.var EQ instr_with_params', see comment above 
     |    operand.var EQ ID.id LPAREN parameter_list.list RPAREN
                                         {: return logic.createReturnInstrWithParams(var, id, list); :}
     ;

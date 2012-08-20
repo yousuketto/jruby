@@ -46,6 +46,7 @@ import org.jcodings.specific.UTF8Encoding;
 import org.jruby.RubyLocalJumpError.Reason;
 import org.jruby.ir.IRScopeType;
 import org.jruby.ir.Operation;
+import org.jruby.ir.instructions.SuperInstrType;
 import org.jruby.ir.instructions.specialized.SpecializedInstType;
 import org.jruby.ir.operands.OperandType;
 import org.jruby.lexer.yacc.ISourcePosition;
@@ -223,6 +224,10 @@ public enum NonIRObjectFactory {
 
     public KCode createKcode(String kcodeName) {
         return KCode.valueOf(kcodeName);
+    }
+
+    public SuperInstrType createSuperInstrType(String superInstrTypeString) {
+        return SuperInstrType.valueOf(superInstrTypeString);
     }
 
 }

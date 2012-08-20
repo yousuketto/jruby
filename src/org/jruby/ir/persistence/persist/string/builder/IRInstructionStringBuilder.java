@@ -33,6 +33,8 @@ public class IRInstructionStringBuilder extends AbstractIRStringBuilder<Instr> {
         return PARAMETER_LIST_END_MARKER;
     }
 
+    // Result inst all starts with '${variable} = ${operation} ...',
+    // other instructions - with '${operation} ...'
     public void appendPrefix(final Instr instr) {
         if (instr instanceof ResultInstr) {
             final Variable result = ((ResultInstr) instr).getResult();
@@ -42,6 +44,7 @@ public class IRInstructionStringBuilder extends AbstractIRStringBuilder<Instr> {
         appendVerbatim(instr.getOperation().name());
     }
 
+    // Special markers, that helps to recreate state of Instr
     public void appendMarkers(final Instr instr) {
         if (instr.hasUnusedResult()) {
             appendVerbatim(HAS_UNUSED_RESULT_MARKER);

@@ -11,6 +11,10 @@ import org.jruby.runtime.Arity;
 import org.jruby.util.KCode;
 import org.jruby.util.RegexpOptions;
 
+/**
+ * Constructs string
+ * That class contains code that is common for all ...IRStringBuilder's
+ */
 public abstract class AbstractIRStringBuilder<T> {
     
     private static final String DOUBLE_QUOTES = "\"";

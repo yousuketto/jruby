@@ -126,16 +126,16 @@ import org.jruby.ir.operands.StringLiteral;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.Variable;
-import org.jruby.ir.persistence.read.parser.IRParsingContext;
+import org.jruby.ir.persistence.read.parser.IRFileParsingContext;
 import org.jruby.ir.persistence.read.parser.ParametersIterator;
 import org.jruby.lexer.yacc.ISourcePosition;
 import org.jruby.runtime.CallType;
 
 public class IRInstructionFactory {
 
-    private final IRParsingContext context;
+    private final IRFileParsingContext context;
 
-    public IRInstructionFactory(final IRParsingContext context) {
+    public IRInstructionFactory(final IRFileParsingContext context) {
         this.context = context;
     }
 

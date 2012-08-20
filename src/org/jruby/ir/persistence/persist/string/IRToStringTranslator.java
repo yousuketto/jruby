@@ -5,7 +5,10 @@ import org.jruby.ir.instructions.Instr;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.persistence.persist.string.builder.AbstractIRStringBuilder;
 
-
+/**
+ * Accepts IR and returns its String representation
+ *
+ */
 public class IRToStringTranslator {
     
     private IRToStringTranslator(){}
