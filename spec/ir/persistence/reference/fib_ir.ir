@@ -1,37 +1,34 @@
-Scope(SCRIPT_BODY):<->:0
-LocalScope: []
-Scope(INSTANCE_METHOD):<fib_ruby>:0
-LexicalParent:<->
-LocalScope: [n]
+SCRIPT_BODY<"-", "LocalScope: []">
+INSTANCE_METHOD<"fib_ruby", 0, "-:0", "LocalScope: [n]">
 
-Scope:<->
-%self = recv_self
-%current_scope = scope<->
-%current_module = module<->
-line_num(0)
-def_inst_meth("--unused--", fib_ruby, 0)
-return(nil)
+"-:0"
+SELF = RECV_SELF
+TEMPORARY_VARIABLE{"%current_scope"} = COPY(CURRENT_SCOPE{"-:0"})
+TEMPORARY_VARIABLE{"%current_module"} = COPY(SCOPE_MODULE{"-:0"})
+LINE_NUM(0)
+DEF_INST_METH(STRING_LITERAL{"--unused--"}, "fib_ruby:0")
+RETURN(NIL, null)
 
-Scope:<fib_ruby>
-%self = recv_self
-%current_scope = scope<->
-%current_module = module<->
-check_arity(1, 0, -1)
-n(0:0) = recv_pre_reqd_arg(0)
-%block(0:1) = recv_closure
-thread_poll
-line_num(1)
-%v_2 = call(NORMAL, '<', n(0:0), [Fixnum:2], null)
-b_false(%v_2, LBL_0)
-%v_3 = copy(n(0:0))
-jump LBL_1
-LBL_0:
-%v_4 = call(NORMAL, '-', n(0:0), [Fixnum:2], null)
-%v_5 = call(FUNCTIONAL, 'fib_ruby', %self, [%v_4], null)
-%v_6 = call(NORMAL, '-', n(0:0), [Fixnum:1], null)
-%v_7 = call(FUNCTIONAL, 'fib_ruby', %self, [%v_6], null)
-%v_8 = call(NORMAL, '+', %v_5, [%v_7], null)
-%v_3 = copy(%v_8)
-LBL_1:
-return(%v_3)
+"fib_ruby:0"
+SELF = RECV_SELF
+TEMPORARY_VARIABLE{"%current_scope"} = COPY(CURRENT_SCOPE{"-:0"})
+TEMPORARY_VARIABLE{"%current_module"} = COPY(SCOPE_MODULE{"-:0"})
+CHECK_ARITY(1, 0, -1)
+LOCAL_VARIABLE{"n", 0} = RECV_PRE_REQD_ARG(0)
+LOCAL_VARIABLE{"%block", 0} = RECV_CLOSURE
+THREAD_POLL(false)
+LINE_NUM(1)
+TEMPORARY_VARIABLE{"%v_2"} = CALL(LOCAL_VARIABLE{"n", 0}, "NORMAL", METH_ADDR{"<"}, [FIXNUM{2}], null)
+B_FALSE(TEMPORARY_VARIABLE{"%v_2"}, LABEL{"LBL_0"})
+TEMPORARY_VARIABLE{"%v_3"} = COPY(LOCAL_VARIABLE{"n", 0})
+JUMP(LABEL{"LBL_1"})
+LABEL(LABEL{"LBL_0"})
+TEMPORARY_VARIABLE{"%v_4"} = CALL(LOCAL_VARIABLE{"n", 0}, "NORMAL", METH_ADDR{"-"}, [FIXNUM{2}], null)
+TEMPORARY_VARIABLE{"%v_5"} = CALL(SELF, "FUNCTIONAL", METH_ADDR{"fib_ruby"}, [TEMPORARY_VARIABLE{"%v_4"}], null)
+TEMPORARY_VARIABLE{"%v_6"} = CALL(LOCAL_VARIABLE{"n", 0}, "NORMAL", METH_ADDR{"-"}, [FIXNUM{1}], null)
+TEMPORARY_VARIABLE{"%v_7"} = CALL(SELF, "FUNCTIONAL", METH_ADDR{"fib_ruby"}, [TEMPORARY_VARIABLE{"%v_6"}], null)
+TEMPORARY_VARIABLE{"%v_8"} = CALL(TEMPORARY_VARIABLE{"%v_5"}, "NORMAL", METH_ADDR{"+"}, [TEMPORARY_VARIABLE{"%v_7"}], null)
+TEMPORARY_VARIABLE{"%v_3"} = COPY(TEMPORARY_VARIABLE{"%v_8"})
+LABEL(LABEL{"LBL_1"})
+RETURN(TEMPORARY_VARIABLE{"%v_3"}, null)
 

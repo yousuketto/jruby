@@ -9,7 +9,6 @@ java_import org.jruby.ir.IRBuilder
 java_import org.jruby.ir.IRManager
 java_import org.jruby.ir.IRScope
 java_import org.jruby.ir.persistence.persist.IRPersister
-java_import org.jruby.ir.persistence.read.IRReadingContext
 
 # Fibbonacci example from http://www.engineyard.com/blog/2012/oss-grant-roundup-jruby-runtime/ is used here
 describe IRPersister do
@@ -19,8 +18,8 @@ describe IRPersister do
   RB_FILE_NAME = "fib_ruby.rb"
   REFERENCE_RUBY_FILE_PATH = "#{REFERENCE_DIR}/#{RB_FILE_NAME}"
   REFERENCE_IR_FILE_PATH = "#{REFERENCE_DIR}/fib_ir.ir"
-  EXPECTED_CREATED_IR_FOLDER_PATH = "#{REFERENCE_DIR}/ir"
-  EXPECTED_CREATED_IR_FILE_PATH = "#{EXPECTED_CREATED_IR_FOLDER_PATH}/fib_ruby.ir"
+  EXPECTED_CREATED_IR_FOLDER_PATH = "#{File.expand_path('~')}/ir#{Dir.pwd}"
+  EXPECTED_CREATED_IR_FILE_PATH = "#{EXPECTED_CREATED_IR_FOLDER_PATH}/-.ir"
 
   # Produce Ruby runtime and IRScope from .rb file
   before :all do
@@ -28,11 +27,11 @@ describe IRPersister do
     instance_config.script_file_name = RB_FILE_NAME
     instance_config.current_directory = REFERENCE_DIR
 
-    @runtime = Ruby.new_instance(instance_config)
+    runtime = Ruby.new_instance(instance_config)
 
     rb_file_content = File.read(REFERENCE_RUBY_FILE_PATH)
     ast = JRuby.parse(rb_file_content)
-    manager = @runtime.ir_manager
+    manager = runtime.ir_manager
     manager.dry_run = true
     is_19 = false
     @scope = IRBuilder.createIRBuilder(manager, is_19).buildRoot(ast)
@@ -42,14 +41,12 @@ describe IRPersister do
   after :all do
     if File.exists?(EXPECTED_CREATED_IR_FILE_PATH)
       File.delete(EXPECTED_CREATED_IR_FILE_PATH)
-      Dir.delete(EXPECTED_CREATED_IR_FOLDER_PATH)
     end
   end
 
   describe '.persist' do    
     before :all do
-      IRReadingContext::INSTANCE.setFileName(RB_FILE_NAME)
-      IRPersistenceFacade.persist(@scope, @runtime)
+      IRPersister.persist(@scope)
     end
     
     it 'should create .ir file in ir directory relatively to rb file' do

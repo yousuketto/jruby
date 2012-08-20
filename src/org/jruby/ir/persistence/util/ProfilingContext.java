@@ -11,10 +11,6 @@ public enum ProfilingContext {
     private long totalTime;
     private static final boolean switchedOn = RubyInstanceConfig.IR_PERSISTENCE_PROFILE;
     
-    static {
-        System.out.print(switchedOn);
-    }
-    
     public boolean isSwitchedOn() {
         return switchedOn;
     }
