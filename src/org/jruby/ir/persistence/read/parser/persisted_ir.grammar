@@ -30,7 +30,7 @@
 
     private PersistedIRParserLogic logic;
 
-    public void init(IRParsingContext context) {
+    public void init(IRFileParsingContext context) {
         logic = new PersistedIRParserLogic(context);
     }
 

@@ -16,13 +16,12 @@ public class IRPersister {
     public static void persist(final IRScope irScopeToPersist)
             throws IRPersistenceException {
         try {
-            final String stringRepresentationOfIR = IRToStringTranslator.translate(irScopeToPersist);
-            final String rbFileName = irScopeToPersist.getFileName();
-            
+            final String rbFileName = irScopeToPersist.getFileName();            
             // Persist ir only if its not up to date with rb file
             final boolean needToPersistIr = !IRFileExpert.INSTANCE.persistedIrIsUpToDateForRbFile(rbFileName);
             if (needToPersistIr) {
-                File irFile = IRFileExpert.INSTANCE.getIrFileByRbFileForPersistence(rbFileName);
+                final File irFile = IRFileExpert.INSTANCE.getIrFileByRbFileForPersistence(rbFileName);
+                final String stringRepresentationOfIR = IRToStringTranslator.translate(irScopeToPersist);
                 FileIO.INSTANCE.writeToFile(irFile, stringRepresentationOfIR);
                 // Set IR file to be up to date with rb file
                 IRFileExpert.INSTANCE.rememberModificationTimeForIr(rbFileName);
