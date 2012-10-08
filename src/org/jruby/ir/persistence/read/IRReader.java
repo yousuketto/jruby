@@ -1,5 +1,6 @@
 package org.jruby.ir.persistence.read;
 
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 
 import org.jruby.Ruby;
@@ -15,7 +16,7 @@ public class IRReader {
 
     public static IRScope read(InputStream is, Ruby runtime) throws IRPersistenceException {
         try {
-            final PersistedIRScanner input = new PersistedIRScanner(is);
+            final PersistedIRScanner input = new PersistedIRScanner(new BufferedInputStream(is));
             final IRFileParsingContext context = new IRFileParsingContext(runtime);
             
             parser.init(context);

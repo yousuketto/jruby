@@ -69,10 +69,6 @@ public class IRFileParsingContext {
     public IRScope getToplevelScope() {
         return toplevelScope;
     }
-    
-    public boolean isContainsVariable(String name) {
-        return variablesByNames.containsKey(name);
-    }
 
     public TemporaryVariable getVariable(String name) {
         return variablesByNames.get(name);
@@ -80,10 +76,6 @@ public class IRFileParsingContext {
 
     public void addVariable(TemporaryVariable variable) {
         this.variablesByNames.put(variable.getName(), variable);
-    }
-    
-    public boolean isContainsLabel(String labelValue) {
-        return labelsByNames.containsKey(labelValue);
     }
 
     public Label getLabel(String labelValue) {

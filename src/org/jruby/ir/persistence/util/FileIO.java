@@ -1,36 +1,30 @@
 package org.jruby.ir.persistence.util;
 
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 
-public enum FileIO {
-    INSTANCE;
+public class FileIO {
+    public static final FileIO INSTANCE = new FileIO();;
 
-    public void writeToFile(final File file, final String containment) throws IOException {
-        final FileOutputStream fileOutputStream = new FileOutputStream(file);
-        
-        writeToFileCommon(containment, fileOutputStream);
+    private FileIO() { }
+
+    public void writeToFile(final File file, final String content) throws IOException {
+        writeToFileCommon(content, new BufferedWriter(new FileWriter(file)));
     }
 
-    public void writeToFile(final String fileName, final String containment) throws IOException {
-        final File file = new File(fileName);
-        final FileOutputStream fileOutputStream = new FileOutputStream(file);
-        
-        writeToFileCommon(containment, fileOutputStream);
+    public void writeToFile(final String fileName, final String content) throws IOException {
+        writeToFile(new File(fileName), content);
     }
 
-    private void writeToFileCommon(final String containment, final FileOutputStream fos) throws IOException {
-        OutputStreamWriter outputStreamWriter = null;
+    private void writeToFileCommon(final String content, final BufferedWriter writer) throws IOException {
         try {
-            outputStreamWriter = new OutputStreamWriter(fos);
-            outputStreamWriter.write(containment);
+            writer.write(content);
         } finally {
-            if (outputStreamWriter != null) {
-                outputStreamWriter.close();
+            if (writer != null) {
+                writer.close();
             }
         }
     }
-
 }

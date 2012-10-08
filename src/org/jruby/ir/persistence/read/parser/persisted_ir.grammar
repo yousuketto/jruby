@@ -1,9 +1,7 @@
 %package "org.jruby.ir.persistence.read.parser";
 
 %import "org.jruby.ir.IRScope";
-
 %import "org.jruby.ir.instructions.Instr";
-
 %import "org.jruby.ir.operands.Operand";
 
 %class "PersistedIRParser";
@@ -21,7 +19,6 @@
 %typeof operand = "Operand";
 %typeof abstract_instruction = "Instr";
 %typeof param, NULL = "Object";
-
 %typeof scope_info, scope_descriptor = "IRScope";
 
 %goal scopes;

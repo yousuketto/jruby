@@ -326,8 +326,9 @@ public class IROperandFactory {
         // Check if this label was already created
         // Important! Program would not be interpreted correctly
         // if new name will be created every time
-        if(context.isContainsLabel(labelName)) {
-            return context.getLabel(labelName);
+        Label label = context.getLabel(labelName);
+        if (label != null) {
+            return label;
         }
         
         // FIXME? Warning! This code is relies on current realization of IRScope#getNewLable
@@ -342,12 +343,12 @@ public class IROperandFactory {
         }
         final IRScope currentScope = context.getCurrentScope();
         
-        final Label newLabel = currentScope.getNewLabel(prefix);
+        label = currentScope.getNewLabel(prefix);
         
         // Add to context for future reuse
-        context.addLabel(labelName, newLabel);
+        context.addLabel(labelName, label);
         
-        return newLabel;
+        return label;
     }
     
     private LocalVariable createLocalVariable(final ParametersIterator parametersIterator) {
@@ -442,14 +443,16 @@ public class IROperandFactory {
             return currentScope.getCurrentModuleVariable();
         }
         // Lets search in context
-        else if (context.isContainsVariable(name)) {
-            return context.getVariable(name);
-        } 
-        // Create a brand new one than put it into context for future reuse
         else {
-            final TemporaryVariable newTemporaryVariable = currentScope.getNewTemporaryVariable(name);
-            context.addVariable(newTemporaryVariable);
-            return newTemporaryVariable;
+            Variable v = context.getVariable(name);
+            if (v != null) {
+                return v;
+            } else {
+            // Create a brand new one than put it into context for future reuse
+                final TemporaryVariable newTemporaryVariable = currentScope.getNewTemporaryVariable(name);
+                context.addVariable(newTemporaryVariable);
+                return newTemporaryVariable;
+            }
         }
     }
 

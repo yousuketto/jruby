@@ -5,8 +5,8 @@ import java.io.File;
 import org.jruby.platform.Platform;
 import org.jruby.util.SafePropertyAccessor;
 
-public enum IRFileExpert {
-    INSTANCE;
+public class IRFileExpert {
+    public static final IRFileExpert INSTANCE = new IRFileExpert();
     
     private static final String IR_FILE_EXTENSION = ".ir";
     private static final String EXTENSION_SEPARATOR = ".";
@@ -45,6 +45,8 @@ public enum IRFileExpert {
         IR_ROOT_FOLDER = new File(irRootParentFolder, IR_FOLDER_NAME);
         
     }
+
+    private IRFileExpert() {};
  
     /** 
      * Must be called after writing ir file to disk, otherwise it won't change mtime of file
@@ -145,5 +147,4 @@ public enum IRFileExpert {
         }
         return fileNameWithoutExtension + IR_FILE_EXTENSION;
     }
-
 }

@@ -27,13 +27,26 @@ import org.jruby.ir.persistence.read.parser.PersistedIRParser.Terminals;
 %column
 
 %{
+        static final Symbol LBRACK = new Symbol(Terminals.LBRACK, 0, 0, 0, "[");
+        static final Symbol RBRACK = new Symbol(Terminals.RBRACK, 0, 0, 0, "]");
+        static final Symbol LPAREN = new Symbol(Terminals.LPAREN, 0, 0, 0, "(");
+        static final Symbol RPAREN = new Symbol(Terminals.RPAREN, 0, 0, 0, ")");
+        static final Symbol LBRACE = new Symbol(Terminals.LBRACE, 0, 0, 0, "{");
+        static final Symbol RBRACE = new Symbol(Terminals.RBRACE, 0, 0, 0, "}");
+        static final Symbol LT = new Symbol(Terminals.LT, 0, 0, 0, "<");
+        static final Symbol GT = new Symbol(Terminals.GT, 0, 0, 0, ">");
+        static final Symbol COMMA = new Symbol(Terminals.COMMA, 0, 0, 0, ",");
+        static final Symbol EQ = new Symbol(Terminals.EQ, 0, 0, 0, "=");
+        static final Symbol NULL_SYM = new Symbol(Terminals.NULL, 0, 0, 0, "null");
+        static final Symbol DEAD_INSTR_MARKER = new Symbol(Terminals.DEAD_INSTR_MARKER, 0, 0, 0, "[DEAD]");
+        static final Symbol DEAD_RESULT_INSTR_MARKER = new Symbol(Terminals.DEAD_RESULT_INSTR_MARKER, 0, 0, 0, "[DEAD-RESULT]");
 
         {
             // Make them start from 1's
             yyline++;
             yycolumn++;
         }
-        
+
         private final StringBuilder string = new StringBuilder();
 
         private Symbol token (short id) {
@@ -43,18 +56,17 @@ import org.jruby.ir.persistence.read.parser.PersistedIRParser.Terminals;
         private Symbol token (short id, Object value) {
 	        return new Symbol(id, yyline, yycolumn, yylength(), value);
         }
-        
+
         private void appendToString() {
             string.append( yytext() );
         }
-    
+
         private Symbol finishString() {
-            yybegin(YYINITIAL); 
+            yybegin(YYINITIAL);
             String value = string.toString();
-            string.setLength(0);
+            string.setLength(0); // reset for next use
             return token(Terminals.STRING, value);
         }
-
 %}
 
 LineTerminator = \r|\n|\r\n
@@ -84,39 +96,32 @@ StringCharacter = [^\"\\]
 
 <YYINITIAL> {
     /* String literal */
-    \"                                           { yybegin(STRING); }                                                       
-    
-    
+    \"                                           { yybegin(STRING); }
+
     {WhiteSpace}                                 { /* ignore */ }
-    
-    {LineTerminator}                             { return token(Terminals.EOLN); }
-    
     {FixnumLiteral}                              { return token(Terminals.FIXNUM); }
-    
     {FloatLiteral}                               { return token(Terminals.FLOAT); }
-    
-    "="                                          { return token(Terminals.EQ); }
-    
     {BooleanLiteral}                             { return token(Terminals.BOOLEAN); }
-    
-    "null"                                       { return token(Terminals.NULL); }
-    
-    /* Markers that are common for all instructions */
-    "[DEAD]"                                     { return token(Terminals.DEAD_INSTR_MARKER); }
-    "[DEAD-RESULT]"                              { return token(Terminals.DEAD_RESULT_INSTR_MARKER); }
-    
     {Identifier}                                 { return token(Terminals.ID); }
-    
+    {LineTerminator}                             { return token(Terminals.EOLN); }
+
+    "="                                          { return EQ; }
+    "null"                                       { return NULL_SYM; }
+
+    /* Markers that are common for all instructions */
+    "[DEAD]"                                     { return DEAD_INSTR_MARKER; }
+    "[DEAD-RESULT]"                              { return DEAD_RESULT_INSTR_MARKER; }
+
     /* separators */
-    "["                                          { return token(Terminals.LBRACK); }
-    "]"                                          { return token(Terminals.RBRACK); }
-    "("                                          { return token(Terminals.LPAREN); }
-    ")"                                          { return token(Terminals.RPAREN); }
-    "{"                                          { return token(Terminals.LBRACE); }
-    "}"                                          { return token(Terminals.RBRACE); }
-    "<"                                          { return token(Terminals.LT); }
-    ">"                                          { return token(Terminals.GT); }
-    ","                                          { return token(Terminals.COMMA); }
+    "["                                          { return LBRACK; }
+    "]"                                          { return RBRACK; }
+    "("                                          { return LPAREN; }
+    ")"                                          { return RPAREN; }
+    "{"                                          { return LBRACE; }
+    "}"                                          { return RBRACE; }
+    "<"                                          { return LT; }
+    ">"                                          { return GT; }
+    ","                                          { return COMMA; }
 }
 
 <STRING> {
