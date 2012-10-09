@@ -58,9 +58,8 @@ public class IRFileParsingContext {
      * @param currentScope
      */
     public void setCurrentScope(IRScope currentScope) {
-        if(toplevelScope == null) {
-            this.toplevelScope = currentScope;
-        }
+        if (toplevelScope == null) toplevelScope = currentScope;
+
         this.currentScope = currentScope;
         labelsByNames.clear();
         variablesByNames.clear();
