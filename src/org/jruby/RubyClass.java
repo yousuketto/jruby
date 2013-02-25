@@ -44,7 +44,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -77,12 +76,10 @@ import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.callsite.CacheEntry;
 import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
-import org.jruby.runtime.opto.Invalidator;
 import org.jruby.util.ClassCache.OneShotClassLoader;
 import org.jruby.util.ClassDefiningClassLoader;
 import org.jruby.util.CodegenUtils;
 import org.jruby.util.JavaNameMangler;
-import org.jruby.util.collections.WeakHashSet;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 import org.objectweb.asm.AnnotationVisitor;
@@ -436,7 +433,6 @@ public class RubyClass extends RubyModule {
      */
     protected RubyClass(Ruby runtime, RubyClass superClass, boolean objectSpace) {
         super(runtime, runtime.getClassClass(), objectSpace);
-        this.runtime = runtime;
         this.realClass = superClass == null ? null : superClass.getRealClass();
         setSuperClass(superClass); // this is the only case it might be null here (in MetaClass construction)
     }
@@ -446,7 +442,6 @@ public class RubyClass extends RubyModule {
      */
     protected RubyClass(Ruby runtime) {
         super(runtime, runtime.getClassClass());
-        this.runtime = runtime;
         this.realClass = this;
         index = ClassIndex.CLASS;
     }
@@ -948,123 +943,6 @@ public class RubyClass extends RubyModule {
         superClass.addSubclass(this);
         // update superclass reference
         setSuperClass(superClass);
-    }
-    
-    public Collection<RubyClass> subclasses(boolean includeDescendants) {
-        Set<RubyClass> mySubclasses = subclasses;
-        if (mySubclasses != null) {
-            Collection<RubyClass> mine = new ArrayList<RubyClass>(mySubclasses);
-            if (includeDescendants) {
-                for (RubyClass i: mySubclasses) {
-                    mine.addAll(i.subclasses(includeDescendants));
-                }
-            }
-
-            return mine;
-        } else {
-            return Collections.EMPTY_LIST;
-        }
-    }
-
-    /**
-     * Add a new subclass to the weak set of subclasses.
-     *
-     * This version always constructs a new set to avoid having to synchronize
-     * against the set when iterating it for invalidation in
-     * invalidateCacheDescendants.
-     *
-     * @param subclass The subclass to add
-     */
-    public synchronized void addSubclass(RubyClass subclass) {
-        synchronized (runtime.getHierarchyLock()) {
-            Set<RubyClass> oldSubclasses = subclasses;
-            if (oldSubclasses == null) subclasses = oldSubclasses = new WeakHashSet<RubyClass>(4);
-            oldSubclasses.add(subclass);
-        }
-    }
-    
-    /**
-     * Remove a subclass from the weak set of subclasses.
-     *
-     * @param subclass The subclass to remove
-     */
-    public synchronized void removeSubclass(RubyClass subclass) {
-        synchronized (runtime.getHierarchyLock()) {
-            Set<RubyClass> oldSubclasses = subclasses;
-            if (oldSubclasses == null) return;
-
-            oldSubclasses.remove(subclass);
-        }
-    }
-
-    /**
-     * Replace an existing subclass with a new one.
-     *
-     * @param subclass The subclass to remove
-     * @param newSubclass The subclass to replace it with
-     */
-    public synchronized void replaceSubclass(RubyClass subclass, RubyClass newSubclass) {
-        synchronized (runtime.getHierarchyLock()) {
-            Set<RubyClass> oldSubclasses = subclasses;
-            if (oldSubclasses == null) return;
-
-            oldSubclasses.remove(subclass);
-            oldSubclasses.add(newSubclass);
-        }
-    }
-
-    public void becomeSynchronized() {
-        // make this class and all subclasses sync
-        synchronized (getRuntime().getHierarchyLock()) {
-            super.becomeSynchronized();
-            Set<RubyClass> mySubclasses = subclasses;
-            if (mySubclasses != null) for (RubyClass subclass : mySubclasses) {
-                subclass.becomeSynchronized();
-            }
-        }
-    }
-
-    /**
-     * Invalidate all subclasses of this class by walking the set of all
-     * subclasses and asking them to invalidate themselves.
-     *
-     * Note that this version works against a reference to the current set of
-     * subclasses, which could be replaced by the time this iteration is
-     * complete. In theory, there may be a path by which invalidation would
-     * miss a class added during the invalidation process, but the exposure is
-     * minimal if it exists at all. The only way to prevent it would be to
-     * synchronize both invalidation and subclass set modification against a
-     * global lock, which we would like to avoid.
-     */
-    @Override
-    public void invalidateCacheDescendants() {
-        super.invalidateCacheDescendants();
-
-        synchronized (runtime.getHierarchyLock()) {
-            Set<RubyClass> mySubclasses = subclasses;
-            if (mySubclasses != null) for (RubyClass subclass : mySubclasses) {
-                subclass.invalidateCacheDescendants();
-            }
-        }
-    }
-    
-    public void addInvalidatorsAndFlush(List<Invalidator> invalidators) {
-        // add this class's invalidators to the aggregate
-        invalidators.add(methodInvalidator);
-        
-        // if we're not at boot time, don't bother fully clearing caches
-        if (!runtime.isBooting()) cachedMethods.clear();
-
-        // no subclasses, don't bother with lock and iteration
-        if (subclasses == null || subclasses.isEmpty()) return;
-        
-        // cascade into subclasses
-        synchronized (runtime.getHierarchyLock()) {
-            Set<RubyClass> mySubclasses = subclasses;
-            if (mySubclasses != null) for (RubyClass subclass : mySubclasses) {
-                subclass.addInvalidatorsAndFlush(invalidators);
-            }
-        }
     }
     
     public Ruby getClassRuntime() {
@@ -1851,10 +1729,8 @@ public class RubyClass extends RubyModule {
         }
     }
 
-    protected final Ruby runtime;
     private ObjectAllocator allocator; // the default allocator
     protected ObjectMarshal marshal;
-    private Set<RubyClass> subclasses;
     public static final int CS_IDX_INITIALIZE = 0;
     public static final String[] CS_NAMES = {
         "initialize"

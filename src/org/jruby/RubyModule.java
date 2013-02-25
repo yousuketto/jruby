@@ -185,6 +185,10 @@ public class RubyModule extends RubyObject {
     public boolean isSingleton() {
         return false;
     }
+    
+    public boolean isExt() {
+        return false;
+    }
 
     public static class KindOf {
         public static final KindOf DEFAULT_KIND_OF = new KindOf();
@@ -231,6 +235,7 @@ public class RubyModule extends RubyObject {
      */
     protected RubyModule(Ruby runtime, RubyClass metaClass, boolean objectSpace) {
         super(runtime, metaClass, objectSpace);
+        this.runtime = runtime;
         id = runtime.allocModuleId();
         runtime.addModule(this);
         // if (parent == null) parent = runtime.getObject();
@@ -1072,6 +1077,14 @@ public class RubyModule extends RubyObject {
     // modifies this class only; used to make the Synchronized module synchronized
     public void becomeSynchronized() {
         cacheEntryFactory = new SynchronizedCacheEntryFactory(cacheEntryFactory);
+        
+        // make this class and all subclasses sync
+        synchronized (getRuntime().getHierarchyLock()) {
+            Set<RubyModule> mySubclasses = subclasses;
+            if (mySubclasses != null) for (RubyModule subclass : mySubclasses) {
+                subclass.becomeSynchronized();
+            }
+        }
     }
 
     public boolean isSynchronized() {
@@ -1096,7 +1109,7 @@ public class RubyModule extends RubyObject {
     public void invalidateCacheDescendants() {
         if (DEBUG) LOG.debug("invalidating descendants: {}", baseName);
 
-        if (includingHierarchies.isEmpty()) {
+        if (includingHierarchies.isEmpty() && subclasses == null) {
             // it's only us; just invalidate directly
             methodInvalidator.invalidate();
             return;
@@ -1109,9 +1122,33 @@ public class RubyModule extends RubyObject {
             for (RubyClass includingHierarchy : includingHierarchies) {
                 includingHierarchy.addInvalidatorsAndFlush(invalidators);
             }
+
+            Set<RubyModule> mySubclasses = subclasses;
+            if (mySubclasses != null) for (RubyModule subclass : mySubclasses) {
+                subclass.addInvalidatorsAndFlush(invalidators);
+            }
         }
         
         methodInvalidator.invalidateAll(invalidators);
+    }
+    
+    public void addInvalidatorsAndFlush(List<Invalidator> invalidators) {
+        // add this class's invalidators to the aggregate
+        invalidators.add(methodInvalidator);
+        
+        // if we're not at boot time, don't bother fully clearing caches
+        if (!getRuntime().isBooting()) cachedMethods.clear();
+
+        // no subclasses, don't bother with lock and iteration
+        if (subclasses == null || subclasses.isEmpty()) return;
+        
+        // cascade into subclasses
+        synchronized (getRuntime().getHierarchyLock()) {
+            Set<RubyModule> mySubclasses = subclasses;
+            if (mySubclasses != null) for (RubyModule subclass : mySubclasses) {
+                subclass.addInvalidatorsAndFlush(invalidators);
+            }
+        }
     }
     
     protected void invalidateCoreClasses() {
@@ -3815,13 +3852,162 @@ public class RubyModule extends RubyObject {
     public void setCacheProxy(boolean cacheProxy) {
         setFlag(USER0_F, cacheProxy);
     }
+    
+    public Collection<RubyModule> subclasses(boolean includeDescendants) {
+        Set<RubyModule> mySubclasses = subclasses;
+        if (mySubclasses != null) {
+            Collection<RubyModule> mine = new ArrayList<RubyModule>(mySubclasses);
+            if (includeDescendants) {
+                for (RubyModule i: mySubclasses) {
+                    mine.addAll(i.subclasses(includeDescendants));
+                }
+            }
+
+            return mine;
+        } else {
+            return Collections.EMPTY_LIST;
+        }
+    }
+
+    /**
+     * Add a new subclass to the weak set of subclasses.
+     *
+     * This version always constructs a new set to avoid having to synchronize
+     * against the set when iterating it for invalidation in
+     * invalidateCacheDescendants.
+     *
+     * @param subclass The subclass to add
+     */
+    public synchronized void addSubclass(RubyModule subclass) {
+        synchronized (runtime.getHierarchyLock()) {
+            Set<RubyModule> oldSubclasses = subclasses;
+            if (oldSubclasses == null) subclasses = oldSubclasses = new WeakHashSet<RubyModule>(4);
+            oldSubclasses.add(subclass);
+        }
+    }
+    
+    /**
+     * Remove a subclass from the weak set of subclasses.
+     *
+     * @param subclass The subclass to remove
+     */
+    public synchronized void removeSubclass(RubyModule subclass) {
+        synchronized (runtime.getHierarchyLock()) {
+            Set<RubyModule> oldSubclasses = subclasses;
+            if (oldSubclasses == null) return;
+
+            oldSubclasses.remove(subclass);
+        }
+    }
+
+    /**
+     * Replace an existing subclass with a new one.
+     *
+     * @param subclass The subclass to remove
+     * @param newSubclass The subclass to replace it with
+     */
+    public synchronized void replaceSubclass(RubyModule subclass, RubyModule newSubclass) {
+        synchronized (runtime.getHierarchyLock()) {
+            Set<RubyModule> oldSubclasses = subclasses;
+            if (oldSubclasses == null) return;
+
+            oldSubclasses.remove(subclass);
+            oldSubclasses.add(newSubclass);
+        }
+    }
+    
+    @JRubyMethod
+    public IRubyObject prepend_features(ThreadContext context, IRubyObject _module) {
+        
+        if (!(_module instanceof RubyModule)) {
+            throw context.runtime.newTypeError(_module, context.runtime.getModule());
+        }
+        RubyModule module = (RubyModule)_module;
+        ((RubyModule)module).prependModule(context, this);
+        
+        return this;
+    }
+    
+    @JRubyMethod(rest = true)
+    public IRubyObject prepend(ThreadContext context, IRubyObject[] _modules) {
+        
+        for (IRubyObject _module: _modules) {
+            if (!(_module instanceof RubyModule)) {
+                throw context.runtime.newTypeError(_module, context.runtime.getModule());
+            }
+        }
+        
+        for (IRubyObject _module: _modules) {
+            RubyModule module = (RubyModule)_module;
+
+            module.callMethod("prepend_features", this);
+            module.callMethod("prepended", this);
+        }
+        
+        return this;
+    }
+    
+    @JRubyMethod
+    public IRubyObject prepended(ThreadContext context, IRubyObject cls) {
+        // default impl does nothing
+        return this;
+    }
+    
+    /**
+     * rb_prepend_module
+     * 
+     * @param context
+     * @param _module 
+     */
+    public void prependModule(ThreadContext context, IRubyObject _module) {
+        Ruby runtime = context.runtime;
+        
+        if (!(_module instanceof RubyModule)) {
+            throw context.runtime.newTypeError(_module, context.runtime.getModule());
+        }
+        RubyModule module = (RubyModule)_module;
+        
+        RubyClass myOrigin = module.origin;
+        
+        infectBy(module);
+        
+        synchronized (runtime.getHierarchyLock()) {
+            if (myOrigin == null) {
+                // origin is now an ICLASS
+                myOrigin = new IncludedModuleWrapper(runtime, superClass, module);
+                
+                // Fix up subclass relationships
+                if (superClass != null) {
+                    superClass.replaceSubclass(this, myOrigin);
+                    superClass.addSubclass(myOrigin);
+                }
+                myOrigin.addSubclass(this);
+                
+                // insert origin into hierarchy
+                superClass = myOrigin;
+                origin = myOrigin;
+                
+                // fix up method table
+                origin.methods = methods;
+                methods = Collections.EMPTY_MAP;
+
+                // TODO: move refined methods, as in the C code
+                // 	st_foreach(RCLASS_M_TBL(origin), move_refined_method, (st_data_t) RCLASS_M_TBL(klass));
+            }
+        }
+        
+        includeModule(module);
+        
+        origin.invalidateCacheDescendants();
+        origin.invalidateConstantCache();
+    }
 
     @Deprecated
     public void checkMethodBound(ThreadContext context, IRubyObject[] args, Visibility visibility) {
     }
     
     private volatile Map<String, Autoload> autoloads = Collections.EMPTY_MAP;
-    private volatile Map<String, DynamicMethod> methods = Collections.EMPTY_MAP;
+    protected volatile Map<String, DynamicMethod> methods = Collections.EMPTY_MAP;
     protected Map<String, CacheEntry> cachedMethods = Collections.EMPTY_MAP;
     protected int generation;
     protected Integer generationObject;
@@ -3860,4 +4046,13 @@ public class RubyModule extends RubyObject {
     
     /** Whether this class proxies a normal Java class */
     private boolean javaProxy = false;
+    
+    /** A set of all subclasses (submodules) of this class (module) */
+    protected Set<RubyModule> subclasses;
+    
+    /** The "origin" class, used for prepending **/
+    protected RubyClass origin = null;
+    
+    /** The JRuby runtime this hierarchy is associated with **/
+    protected final Ruby runtime;
 }
