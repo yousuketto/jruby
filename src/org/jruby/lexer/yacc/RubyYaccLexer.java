@@ -159,6 +159,29 @@ public class RubyYaccLexer {
             ambiguousOperator(op, syn);
         }
     }
+
+    // FIXME: Also sucks that matchMarker will strip off valuable bytes and not work for this (could be a one-liner)
+    private void detectUTF8BOM() throws IOException {
+        int b1 = src.read();
+        if (b1 == 0xef) {
+            int b2 = src.read();
+            if (b2 == 0xbb) {
+                int b3 = src.read();
+                if (b3 == 0xbf) {
+                    setEncoding(UTF8_ENCODING);
+                } else {
+                    src.unread(b3);
+                    src.unread(b2);
+                    src.unread(b1);
+                }
+            } else {
+                src.unread(b2);
+                src.unread(b1);
+            }
+        } else {
+            src.unread(b1);
+        }
+    }
     
     public enum Keyword {
         END ("end", Tokens.kEND, Tokens.kEND, LexState.EXPR_END),
@@ -275,6 +298,7 @@ public class RubyYaccLexer {
 
     // Are we lexing Ruby 1.8 or 1.9+ syntax
     private boolean isOneEight;
+    private boolean isTwoZero;
     // Count of nested parentheses (1.9 only)
     private int parenNest = 0;
     // 1.9 only
@@ -311,6 +335,7 @@ public class RubyYaccLexer {
         resetStacks();
         lex_strterm = null;
         commandStart = true;
+        if (parserSupport != null) isTwoZero = parserSupport.getConfiguration().getVersion().is2_0();
     }
 
     public int nextToken() throws IOException {
@@ -467,6 +492,10 @@ public class RubyYaccLexer {
     private boolean isARG() {
         return lex_state == LexState.EXPR_ARG || lex_state == LexState.EXPR_CMDARG;
     }
+    
+    private boolean isSpaceArg(int c, boolean spaceSeen) {
+        return isARG() && spaceSeen && !Character.isWhitespace(c);
+    }
 
     private void determineExpressionState() {
         switch (lex_state) {
@@ -621,10 +650,26 @@ public class RubyYaccLexer {
             setState(LexState.EXPR_FNAME);
             yaccValue = new Token("%"+c+begin, getPosition());
             return Tokens.tSYMBEG;
-
+        
+        case 'I':
+            if (isTwoZero) {
+                lex_strterm = new StringTerm(str_dquote | STR_FUNC_QWORDS, begin, end);
+                do {c = src.read();} while (Character.isWhitespace(c));                
+                src.unread(c);
+                yaccValue = new Token("%" + c + begin, getPosition());
+                return Tokens.tSYMBOLS_BEG;
+            }
+        case 'i':
+            if (isTwoZero) {
+                lex_strterm = new StringTerm(/* str_squote | */STR_FUNC_QWORDS, begin, end);
+                do {c = src.read();} while (Character.isWhitespace(c));
+                src.unread(c);
+                yaccValue = new Token("%" + c + begin, getPosition());
+                return Tokens.tQSYMBOLS_BEG;
+            }
         default:
-            throw new SyntaxException(PID.STRING_UNKNOWN_TYPE, getPosition(), getCurrentLine(),
-                    "Unknown type of %string. Expected 'Q', 'q', 'w', 'x', 'r' or any non letter character, but found '" + c + "'.");
+            throw new SyntaxException(PID.STRING_UNKNOWN_TYPE, 
+                        getPosition(), getCurrentLine(), "unknown type of %string");
         }
     }
     
@@ -966,7 +1011,7 @@ public class RubyYaccLexer {
         
         return currentToken;
     }
-
+    
     /**
      *  Returns the next token. Also sets yyVal is needed.
      *
@@ -976,6 +1021,10 @@ public class RubyYaccLexer {
         int c;
         boolean spaceSeen = false;
         boolean commandState;
+
+        // FIXME: Sucks we do this n times versus one since it is only important at beginning of parse but we need to change
+        // setup of parser differently.
+        if (token == 0 && src.getLine() == 0) detectUTF8BOM();
         
         if (lex_strterm != null) {
             int tok = lex_strterm.parseString(this, src);
@@ -1255,7 +1304,7 @@ public class RubyYaccLexer {
         //if the warning is generated, the getPosition() on line 954 (this line + 18) will create
         //a wrong position if the "inclusive" flag is not set.
         ISourcePosition tmpPosition = getPosition();
-        if (isARG() && spaceSeen && !Character.isWhitespace(c)) {
+        if (isSpaceArg(c, spaceSeen)) {
             if (warnings.isVerbose()) warnings.warning(ID.ARGUMENT_AS_PREFIX, tmpPosition, "`&' interpreted as argument prefix");
             c = Tokens.tAMPER;
         } else if (isBEG()) {
@@ -1854,7 +1903,7 @@ public class RubyYaccLexer {
             yaccValue = new Token("->", getPosition());
             return Tokens.tLAMBDA;
         }
-        if (isBEG() || (isARG() && spaceSeen && !Character.isWhitespace(c))) {
+        if (isBEG() || isSpaceArg(c, spaceSeen)) {
             if (isARG()) arg_ambiguous();
             setState(LexState.EXPR_BEG);
             src.unread(c);
@@ -1881,8 +1930,8 @@ public class RubyYaccLexer {
             yaccValue = new Token("%", getPosition());
             return Tokens.tOP_ASGN;
         }
-        
-        if (isARG() && spaceSeen && !Character.isWhitespace(c)) return parseQuote(c);
+
+        if (isSpaceArg(c, spaceSeen)) return parseQuote(c);
         
         determineExpressionState();
         
@@ -1938,7 +1987,7 @@ public class RubyYaccLexer {
             return Tokens.tOP_ASGN;
         }
         
-        if (isBEG() || (isARG() && spaceSeen && !Character.isWhitespace(c))) {
+        if (isBEG() || isSpaceArg(c, spaceSeen)) { //FIXME: arg_ambiguous missing
             if (isARG()) arg_ambiguous();
             setState(LexState.EXPR_BEG);
             src.unread(c);
@@ -2084,13 +2133,11 @@ public class RubyYaccLexer {
             return Tokens.tOP_ASGN;
         }
         src.unread(c);
-        if (isARG() && spaceSeen) {
-            if (!Character.isWhitespace(c)) {
-                arg_ambiguous();
-                lex_strterm = new StringTerm(str_regexp, '\0', '/');
-                yaccValue = new Token("/",getPosition());
-                return Tokens.tREGEXP_BEG;
-            }
+        if (isSpaceArg(c, spaceSeen)) {
+            arg_ambiguous();
+            lex_strterm = new StringTerm(str_regexp, '\0', '/');
+            yaccValue = new Token("/",getPosition());
+            return Tokens.tREGEXP_BEG;
         }
         
         determineExpressionState();
@@ -2110,9 +2157,19 @@ public class RubyYaccLexer {
                 yaccValue = new Token("**", getPosition());
                 return Tokens.tOP_ASGN;
             }
-            src.unread(c);
+
+            src.unread(c); // not a '=' put it back
             yaccValue = new Token("**", getPosition());
-            c = Tokens.tPOW;
+
+            if (isTwoZero && isSpaceArg(c, spaceSeen)) {
+                if (warnings.isVerbose()) warnings.warning(ID.ARGUMENT_AS_PREFIX, getPosition(), "`**' interpreted as argument prefix");
+                c = Tokens.tDSTAR;
+            } else if (isTwoZero && isBEG()) {
+                c = Tokens.tDSTAR;
+            } else {
+                if (!isOneEight) warn_balanced(c, spaceSeen, "*", "argument prefix");
+                c = Tokens.tPOW;
+            }
             break;
         case '=':
             setState(LexState.EXPR_BEG);
@@ -2120,7 +2177,7 @@ public class RubyYaccLexer {
             return Tokens.tOP_ASGN;
         default:
             src.unread(c);
-            if (isARG() && spaceSeen && !Character.isWhitespace(c)) {
+            if (isSpaceArg(c, spaceSeen)) {
                 if (warnings.isVerbose()) warnings.warning(ID.ARGUMENT_AS_PREFIX, getPosition(), "`*' interpreted as argument prefix");
                 c = Tokens.tSTAR;
             } else if (isBEG()) {
@@ -2463,11 +2520,6 @@ public class RubyYaccLexer {
                     buffer.setEncoding(UTF8_ENCODING);
                     if (stringLiteral) tokenAddMBC(codepoint, buffer);
                 } else if (stringLiteral) {
-                    if (codepoint == 0 && symbolLiteral) {
-                        throw new SyntaxException(PID.INVALID_ESCAPE_SYNTAX, getPosition(),
-                            getCurrentLine(), "symbol cannot contain '\\u0000'");
-                    }
-
                     buffer.append((char) codepoint);
                 }
             } while (src.peek(' ') || src.peek('\t'));
@@ -2483,11 +2535,6 @@ public class RubyYaccLexer {
                 buffer.setEncoding(UTF8_ENCODING);
                 if (stringLiteral) tokenAddMBC(codepoint, buffer);
             } else if (stringLiteral) {
-                if (codepoint == 0 && symbolLiteral) {
-                    throw new SyntaxException(PID.INVALID_ESCAPE_SYNTAX, getPosition(),
-                        getCurrentLine(), "symbol cannot contain '\\u0000'");
-                }
-
                 buffer.append((char) codepoint);
             }
         }

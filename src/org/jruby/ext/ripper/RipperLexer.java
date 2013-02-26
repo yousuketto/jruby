@@ -433,6 +433,10 @@ public class RipperLexer {
     private boolean isARG() {
         return lex_state == LexState.EXPR_ARG || lex_state == LexState.EXPR_CMDARG;
     }
+    
+    private boolean isSpaceArg(int c, boolean spaceSeen) {
+        return isARG() && spaceSeen && !Character.isWhitespace(c);
+    }
 
     private void determineExpressionState() {
         switch (lex_state) {
@@ -1121,6 +1125,10 @@ public class RipperLexer {
         boolean spaceSeen = false;
         boolean commandState;
         
+        // FIXME: Sucks we do this n times versus one since it is only important at beginning of parse but we need to change
+        // setup of parser differently.
+        if (token == 0 && src.getLine() == 0) detectUTF8BOM();        
+        
         if (lex_strterm != null) {
             int tok = lex_strterm.parseString(this, src);
             if (tok == Tokens.tSTRING_END || tok == Tokens.tREGEXP_END) {
@@ -1413,7 +1421,7 @@ public class RipperLexer {
         //if the warning is generated, the getPosition() on line 954 (this line + 18) will create
         //a wrong position if the "inclusive" flag is not set.
         ISourcePosition tmpPosition = getPosition();
-        if (isARG() && spaceSeen && !Character.isWhitespace(c)) {
+        if (isSpaceArg(c, spaceSeen)) {
             IRubyWarnings warnings = getRuntime().getWarnings();
             if (warnings.isVerbose()) warnings.warning(IRubyWarnings.ID.ARGUMENT_AS_PREFIX, tmpPosition, "`&' interpreted as argument prefix");
             c = Tokens.tAMPER;
@@ -1953,7 +1961,7 @@ public class RipperLexer {
             setState(LexState.EXPR_ARG);
             return Tokens.tLAMBDA;
         }
-        if (isBEG() || (isARG() && spaceSeen && !Character.isWhitespace(c))) {
+        if (isBEG() || isSpaceArg(c, spaceSeen)) {
             if (isARG()) arg_ambiguous();
             setState(LexState.EXPR_BEG);
             src.unread(c);
@@ -1978,7 +1986,7 @@ public class RipperLexer {
             return Tokens.tOP_ASGN;
         }
         
-        if (isARG() && spaceSeen && !Character.isWhitespace(c)) return parseQuote(c);
+        if (isSpaceArg(c, spaceSeen)) return parseQuote(c);
         
         determineExpressionState();
         
@@ -2026,7 +2034,7 @@ public class RipperLexer {
             return Tokens.tOP_ASGN;
         }
         
-        if (isBEG() || (isARG() && spaceSeen && !Character.isWhitespace(c))) {
+        if (isBEG() || isSpaceArg(c, spaceSeen)) {
             if (isARG()) arg_ambiguous();
             setState(LexState.EXPR_BEG);
             src.unread(c);
@@ -2161,12 +2169,10 @@ public class RipperLexer {
             return Tokens.tOP_ASGN;
         }
         src.unread(c);
-        if (isARG() && spaceSeen) {
-            if (!Character.isWhitespace(c)) {
-                arg_ambiguous();
-                lex_strterm = new StringTerm(str_regexp, '\0', '/');
-                return Tokens.tREGEXP_BEG;
-            }
+        if (isSpaceArg(c, spaceSeen)) {
+            arg_ambiguous();
+            lex_strterm = new StringTerm(str_regexp, '\0', '/');
+            return Tokens.tREGEXP_BEG;
         }
         
         determineExpressionState();
@@ -2191,7 +2197,7 @@ public class RipperLexer {
             return Tokens.tOP_ASGN;
         default:
             src.unread(c);
-            if (isARG() && spaceSeen && !Character.isWhitespace(c)) {
+            if (isSpaceArg(c, spaceSeen)) {
                 IRubyWarnings warnings = getRuntime().getWarnings();
                 
                 if (warnings.isVerbose()) warnings.warning(IRubyWarnings.ID.ARGUMENT_AS_PREFIX, getPosition(), "`*' interpreted as argument prefix");
@@ -2535,11 +2541,6 @@ public class RipperLexer {
                     buffer.setEncoding(UTF8_ENCODING);
                     if (stringLiteral) tokenAddMBC(codepoint, buffer);
                 } else if (stringLiteral) {
-                    if (codepoint == 0 && symbolLiteral) {
-                        throw new SyntaxException(SyntaxException.PID.INVALID_ESCAPE_SYNTAX, getPosition(),
-                            getCurrentLine(), "symbol cannot contain '\\u0000'");
-                    }
-
                     buffer.append((char) codepoint);
                 }
             } while (src.peek(' ') || src.peek('\t'));
@@ -2555,11 +2556,6 @@ public class RipperLexer {
                 buffer.setEncoding(UTF8_ENCODING);
                 if (stringLiteral) tokenAddMBC(codepoint, buffer);
             } else if (stringLiteral) {
-                if (codepoint == 0 && symbolLiteral) {
-                    throw new SyntaxException(SyntaxException.PID.INVALID_ESCAPE_SYNTAX, getPosition(),
-                        getCurrentLine(), "symbol cannot contain '\\u0000'");
-                }
-
                 buffer.append((char) codepoint);
             }
         }
@@ -2711,4 +2707,27 @@ public class RipperLexer {
 
         return value;
     }
+    
+    // FIXME: Also sucks that matchMarker will strip off valuable bytes and not work for this (could be a one-liner)
+    private void detectUTF8BOM() throws IOException {
+        int b1 = src.read();
+        if (b1 == 0xef) {
+            int b2 = src.read();
+            if (b2 == 0xbb) {
+                int b3 = src.read();
+                if (b3 == 0xbf) {
+                    setEncoding(UTF8_ENCODING);
+                } else {
+                    src.unread(b3);
+                    src.unread(b2);
+                    src.unread(b1);
+                }
+            } else {
+                src.unread(b2);
+                src.unread(b1);
+            }
+        } else {
+            src.unread(b1);
+        }
+    }    
 }
