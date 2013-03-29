@@ -56,7 +56,8 @@ module Gem
   
   def self.patch_specification
     ## JAR FILES: Allow gem path entries to contain jar files
-    Gem::Specification.class_eval do
+    eval <<-EOS
+    class Gem::Specification
       class << self
         # Replace existing dirs
         def dirs
@@ -83,6 +84,7 @@ module Gem
       end
     end
     ## END JAR FILES
+    EOS
   end
   
   def self.patch_config_file
