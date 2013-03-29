@@ -373,3 +373,5 @@ class Gem::ConfigFile
 
   attr_reader :hash
 end
+
+Gem.patch_config_file

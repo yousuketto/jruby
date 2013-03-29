@@ -22,9 +22,6 @@ class org::jruby::ast::Node
   attr_accessor :locals
 
   def run
-    unless defined?(JRuby)
-      require 'jruby'
-    end
     root = self
     unless org.jruby.ast.RootNode === root
       pos = POS

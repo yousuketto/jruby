@@ -62,7 +62,6 @@ import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyBasicObject;
 import org.jruby.RubyClass;
-import org.jruby.RubyClassPathVariable;
 import org.jruby.RubyException;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubyMethod;
@@ -100,7 +99,6 @@ import org.jruby.java.proxies.MapJavaProxy;
 import org.jruby.java.proxies.InterfaceJavaProxy;
 import org.jruby.java.proxies.JavaProxy;
 import org.jruby.java.proxies.RubyObjectHolderProxy;
-import org.jruby.javasupport.proxy.JavaProxyClassFactory;
 import org.jruby.util.ClassCache.OneShotClassLoader;
 import org.jruby.util.cli.Options;
 
@@ -110,30 +108,7 @@ public class Java implements Library {
     public static final boolean OBJECT_PROXY_CACHE = Options.JI_OBJECTPROXYCACHE.load();
 
     public void load(Ruby runtime, boolean wrap) throws IOException {
-        createJavaModule(runtime);
-
-        RubyModule jpmt = runtime.defineModule("JavaPackageModuleTemplate");
-        jpmt.getSingletonClass().setSuperClass(new BlankSlateWrapper(runtime, jpmt.getMetaClass().getSuperClass(), runtime.getKernel()));
-
-        runtime.getLoadService().require("jruby/java");
-        
-        // rewite ArrayJavaProxy superclass to point at Object, so it inherits Object behaviors
-        RubyClass ajp = runtime.getClass("ArrayJavaProxy");
-        ajp.setSuperClass(runtime.getJavaSupport().getObjectJavaClass().getProxyClass());
-        ajp.includeModule(runtime.getEnumerable());
-        
-        RubyClassPathVariable.createClassPathVariable(runtime);
-        
-        runtime.setJavaProxyClassFactory(JavaProxyClassFactory.createFactory());
-
-        // modify ENV_JAVA to be a read/write version
-        Map systemProps = new SystemPropertiesMap();
-        runtime.getObject().setConstantQuiet(
-                "ENV_JAVA",
-                new MapJavaProxy(
-                        runtime,
-                        (RubyClass)Java.getProxyClass(runtime, SystemPropertiesMap.class),
-                        systemProps));
+        // this does nothing now, since we already load everything at boot
     }
 
     public static RubyModule createJavaModule(Ruby runtime) {

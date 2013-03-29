@@ -1,12 +1,7 @@
-require 'rubygems/config_file'
 require 'rbconfig'
 require 'jruby/util'
 
 module Gem
-
-  ConfigFile::PLATFORM_DEFAULTS['install'] = '--no-rdoc --no-ri --env-shebang'
-  ConfigFile::PLATFORM_DEFAULTS['update']  = '--no-rdoc --no-ri --env-shebang'
-
   class << self
     alias_method :original_ruby, :ruby
     def ruby
@@ -58,36 +53,43 @@ module Gem
     return File::PATH_SEPARATOR unless File::PATH_SEPARATOR == ':'
     /(?<!jar:file|jar|file|classpath):/
   end
-end
-
-## JAR FILES: Allow gem path entries to contain jar files
-class Gem::Specification
-  class << self
-    # Replace existing dirs
-    def dirs
-      @@dirs ||= Gem.path.collect {|dir|
-        if File.file?(dir) && dir =~ /\.jar$/
-          "file:#{dir}!/specifications"
-        elsif File.directory?(dir) || dir =~ /^file:/
-          File.join(dir, "specifications")
+  
+  def self.patch_specification
+    ## JAR FILES: Allow gem path entries to contain jar files
+    Gem::Specification.class_eval do
+      class << self
+        # Replace existing dirs
+        def dirs
+          @@dirs ||= Gem.path.collect {|dir|
+            if File.file?(dir) && dir =~ /\.jar$/
+              "file:#{dir}!/specifications"
+            elsif File.directory?(dir) || dir =~ /^file:/
+              File.join(dir, "specifications")
+            end
+          }.compact + spec_directories_from_classpath
         end
-      }.compact + spec_directories_from_classpath
-    end
 
-    # Replace existing dirs=
-    def dirs= dirs
-      self.reset
+        # Replace existing dirs=
+        def dirs= dirs
+          self.reset
 
-      # ugh
-      @@dirs = Array(dirs).map { |dir| File.join dir, "specifications" } + spec_directories_from_classpath
-    end
+          # ugh
+          @@dirs = Array(dirs).map { |dir| File.join dir, "specifications" } + spec_directories_from_classpath
+        end
 
-    def spec_directories_from_classpath
-      stuff = JRuby::Util.classloader_resources("specifications")
+        def spec_directories_from_classpath
+          stuff = JRuby::Util.classloader_resources("specifications")
+        end
+      end
     end
+    ## END JAR FILES
+  end
+  
+  def self.patch_config_file
+    ConfigFile::PLATFORM_DEFAULTS['install'] = '--no-rdoc --no-ri --env-shebang'
+    ConfigFile::PLATFORM_DEFAULTS['update']  = '--no-rdoc --no-ri --env-shebang'
   end
 end
-## END JAR FILES
 
 if (Gem::win_platform?)
   module Process

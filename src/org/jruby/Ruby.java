@@ -130,12 +130,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
 import java.net.BindException;
 import java.nio.channels.ClosedChannelException;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -148,6 +151,12 @@ import org.jruby.javasupport.proxy.JavaProxyClassFactory;
 import static org.jruby.internal.runtime.GlobalVariable.Scope.*;
 import org.jruby.internal.runtime.methods.CallConfiguration;
 import org.jruby.internal.runtime.methods.JavaMethod;
+import org.jruby.java.proxies.MapJavaProxy;
+import org.jruby.java.util.BlankSlateWrapper;
+import org.jruby.java.util.SystemPropertiesMap;
+import org.jruby.javasupport.Java;
+import static org.jruby.javasupport.Java.createJavaModule;
+import org.jruby.util.cli.Options;
 
 /**
  * The Ruby object represents the top-level of a JRuby "instance" in a given VM.
@@ -1139,36 +1148,22 @@ public final class Ruby {
 
         // set up defined messages
         initDefinedMessages();
-        
+
         irManager = new IRManager();
-        
+
         // Initialize the "dummy" class used as a marker
         dummyClass = new RubyClass(this, classClass);
         dummyClass.freeze(tc);
-        
+
         // Create global constants and variables
         RubyGlobal.createGlobals(tc, this);
 
         // Prepare LoadService and load path
         getLoadService().init(config.getLoadPaths());
-
+        
         // initialize builtin libraries
         initBuiltins();
-
-        // load JRuby internals, which loads Java support
-        // if we can't use reflection, 'jruby' and 'java' won't work; no load.
-        boolean reflectionWorks;
-        try {
-            ClassLoader.class.getDeclaredMethod("getResourceAsStream", String.class);
-            reflectionWorks = true;
-        } catch (Exception e) {
-            reflectionWorks = false;
-        }
         
-        if (!RubyInstanceConfig.DEBUG_PARSER && reflectionWorks) {
-            loadService.require("jruby");
-        }
-
         // out of base boot mode
         booting = false;
         
@@ -1655,19 +1650,207 @@ public final class Ruby {
         if (RubyInstanceConfig.DEBUG_PARSER) return;
         
         // load Ruby parts of core
-        loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel.rb", false);
         
-        switch (config.getCompatVersion()) {
-            case RUBY1_8:
-                loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel18.rb", false);
-                break;
-            case RUBY1_9:
-                loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel19.rb", false);
-                break;
-            case RUBY2_0:
-                loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel20.rb", false);
-                break;
+        // if we can't use reflection, 'jruby' and 'java' won't work; no load.
+        boolean _reflectionWorks;
+        try {
+            ClassLoader.class.getDeclaredMethod("getResourceAsStream", String.class);
+            _reflectionWorks = true;
+        } catch (Exception e) {
+            _reflectionWorks = false;
         }
+        final boolean reflectionWorks = _reflectionWorks;
+        
+        try {
+            parallelBoot("ruby-based kernel",
+                    new Booter("java library") {
+                        @Override
+                        public void boot() {
+                            if (!RubyInstanceConfig.DEBUG_PARSER && reflectionWorks) {
+                                createJavaModule(Ruby.this);
+
+                                RubyModule jpmt = Ruby.this.defineModule("JavaPackageModuleTemplate");
+                                jpmt.getSingletonClass().setSuperClass(new BlankSlateWrapper(Ruby.this, jpmt.getMetaClass().getSuperClass(), Ruby.this.getKernel()));
+                                
+                                loadService.loadFromClassLoader(getClassLoader(), "jruby/java/java_module.rb", false);
+                                loadService.loadFromClassLoader(getClassLoader(), "jruby/java/java_package_module_template.rb", false);
+                                loadService.loadFromClassLoader(getClassLoader(), "jruby/java/java_utilities.rb", false);
+                                loadService.loadFromClassLoader(getClassLoader(), "jruby/java/core_ext/kernel.rb", false);
+                                loadService.loadFromClassLoader(getClassLoader(), "jruby/java/core_ext/module.rb", false);
+                                loadService.loadFromClassLoader(getClassLoader(), "jruby/java/core_ext/object.rb", false);
+                                
+                                parallelBoot("java integration",
+                                    new ClassLoadedRubyBooter("jruby/java/java_ext/java.lang.rb"),
+                                    new ClassLoadedRubyBooter("jruby/java/java_ext/java.util.rb"),
+                                    new ClassLoadedRubyBooter("jruby/java/java_ext/java.util.regex.rb"),
+                                    new ClassLoadedRubyBooter("jruby/java/java_ext/java.io.rb"),
+                                    new ClassLoadedRubyBooter("jruby/java/java_ext/java.net.rb"),
+                                    new ClassLoadedRubyBooter("jruby/java/java_ext/org.jruby.ast.rb"));
+
+                                // rewite ArrayJavaProxy superclass to point at Object, so it inherits Object behaviors
+                                RubyClass ajp = Ruby.this.getClass("ArrayJavaProxy");
+                                ajp.setSuperClass(Ruby.this.getJavaSupport().getObjectJavaClass().getProxyClass());
+                                ajp.includeModule(Ruby.this.getEnumerable());
+
+                                RubyClassPathVariable.createClassPathVariable(Ruby.this);
+
+                                Ruby.this.setJavaProxyClassFactory(JavaProxyClassFactory.createFactory());
+
+                                // modify ENV_JAVA to be a read/write version
+                                Map systemProps = new SystemPropertiesMap();
+                                Ruby.this.getObject().setConstantQuiet(
+                                        "ENV_JAVA",
+                                        new MapJavaProxy(
+                                                Ruby.this,
+                                                (RubyClass)Java.getProxyClass(Ruby.this, SystemPropertiesMap.class),
+                                                systemProps));
+                            }
+                        }
+                    },
+                    
+                    new Booter("jruby library") {
+                        @Override
+                        public void boot() {
+                            if (!RubyInstanceConfig.DEBUG_PARSER && reflectionWorks) {
+                                loadService.require("jruby");
+                            }
+                        }
+                    },
+
+                    new Booter("common kernel") {
+                        @Override
+                        public void boot() {
+                            // This is the primary kernel file, containing loads for subkernels that are
+                            // common to all supported versions of Ruby. Subsequent version-specific kernel
+                            // loads are expected to add and patch the behaviors loaded by this file.
+
+                            // These are loads so they don't pollute LOADED_FEATURES
+                            loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel/jruby/generator.rb", false);
+                            loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel/jruby/type.rb", false);
+                            loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel/signal.rb", false);
+
+                            // Java 7 process launching support
+                            String specVersion = SafePropertyAccessor.getProperty("java.specification.version");
+                            if (specVersion != null && new BigDecimal(specVersion).compareTo(new BigDecimal("1.7")) >= 0) {
+                                loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel/jruby/process_manager.rb", false);
+                            }
+                        }
+                    },
+                    
+                    new Booter("versioned kernel") {
+                        @Override
+                        public void boot() {
+                            switch (config.getCompatVersion()) {
+                                case RUBY1_8:
+                                    loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel18.rb", false);
+                                    break;
+                                case RUBY1_9:
+                                    // Thread features are always available in 1.9.
+                                    loadService.require("thread.jar");
+
+                                    // These are loads so they don"t pollute LOADED_FEATURES
+                                    parallelBoot("1.9 core",
+                                            new ClassLoadedRubyBooter("jruby/kernel19/thread.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/kernel.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/proc.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/process.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/jruby/process_util.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/jruby/type.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/enumerator.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/enumerable.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/io.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/time.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/gc.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/encoding/converter.rb"),
+                                            new ClassLoadedRubyBooter("jruby/kernel19/rubygems.rb"));
+                                    break;
+                                case RUBY2_0:
+                                    loadService.loadFromClassLoader(getClassLoader(), "jruby/kernel20.rb", false);
+                                    break;
+                            }
+                        }
+                    });
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Error e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
+    private abstract class Booter {
+        final String name;
+        Booter(String name) {this.name = name;}
+        public abstract void boot();
+    }
+    
+    private class ClassLoadedRubyBooter extends Booter {
+        public ClassLoadedRubyBooter(String library) {
+            super(library);
+        }
+        
+        public void boot() {
+            loadService.loadFromClassLoader(getClassLoader(), name, false);
+        }
+    }
+    
+    private void syncBoot(String aggregateName, Booter... booters) {
+        long startTimeOuter = System.currentTimeMillis();
+        
+        for (final Booter booter : booters) {
+            long startTimeInner = System.currentTimeMillis();
+            booter.boot();
+
+            if (Options.DEBUG_BOOT_TIMING.load()) LOG.info("boot_parallel(" + booter.name + "): " + (System.currentTimeMillis() - startTimeInner) / 1000.0 + "s");
+        }
+
+
+        if (Options.DEBUG_BOOT_TIMING.load()) LOG.info("boot_aggregate(" + aggregateName + "): " + (System.currentTimeMillis() - startTimeOuter) / 1000.0 + "s");
+    }
+    
+    private void parallelBoot(String aggregateName, Booter... booters) {
+        long startTime = System.currentTimeMillis();
+        List<Future<Object>> bootFutures = new ArrayList<Future<Object>>(booters.length);
+        for (final Booter booter : booters) {
+            bootFutures.add(executor.submit(new Callable<Object>() {
+                @Override
+                public Object call() {
+                    long startTime = System.currentTimeMillis();
+                    
+                    try {
+                        booter.boot();
+                    } catch (Throwable t) {
+                        System.err.println("Error while attempting parallel boot: ");
+                        t.printStackTrace();
+                        throw new RuntimeException(t);
+                    }
+                    
+
+                    if (Options.DEBUG_BOOT_TIMING.load()) LOG.info("boot_parallel(" + booter.name + "): " + (System.currentTimeMillis() - startTime) / 1000.0 + "s");
+                    return null;
+                }
+            }));
+        }
+        
+        try {
+
+            for (Future<Object> future : bootFutures) future.get();
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Error e) {
+            throw e;
+        } catch (ExecutionException e) {
+            System.err.println("Error while attempting parallel boot: ");
+            e.getCause().printStackTrace();
+            throw new RuntimeException(e.getCause());
+        } catch (Throwable t) {
+            System.err.println("Error while attempting parallel boot: ");
+            t.printStackTrace();
+            throw new RuntimeException(t);
+        }
+
+        if (Options.DEBUG_BOOT_TIMING.load()) LOG.info("boot_aggregate(" + aggregateName + "): " + (System.currentTimeMillis() - startTime) / 1000.0 + "s");
     }
 
     private void addLazyBuiltin(String name, String shortName, String className) {

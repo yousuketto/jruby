@@ -2169,3 +2169,4 @@ end
 
 Gem.clear_paths
 
+Gem.patch_specification
