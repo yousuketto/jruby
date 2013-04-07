@@ -1,1 +1,9 @@
 fails:Marshal.dump with a Float dumps a Float
+fails:Marshal.dump with an object responding to #_dump dumps the object returned by #marshal_dump
+fails:Marshal.dump with a String dumps a blank String
+fails:Marshal.dump with a String dumps a short String
+fails:Marshal.dump with a String dumps a long String
+fails:Marshal.dump with a String dumps a String extended with a Module
+fails:Marshal.dump with a Regexp dumps an extended Regexp
+fails:Marshal.dump with an Array dumps an extended Array
+fails:Marshal.dump with a Hash dumps an extended Hash
