@@ -31,6 +31,8 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
+import com.sun.tracing.ProviderFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -43,6 +45,7 @@ import org.jruby.ast.Node;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.runtime.DynamicScope;
+import org.jruby.runtime.JRuby;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.LoadServiceResourceInputStream;
@@ -52,6 +55,8 @@ import org.jruby.util.ByteList;
  * Serves as a simple facade for all the parsing magic.
  */
 public class Parser {
+    public static JRuby provider;
+    
     private final Ruby runtime;
     private volatile long totalTime;
     private volatile int totalBytes;
@@ -101,6 +106,10 @@ public class Parser {
         // We only need to pass in current scope if we are evaluating as a block (which
         // is only done for evals).  We need to pass this in so that we can appropriately scope
         // down to captured scopes when we are parsing.
+        ProviderFactory factory = ProviderFactory.getDefaultFactory();
+        provider = factory.createProvider(JRuby.class);
+        provider.parseBegin(lexerSource.getFilename(), lexerSource.getLine());
+       
         if (blockScope != null) {
             configuration.parseAsBlock(blockScope);
         }

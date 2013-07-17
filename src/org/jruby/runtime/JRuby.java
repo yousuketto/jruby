@@ -37,4 +37,5 @@ import com.sun.tracing.Provider;
   */
 
 public interface JRuby extends Provider {
+    void parseBegin(String filename, int lineno);
 }
