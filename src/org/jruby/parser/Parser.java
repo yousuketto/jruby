@@ -56,13 +56,15 @@ import org.jruby.util.ByteList;
  * Serves as a simple facade for all the parsing magic.
  */
 public class Parser {
-    public static JRuby provider;
+    public static JRuby provider;//=factory.createProvider(JRuby.class);
+    ProviderFactory factory = ProviderFactory.getDefaultFactory();
     
     private final Ruby runtime;
     private volatile long totalTime;
     private volatile int totalBytes;
 
     public Parser(Ruby runtime) {
+        provider=factory.createProvider(JRuby.class);
         this.runtime = runtime;
     }
 
@@ -107,8 +109,8 @@ public class Parser {
         // We only need to pass in current scope if we are evaluating as a block (which
         // is only done for evals).  We need to pass this in so that we can appropriately scope
         // down to captured scopes when we are parsing.
-        ProviderFactory factory = ProviderFactory.getDefaultFactory();
-        provider = factory.createProvider(JRuby.class);
+        //ProviderFactory factory = ProviderFactory.getDefaultFactory();
+        //provider = factory.createProvider(JRuby.class);
         provider.parseBegin(lexerSource.getFilename(), lexerSource.getLine());
        
         if (blockScope != null) {
