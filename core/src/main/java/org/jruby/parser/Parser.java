@@ -55,7 +55,7 @@ import org.jruby.util.ByteList;
  * Serves as a simple facade for all the parsing magic.
  */
 public class Parser {
-    public static JRuby provider;//=factory.createProvider(JRuby.class);
+    public static JRuby provider;
     ProviderFactory factory = ProviderFactory.getDefaultFactory();
     
     private final Ruby runtime;
@@ -63,8 +63,8 @@ public class Parser {
     private volatile int totalBytes;
 
     public Parser(Ruby runtime) {
+        this.runtime = runtime;        
         provider=factory.createProvider(JRuby.class);
-        this.runtime = runtime;
     }
 
     public long getTotalTime() {
@@ -108,10 +108,7 @@ public class Parser {
         // We only need to pass in current scope if we are evaluating as a block (which
         // is only done for evals).  We need to pass this in so that we can appropriately scope
         // down to captured scopes when we are parsing.
-        //ProviderFactory factory = ProviderFactory.getDefaultFactory();
-        //provider = factory.createProvider(JRuby.class);
         provider.parseBegin(lexerSource.getFilename(), lexerSource.getLine());
-       
         if (blockScope != null) {
             configuration.parseAsBlock(blockScope);
         }
@@ -170,7 +167,8 @@ public class Parser {
         if (runtime.getCoverageData().isCoverageEnabled()) {
             runtime.getCoverageData().prepareCoverage(file, configuration.getCoverage());
         }
-
+        
+        provider.parseEnd(lexerSource.getFilename(), lexerSource.getLine());
         return ast;
     }
 
