@@ -365,6 +365,7 @@ public class LoadService {
             if (runtime.getDebug().isTrue()) e.printStackTrace(runtime.getErr());
             throw newLoadErrorFromThrowable(runtime, file, e);
         }
+        provider.loadReturn(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
     }
 
     public void loadFromClassLoader(ClassLoader classLoader, String file, boolean wrap) {
