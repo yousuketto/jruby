@@ -345,6 +345,7 @@ public class LoadService {
         } finally {
             loadTimer.endLoad(file, startTime);
         }
+        provider.loadReturn(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
     }
 
     public void loadFromClassLoader(ClassLoader classLoader, String file, boolean wrap) {
