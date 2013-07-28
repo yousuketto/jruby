@@ -41,4 +41,7 @@ public interface JRuby extends Provider {
     void parseBegin(String filename, int lineno);
     void parseEnd(String filename, int lineno);
     void raise(String classname, String filename, int lineno);
+    void loadEntry(String loadedFile, String fileName, int lineNo);
+    void loadReturn(String loadedFile, String fileName, int lineNo);
+
 }

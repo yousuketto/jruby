@@ -70,6 +70,8 @@ import org.jruby.ext.rbconfig.RbConfigLibrary;
 import org.jruby.platform.Platform;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.Constants;
+import org.jruby.runtime.JRuby;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.JRubyFile;
 import org.jruby.util.log.Logger;
@@ -188,6 +190,8 @@ public class LoadService {
     }
     protected static final Pattern sourcePattern = Pattern.compile("\\.(?:rb)$");
     protected static final Pattern extensionPattern = Pattern.compile("\\.(?:so|o|dll|bundle|jar)$");
+    
+    public static JRuby provider;
 
     protected RubyArray loadPath;
     protected StringArraySet loadedFeatures;
@@ -206,6 +210,7 @@ public class LoadService {
         } else {
             loadTimer = new LoadTimer();
         }
+        provider=Provider.getInstance();
     }
 
     /**
@@ -314,6 +319,7 @@ public class LoadService {
     public void load(String file, boolean wrap) {
         long startTime = loadTimer.startLoad(file);
         try {
+            provider.loadEntry(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
             if(!runtime.getProfile().allowLoad(file)) {
                 throw runtime.newLoadError("no such file to load -- " + file, file);
             }
