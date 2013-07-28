@@ -980,10 +980,12 @@ public class RubyKernel {
         if (runtime.getDebug().isTrue()) {
             printExceptionSummary(context, runtime, raise.getException());
         }
+        
         provider=Provider.getInstance();
         RubyStackTraceElement[] elements = raise.getException().getBacktraceElements();
         RubyStackTraceElement firstElement = elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
         provider.raise(raise.getException().getMetaClass()+"", firstElement.getFileName(), firstElement.getLineNumber());
+        
         throw raise;
     }
 
