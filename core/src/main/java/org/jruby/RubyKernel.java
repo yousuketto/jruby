@@ -58,6 +58,8 @@ import org.jruby.runtime.Binding;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.Helpers;
+import org.jruby.runtime.JRuby;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.backtrace.RubyStackTraceElement;
@@ -90,6 +92,8 @@ import static org.jruby.runtime.Visibility.PUBLIC;
 @JRubyModule(name="Kernel")
 public class RubyKernel {
     public final static Class<?> IRUBY_OBJECT = IRubyObject.class;
+    
+    public static JRuby provider;
 
     public static abstract class MethodMissingMethod extends JavaMethodNBlock {
         public MethodMissingMethod(RubyModule implementationClass) {
@@ -814,7 +818,10 @@ public class RubyKernel {
         if (runtime.getDebug().isTrue()) {
             printExceptionSummary(context, runtime, raise.getException());
         }
-
+        provider=Provider.getInstance();
+        RubyStackTraceElement[] elements = raise.getException().getBacktraceElements();
+        RubyStackTraceElement firstElement = elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+        provider.raise(raise.getException().getMetaClass()+"", firstElement.getFileName(), firstElement.getLineNumber());
         throw raise;
     }
 

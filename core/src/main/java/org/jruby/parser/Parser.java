@@ -31,8 +31,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.parser;
 
-import com.sun.tracing.ProviderFactory;
-
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -46,6 +44,7 @@ import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.JRuby;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.LoadServiceResourceInputStream;
@@ -56,7 +55,6 @@ import org.jruby.util.ByteList;
  */
 public class Parser {
     public static JRuby provider;
-    ProviderFactory factory = ProviderFactory.getDefaultFactory();
     
     private final Ruby runtime;
     private volatile long totalTime;
@@ -64,7 +62,7 @@ public class Parser {
 
     public Parser(Ruby runtime) {
         this.runtime = runtime;        
-        provider=factory.createProvider(JRuby.class);
+        provider=Provider.getInstance();
     }
 
     public long getTotalTime() {

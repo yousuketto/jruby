@@ -28,17 +28,25 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.runtime;
 
-import com.sun.tracing.Provider;
+import com.sun.tracing.ProviderFactory;
 
 /**
-  * Implementation of JRuby DTrace provider interface
+  * This class make object of JRuby provider
+  * This will make sure only one object will exist.
+  * Implement Singleton Pattern.
   * 
   * This will define the DTrace probes that will exist in JRuby 
   */
 
-public interface JRuby extends Provider {
-    
-    void parseBegin(String filename, int lineno);
-    void parseEnd(String filename, int lineno);
-    void raise(String classname, String filename, int lineno);
+public abstract class Provider implements JRuby{
+
+    public static JRuby provider=null;    
+
+    public static JRuby getInstance(){
+        if(provider==null){
+            ProviderFactory factory = ProviderFactory.getDefaultFactory();
+            provider = factory.createProvider(JRuby.class);
+        }
+        return provider;
+    }
 }
