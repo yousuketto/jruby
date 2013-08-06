@@ -29,6 +29,7 @@
 package org.jruby.runtime;
 
 import com.sun.tracing.Provider;
+import com.sun.tracing.dtrace.FunctionName;
 
 /**
   * Implementation of JRuby DTrace provider interface
@@ -38,10 +39,10 @@ import com.sun.tracing.Provider;
 
 public interface JRuby extends Provider {
     
-    void parseBegin(String filename, int lineno);
-    void parseEnd(String filename, int lineno);
-    void raise(String classname, String filename, int lineno);
-    void loadEntry(String loadedFile, String fileName, int lineNo);
-    void loadReturn(String loadedFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.parser.Parser.parse()") void parseBegin(String filename, int lineno);
+    @FunctionName("org.jruby.parser.Parser.parse()") void parseEnd(String filename, int lineno);
+    @FunctionName("org.jruby.RubyKernel.raise()") void raise(String classname, String filename, int lineno);
+    @FunctionName("org.jruby.runtime.LoadService.load()") void loadEntry(String loadedFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.runtime.LoadService.load()") void loadReturn(String loadedFile, String fileName, int lineNo);
 
 }
