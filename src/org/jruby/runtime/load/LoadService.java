@@ -415,10 +415,12 @@ public class LoadService {
     }
 
     public boolean require(String requireName) {
+        provider.findRequireEntry(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
         return requireCommon(requireName, true) == RequireState.LOADED;
     }
 
     public boolean autoloadRequire(String requireName) {
+        provider.requireEntry(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
         return requireCommon(requireName, false) != RequireState.CIRCULAR;
     }
 
