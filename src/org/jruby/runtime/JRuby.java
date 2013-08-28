@@ -44,8 +44,8 @@ public interface JRuby extends Provider {
     @FunctionName("org.jruby.RubyKernel.raise()") void raise(String classname, String filename, int lineno);
     @FunctionName("org.jruby.runtime.LoadService.load()") void loadEntry(String loadedFile, String fileName, int lineNo);
     @FunctionName("org.jruby.runtime.LoadService.load()") void loadReturn(String loadedFile, String fileName, int lineNo);
-    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad") void findRequireEntry(String loadedFile, String fileName, int lineNo);
-    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad") void findRequireReturn(String loadedFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad()") void findRequireEntry(String loadedFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad()") void findRequireReturn(String loadedFile, String fileName, int lineNo);
     @FunctionName("org.jruby.runtime.LoadService.require()") void requireEntry(String loadedFile, String fileName, int lineNo);
     @FunctionName("org.jruby.runtime.LoadService.require()") void requireReturn(String loadedFile, String fileName, int lineNo);
 
