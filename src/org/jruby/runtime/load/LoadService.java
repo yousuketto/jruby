@@ -390,6 +390,8 @@ public class LoadService {
     }
 
     public SearchState findFileForLoad(String file) {
+        
+        provider.findRequireEntry(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
         if (Platform.IS_WINDOWS) {
             file = file.replace('\\', '/');
         }
@@ -406,21 +408,21 @@ public class LoadService {
         for (LoadSearcher searcher : searchers) {
             if (searcher.shouldTrySearch(state)) {
                 if (!searcher.trySearch(state)) {
+                    provider.findRequireReturn(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
                     return null;
                 }
             }
         }
-
+        provider.findRequireEntry(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
         return state;
     }
 
     public boolean require(String requireName) {
-        provider.findRequireEntry(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+        provider.requireEntry(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
         return requireCommon(requireName, true) == RequireState.LOADED;
     }
 
     public boolean autoloadRequire(String requireName) {
-        provider.requireEntry(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
         return requireCommon(requireName, false) != RequireState.CIRCULAR;
     }
 
@@ -431,6 +433,7 @@ public class LoadService {
     private RequireState requireCommon(String requireName, boolean circularRequireWarning) {
         // check for requiredName without extension.
         if (featureAlreadyLoaded(requireName)) {
+            provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
             return RequireState.ALREADY_LOADED;
         }
 
@@ -438,6 +441,7 @@ public class LoadService {
             if (circularRequireWarning && runtime.isVerbose() && runtime.is1_9()) {
                 warnCircularRequire(requireName);
             }
+            provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
             return RequireState.CIRCULAR;
         }
         try {
@@ -447,6 +451,7 @@ public class LoadService {
 
             // check for requiredName again now that we're locked
             if (featureAlreadyLoaded(requireName)) {
+                provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
                 return RequireState.ALREADY_LOADED;
             }
 
@@ -454,11 +459,13 @@ public class LoadService {
             long startTime = loadTimer.startLoad(requireName);
             try {
                 boolean loaded = smartLoadInternal(requireName);
+                provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
                 return loaded ? RequireState.LOADED : RequireState.ALREADY_LOADED;
             } finally {
                 loadTimer.endLoad(requireName, startTime);
             }
         } finally {
+            //provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
             requireLocks.unlock(requireName);
         }
     }

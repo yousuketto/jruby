@@ -180,6 +180,7 @@ class Ant
         system "#{ant_bin} #{options.to_s}" # FIXME: Make this more secure if using array form
       end
     rescue => e
+      raise e
       warn e.message
       warn e.backtrace.join("\n")
     end
