@@ -450,7 +450,6 @@ public class LoadService {
                 loadTimer.endLoad(requireName, startTime);
             }
         } finally {
-            //provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
             requireLocks.unlock(requireName);
         }
     }
