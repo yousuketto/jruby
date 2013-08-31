@@ -63,7 +63,7 @@ public class Parser {
 
     public Parser(Ruby runtime) {
         this.runtime = runtime;        
-        provider=Provider.getInstance();
+        provider = Provider.getInstance();
     }
 
     public long getTotalTime() {

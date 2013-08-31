@@ -40,10 +40,10 @@ import com.sun.tracing.ProviderFactory;
 
 public abstract class Provider implements JRuby{
 
-    public static JRuby provider=null;    
+    public static JRuby provider = null;    
 
     public static JRuby getInstance(){
-        if(provider==null){
+        if(provider == null){
             ProviderFactory factory = ProviderFactory.getDefaultFactory();
             provider = factory.createProvider(JRuby.class);
         }

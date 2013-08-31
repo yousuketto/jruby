@@ -227,7 +227,7 @@ public class LoadService {
         } else {
             loadTimer = new LoadTimer();
         }
-        provider=Provider.getInstance();
+        provider = Provider.getInstance();
     }
 
     /**
