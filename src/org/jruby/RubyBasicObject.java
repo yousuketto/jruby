@@ -49,8 +49,10 @@ import org.jruby.runtime.Helpers;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.JRuby;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ObjectSpace;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import static org.jruby.runtime.Visibility.*;
@@ -105,6 +107,8 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
     private static final Logger LOG = LoggerFactory.getLogger("RubyBasicObject");
 
     private static final boolean DEBUG = false;
+    
+    public static JRuby provider= Provider.getInstance();
     
     // The class of this object
     protected transient RubyClass metaClass;
@@ -228,15 +232,18 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      */
     public RubyBasicObject(Ruby runtime, RubyClass metaClass) {
         this.metaClass = metaClass;
-
-        runtime.addToObjectSpace(true, this);
+        runtime.addToObjectSpace(true, this);        
+        provider.objectCreate(metaClass.getName());
+    
     }
+        
 
     /**
      * Path for objects that don't taint and don't enter objectspace.
      */
     public RubyBasicObject(RubyClass metaClass) {
         this.metaClass = metaClass;
+        provider.objectCreate(metaClass.getName());
     }
 
     /**
@@ -245,9 +252,9 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      * considered immediate, they'll always pass false here)
      */
     protected RubyBasicObject(Ruby runtime, RubyClass metaClass, boolean useObjectSpace) {
-        this.metaClass = metaClass;
-
+        this.metaClass = metaClass;        
         runtime.addToObjectSpace(useObjectSpace, this);
+        //provider.objectCreate(metaClass.getName());
     }
 
     protected void taint(Ruby runtime) {

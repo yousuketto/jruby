@@ -44,9 +44,12 @@ public interface JRuby extends Provider {
     @FunctionName("org.jruby.RubyKernel.raise()") void raise(String classname, String filename, int lineno);
     @FunctionName("org.jruby.runtime.LoadService.load()") void loadEntry(String loadedFile, String fileName, int lineNo);
     @FunctionName("org.jruby.runtime.LoadService.load()") void loadReturn(String loadedFile, String fileName, int lineNo);
-    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad()") void findRequireEntry(String loadedFile, String fileName, int lineNo);
-    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad()") void findRequireReturn(String loadedFile, String fileName, int lineNo);
-    @FunctionName("org.jruby.runtime.LoadService.require()") void requireEntry(String loadedFile, String fileName, int lineNo);
-    @FunctionName("org.jruby.runtime.LoadService.require()") void requireReturn(String loadedFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad()") void findRequireEntry(String requiredFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.runtime.LoadService.findFileForLoad()") void findRequireReturn(String requiredFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.runtime.LoadService.require()") void requireEntry(String reqiredFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.runtime.LoadService.require()") void requireReturn(String requiredFile, String fileName, int lineNo);
+    @FunctionName("org.jruby.internal.runtime.methods.DynamicMethod.call()") void methodEntry(String classname, String methodName, String fileName, int lineNo);
+    @FunctionName("org.jruby.RubyBasicObject()") void objectCreate(String className);
+    
 
 }
