@@ -72,6 +72,7 @@ import org.jruby.util.TypeConverter;
 import org.jruby.util.cli.Options;
 
 import java.io.ByteArrayOutputStream;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
@@ -95,7 +96,7 @@ import org.jruby.runtime.backtrace.TraceType;
 public class RubyKernel {
     public final static Class<?> IRUBY_OBJECT = IRubyObject.class;
     
-    public static JRuby provider;
+    private static JRuby provider = Provider.getInstance();
 
     public static abstract class MethodMissingMethod extends JavaMethodNBlock {
         public MethodMissingMethod(RubyModule implementationClass) {
@@ -981,7 +982,6 @@ public class RubyKernel {
             printExceptionSummary(context, runtime, raise.getException());
         }
         
-        provider = Provider.getInstance();
         RubyStackTraceElement[] elements = raise.getException().getBacktraceElements();
         RubyStackTraceElement firstElement = elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
         provider.raise(raise.getException().getMetaClass() + "", firstElement.getFileName(), firstElement.getLineNumber());
@@ -1151,6 +1151,8 @@ public class RubyKernel {
 
     @JRubyMethod(optional = 1, module = true, visibility = PRIVATE, omit = true, compat = RUBY1_8)
     public static IRubyObject caller(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
+        System.out.println("ddddddddd");
+        try{throw new Exception();}catch(Exception e){e.printStackTrace();}
         return caller19(context, recv, args, block);
     }
     
