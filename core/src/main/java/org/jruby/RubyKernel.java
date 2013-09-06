@@ -970,13 +970,7 @@ public class RubyKernel {
     }
 
     public static IRubyObject caller(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
-<<<<<<< HEAD:core/src/main/java/org/jruby/RubyKernel.java
         return caller20(context, recv, args, block);
-=======
-        System.out.println("ddddddddd");
-        try{throw new Exception();}catch(Exception e){e.printStackTrace();}
-        return caller19(context, recv, args, block);
->>>>>>> objectCreate finished and refactored:src/org/jruby/RubyKernel.java
     }
     
     public static IRubyObject caller19(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {

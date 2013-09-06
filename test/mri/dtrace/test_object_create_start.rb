@@ -25,7 +25,7 @@ module DTrace
     private
     def probe
       <<-eoprobe
-ruby$target:::object-create
+JRuby*:::objectCreate
 {
   printf("%s %s %d\\n", copyinstr(arg0), copyinstr(arg1), arg2);
 }

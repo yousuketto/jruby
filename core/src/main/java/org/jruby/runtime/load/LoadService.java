@@ -201,7 +201,7 @@ public class LoadService {
     private static Method methodRequireReturn;
     private static Method methodFindRequireEntry;
     private static Method methodFindRequireReturn;
-    private Probe probeLoadEntry;
+    private static Probe probeLoadEntry;
     private static Probe probeLoadReturn;
     private static Probe probeRequireEntry;
     private static Probe probeRequireReturn;

@@ -1,10 +1,12 @@
 package org.jruby.runtime.callsite;
 
+import org.jruby.MetaClass;
 import org.jruby.RubyBasicObject;
 import org.jruby.RubyClass;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyFloat;
 import org.jruby.RubyLocalJumpError;
+import org.jruby.RubyModule;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.JumpException.BreakJump;
 import org.jruby.exceptions.RaiseException;
@@ -14,17 +16,40 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.CallSite;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.JRuby;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
+
+import com.sun.tracing.Probe;
+import java.lang.reflect.Method;
 
 public abstract class CachingCallSite extends CallSite {
     protected CacheEntry cache = CacheEntry.NULL_CACHE;
     public static volatile int totalCallSites;
+    public static JRuby provider = Provider.getInstance();
+    private static Method methodMethodEntry;
+    private static Method methodMethodReturn;
+    private static Probe probeMethodEntry;
+    private static Probe probeMethodReturn;
 //    private AtomicBoolean isPolymorphic = new AtomicBoolean(false);
 
     public CachingCallSite(String methodName, CallType callType) {
         super(methodName, callType);
         totalCallSites++;
+        initializeDTrace();
+    }
+    
+    public void initializeDTrace(){
+        try {
+            methodMethodEntry = JRuby.class.getMethod("methodEntry", String.class, String.class, String.class, Integer.TYPE);
+            methodMethodReturn = JRuby.class.getMethod("methodReturn", String.class, String.class, String.class, Integer.TYPE);
+            
+        } catch (Exception e) {}
+        
+        probeMethodEntry = provider.getProbe(methodMethodEntry);
+        probeMethodReturn = provider.getProbe(methodMethodReturn);
     }
 
     public CacheEntry getCache() {
@@ -283,6 +308,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, args, block);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, args, block);
     }
 
@@ -293,6 +328,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, args);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, args);
     }
 
@@ -303,6 +348,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName);
     }
 
@@ -313,6 +368,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, block);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, block);
     }
 
@@ -323,6 +388,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, arg);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, arg);
     }
 
@@ -333,6 +408,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, arg, block);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, arg, block);
     }
 
@@ -343,6 +428,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, arg1, arg2);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, arg1, arg2);
     }
 
@@ -353,6 +448,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, arg1, arg2, block);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, arg1, arg2, block);
     }
 
@@ -363,6 +468,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, arg1, arg2, arg3);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, arg1, arg2, arg3);
     }
 
@@ -373,6 +488,16 @@ public abstract class CachingCallSite extends CallSite {
             return callMethodMissing(context, self, method, arg1, arg2, arg3, block);
         }
         updateCache(entry);
+        if ( probeMethodEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = context.getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            RubyModule cls = method.getImplementationClass(); 
+            if(cls instanceof MetaClass){
+                cls = (RubyModule)((MetaClass)cls).getAttached();
+            }
+        
+            provider.methodEntry(cls.getName(), methodName, context.getFile(), firstElement.getLineNumber());
+        }
         return method.call(context, self, selfType, methodName, arg1, arg2, arg3, block);
     }
 
