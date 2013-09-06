@@ -768,7 +768,6 @@ public final class ThreadContext {
     
     public RubyStackTraceElement[] getTraceSubset(int level, Integer length, StackTraceElement[] stacktrace) {
         runtime.incrementCallerCount();
-        
         if (length != null && length == 0) return new RubyStackTraceElement[0];
         
         RubyStackTraceElement[] trace =

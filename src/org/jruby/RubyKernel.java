@@ -1151,8 +1151,6 @@ public class RubyKernel {
 
     @JRubyMethod(optional = 1, module = true, visibility = PRIVATE, omit = true, compat = RUBY1_8)
     public static IRubyObject caller(ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
-        System.out.println("ddddddddd");
-        try{throw new Exception();}catch(Exception e){e.printStackTrace();}
         return caller19(context, recv, args, block);
     }
     
