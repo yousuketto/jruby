@@ -49,7 +49,7 @@ public interface JRuby extends Provider {
     @FunctionName("org.jruby.runtime.LoadService.require()") void requireEntry(String reqiredFile, String fileName, int lineNo);
     @FunctionName("org.jruby.runtime.LoadService.require()") void requireReturn(String requiredFile, String fileName, int lineNo);
     @FunctionName("org.jruby.internal.runtime.methods.DynamicMethod.call()") void methodEntry(String classname, String methodName, String fileName, int lineNo);
-    @FunctionName("org.jruby.RubyBasicObject()") void objectCreate(String className);
+    @FunctionName("org.jruby.RubyBasicObject()") void objectCreate(String className, String fileName, int lineNo);
     
 
 }

@@ -69,11 +69,14 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.CallSite;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ClassIndex;
+import org.jruby.runtime.JRuby;
 import org.jruby.runtime.MethodIndex;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ObjectMarshal;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
 import static org.jruby.runtime.Visibility.*;
+import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.callsite.CacheEntry;
 import org.jruby.runtime.ivars.VariableAccessorField;
@@ -100,6 +103,8 @@ import org.objectweb.asm.FieldVisitor;
 public class RubyClass extends RubyModule {
 
     private static final Logger LOG = LoggerFactory.getLogger("RubyClass");
+    
+    private static JRuby provider = Provider.getInstance();
 
     public static void createClassClass(Ruby runtime, RubyClass classClass) {
         classClass.setClassIndex(ClassIndex.CLASS);
@@ -224,6 +229,9 @@ public class RubyClass extends RubyModule {
         if (obj.getMetaClass().getRealClass() != getRealClass()) {
             throw runtime.newTypeError("wrong instance allocation");
         }
+        RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+        RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+        provider.objectCreate(getRealClass().getName(), firstElement.getFileName(), firstElement.getLineNumber());
         return obj;
     }
 

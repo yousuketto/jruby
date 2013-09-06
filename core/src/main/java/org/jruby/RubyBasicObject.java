@@ -50,10 +50,8 @@ import org.jruby.runtime.Helpers;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.CallType;
 import org.jruby.runtime.ClassIndex;
-import org.jruby.runtime.JRuby;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ObjectSpace;
-import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import static org.jruby.runtime.Visibility.*;
@@ -76,6 +74,7 @@ import static org.jruby.runtime.invokedynamic.MethodNames.OP_CMP;
 import static org.jruby.runtime.invokedynamic.MethodNames.EQL;
 import static org.jruby.runtime.invokedynamic.MethodNames.INSPECT;
 import org.jruby.runtime.ivars.VariableTableManager;
+
 
 /**
  * RubyBasicObject is the only implementation of the
@@ -235,9 +234,8 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      */
     public RubyBasicObject(Ruby runtime, RubyClass metaClass) {
         this.metaClass = metaClass;
-        runtime.addToObjectSpace(true, this);        
-        provider.objectCreate(metaClass.getName());
-    
+        
+        runtime.addToObjectSpace(true, this);
     }
         
 
@@ -246,7 +244,7 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      */
     public RubyBasicObject(RubyClass metaClass) {
         this.metaClass = metaClass;
-        provider.objectCreate(metaClass.getName());
+        
     }
 
     /**
@@ -255,9 +253,9 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      * considered immediate, they'll always pass false here)
      */
     protected RubyBasicObject(Ruby runtime, RubyClass metaClass, boolean useObjectSpace) {
-        this.metaClass = metaClass;        
+        this.metaClass = metaClass;   
+        
         runtime.addToObjectSpace(useObjectSpace, this);
-        //provider.objectCreate(metaClass.getName());
     }
 
     protected void taint(Ruby runtime) {

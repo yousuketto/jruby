@@ -34,10 +34,12 @@
 package org.jruby.runtime.load;
 
 import org.jruby.util.collections.StringArraySet;
+import com.sun.tracing.Probe;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URI;
@@ -72,6 +74,7 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.Constants;
 import org.jruby.runtime.JRuby;
 import org.jruby.runtime.Provider;
+import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.JRubyFile;
 import org.jruby.util.log.Logger;
@@ -192,6 +195,18 @@ public class LoadService {
     protected static final Pattern extensionPattern = Pattern.compile("\\.(?:so|o|dll|bundle|jar)$");
     
     public static JRuby provider;
+    private static Method methodLoadEntry;
+    private static Method methodLoadReturn;
+    private static Method methodRequireEntry;
+    private static Method methodRequireReturn;
+    private static Method methodFindRequireEntry;
+    private static Method methodFindRequireReturn;
+    private Probe probeLoadEntry;
+    private static Probe probeLoadReturn;
+    private static Probe probeRequireEntry;
+    private static Probe probeRequireReturn;
+    private static Probe probeFindRequireEntry;
+    private static Probe probeFindRequireReturn;
 
     protected RubyArray loadPath;
     protected StringArraySet loadedFeatures;
@@ -210,7 +225,29 @@ public class LoadService {
         } else {
             loadTimer = new LoadTimer();
         }
+        initializeDTrace();
+        
+    }
+    
+    public void initializeDTrace(){
         provider = Provider.getInstance();
+        
+        try {
+            methodLoadEntry = JRuby.class.getMethod("loadEntry", String.class, String.class, Integer.TYPE);
+            methodLoadReturn = JRuby.class.getMethod("loadReturn", String.class, String.class, Integer.TYPE);
+            methodRequireEntry = JRuby.class.getMethod("requireEntry", String.class, String.class, Integer.TYPE);
+            methodRequireReturn = JRuby.class.getMethod("requireReturn", String.class, String.class, Integer.TYPE);
+            methodFindRequireEntry = JRuby.class.getMethod("findRequireEntry", String.class, String.class, Integer.TYPE);
+            methodFindRequireReturn = JRuby.class.getMethod("findRequireReturn", String.class, String.class, Integer.TYPE);
+            
+        } catch (Exception e) {}
+        
+        probeLoadEntry = provider.getProbe(methodLoadEntry);
+        probeLoadReturn = provider.getProbe(methodLoadReturn);
+        probeRequireEntry = provider.getProbe(methodRequireEntry);
+        probeRequireReturn = provider.getProbe(methodRequireReturn);
+        probeFindRequireEntry = provider.getProbe(methodFindRequireEntry);
+        probeFindRequireReturn = provider.getProbe(methodFindRequireReturn);
     }
 
     /**
@@ -319,7 +356,12 @@ public class LoadService {
     public void load(String file, boolean wrap) {
         long startTime = loadTimer.startLoad(file);
         try {
-            provider.loadEntry(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+            if ( probeLoadEntry.isEnabled() ) {
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+            provider.loadEntry(file, firstElement.getFileName(), firstElement.getLineNumber());
+            }
+
             if(!runtime.getProfile().allowLoad(file)) {
                 throw runtime.newLoadError("no such file to load -- " + file, file);
             }
@@ -345,7 +387,11 @@ public class LoadService {
         } finally {
             loadTimer.endLoad(file, startTime);
         }
-        provider.loadReturn(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+        if ( probeLoadReturn.isEnabled() ) {
+        RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+        RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+        provider.loadReturn(file, firstElement.getFileName(), firstElement.getLineNumber());
+        }
     }
 
     public void loadFromClassLoader(ClassLoader classLoader, String file, boolean wrap) {
@@ -376,7 +422,11 @@ public class LoadService {
 
     public SearchState findFileForLoad(String file) {
         
-        provider.findRequireEntry(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+        if ( probeFindRequireEntry.isEnabled() ) {
+        RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+        RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+        provider.findRequireEntry(file, firstElement.getFileName(), firstElement.getLineNumber());
+        }
         if (Platform.IS_WINDOWS) {
             file = file.replace('\\', '/');
         }
@@ -398,12 +448,20 @@ public class LoadService {
                 }
             }
         }
-        provider.findRequireEntry(file, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+        if ( probeFindRequireReturn.isEnabled() ) {
+        RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+        RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+        provider.findRequireReturn(file, firstElement.getFileName(), firstElement.getLineNumber());
+        }
         return state;
     }
 
     public boolean require(String requireName) {
-        provider.requireEntry(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+        if ( probeRequireEntry.isEnabled() ) {
+        RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+        RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);        
+        provider.requireEntry(requireName, firstElement.getFileName(), firstElement.getLineNumber());
+        }
         return requireCommon(requireName, true) == RequireState.LOADED;
     }
 
@@ -418,7 +476,11 @@ public class LoadService {
     private RequireState requireCommon(String requireName, boolean circularRequireWarning) {
         // check for requiredName without extension.
         if (featureAlreadyLoaded(requireName)) {
-            provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+            if (probeRequireReturn.isEnabled()) {
+                RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+                RubyStackTraceElement firstElement = elements != null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+                provider.requireReturn(requireName, firstElement.getFileName(), firstElement.getLineNumber());
+            }
             return RequireState.ALREADY_LOADED;
         }
 
@@ -426,7 +488,11 @@ public class LoadService {
             if (circularRequireWarning && runtime.isVerbose()) {
                 warnCircularRequire(requireName);
             }
-            provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+            if (probeRequireReturn.isEnabled()) {
+                RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+                RubyStackTraceElement firstElement = elements != null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+                provider.requireReturn(requireName, firstElement.getFileName(), firstElement.getLineNumber());
+            }
             return RequireState.CIRCULAR;
         }
         try {
@@ -436,7 +502,11 @@ public class LoadService {
 
             // check for requiredName again now that we're locked
             if (featureAlreadyLoaded(requireName)) {
-                provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+                if (probeRequireReturn.isEnabled()) {
+                    RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+                    RubyStackTraceElement firstElement = elements != null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+                    provider.requireReturn(requireName, firstElement.getFileName(), firstElement.getLineNumber());
+                }
                 return RequireState.ALREADY_LOADED;
             }
 
@@ -444,7 +514,11 @@ public class LoadService {
             long startTime = loadTimer.startLoad(requireName);
             try {
                 boolean loaded = smartLoadInternal(requireName);
-                provider.requireReturn(requireName, runtime.getCurrentContext().getFile(), runtime.getCurrentContext().getLine());
+                if (probeRequireReturn.isEnabled()) {
+                    RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+                    RubyStackTraceElement firstElement = elements != null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+                    provider.requireReturn(requireName, firstElement.getFileName(), firstElement.getLineNumber());
+                }
                 return loaded ? RequireState.LOADED : RequireState.ALREADY_LOADED;
             } finally {
                 loadTimer.endLoad(requireName, startTime);
