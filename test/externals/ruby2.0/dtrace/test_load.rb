@@ -16,7 +16,7 @@ module DTrace
 
     def test_load_entry
       probe = <<-eoprobe
-ruby$target:::load-entry
+JRuby*:::loadEntry
 {
   printf("%s %s %d\\n", copyinstr(arg0), copyinstr(arg1), arg2);
 }
@@ -31,7 +31,7 @@ ruby$target:::load-entry
 
     def test_load_return
       probe = <<-eoprobe
-ruby$target:::load-return
+JRuby*:::loadReturn
 {
   printf("%s\\n", copyinstr(arg0));
 }

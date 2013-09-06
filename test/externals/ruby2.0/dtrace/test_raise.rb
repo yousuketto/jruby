@@ -4,7 +4,7 @@ module DTrace
   class TestRaise < TestCase
     def test_raise
       probe = <<-eoprobe
-ruby$target:::raise
+JRuby*:::raise
 {
   printf("%s %s %d\\n", copyinstr(arg0), copyinstr(arg1), arg2);
 }
