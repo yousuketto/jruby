@@ -4,7 +4,7 @@ module DTrace
   class TestRequire < TestCase
     def test_require_entry
       probe = <<-eoprobe
-ruby$target:::require-entry
+JRuby*:::requireEntry
 {
   printf("%s %s %d\\n", copyinstr(arg0), copyinstr(arg1), arg2);
 }
@@ -19,7 +19,7 @@ ruby$target:::require-entry
 
     def test_require_return
       probe = <<-eoprobe
-ruby$target:::require-return
+JRuby*:::requireReturn
 {
   printf("%s\\n", copyinstr(arg0));
 }

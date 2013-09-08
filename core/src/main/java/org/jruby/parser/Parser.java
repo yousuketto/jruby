@@ -44,6 +44,8 @@ import org.jruby.ext.coverage.CoverageData;
 import org.jruby.lexer.yacc.LexerSource;
 import org.jruby.lexer.yacc.SyntaxException;
 import org.jruby.runtime.DynamicScope;
+import org.jruby.runtime.JRuby;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.LoadServiceResourceInputStream;
@@ -53,12 +55,15 @@ import org.jruby.util.ByteList;
  * Serves as a simple facade for all the parsing magic.
  */
 public class Parser {
+    public static JRuby provider;
+    
     private final Ruby runtime;
     private volatile long totalTime;
     private volatile int totalBytes;
 
     public Parser(Ruby runtime) {
-        this.runtime = runtime;
+        this.runtime = runtime;        
+        provider = Provider.getInstance();
     }
 
     public long getTotalTime() {
@@ -102,6 +107,7 @@ public class Parser {
         // We only need to pass in current scope if we are evaluating as a block (which
         // is only done for evals).  We need to pass this in so that we can appropriately scope
         // down to captured scopes when we are parsing.
+        provider.parseBegin(lexerSource.getFilename(), lexerSource.getLine());
         if (blockScope != null) {
             configuration.parseAsBlock(blockScope);
         }
@@ -162,7 +168,8 @@ public class Parser {
         if (runtime.getCoverageData().isCoverageEnabled()) {
             runtime.getCoverageData().prepareCoverage(file, configuration.getCoverage());
         }
-
+        
+        provider.parseEnd(lexerSource.getFilename(), lexerSource.getLine());
         return ast;
     }
 

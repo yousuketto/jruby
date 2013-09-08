@@ -75,6 +75,7 @@ import static org.jruby.runtime.invokedynamic.MethodNames.EQL;
 import static org.jruby.runtime.invokedynamic.MethodNames.INSPECT;
 import org.jruby.runtime.ivars.VariableTableManager;
 
+
 /**
  * RubyBasicObject is the only implementation of the
  * {@link org.jruby.runtime.builtin.IRubyObject}. Every Ruby object in JRuby
@@ -233,15 +234,17 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      */
     public RubyBasicObject(Ruby runtime, RubyClass metaClass) {
         this.metaClass = metaClass;
-
+        
         runtime.addToObjectSpace(true, this);
     }
+        
 
     /**
      * Path for objects that don't taint and don't enter objectspace.
      */
     public RubyBasicObject(RubyClass metaClass) {
         this.metaClass = metaClass;
+        
     }
 
     /**
@@ -250,8 +253,8 @@ public class RubyBasicObject implements Cloneable, IRubyObject, Serializable, Co
      * considered immediate, they'll always pass false here)
      */
     protected RubyBasicObject(Ruby runtime, RubyClass metaClass, boolean useObjectSpace) {
-        this.metaClass = metaClass;
-
+        this.metaClass = metaClass;   
+        
         runtime.addToObjectSpace(useObjectSpace, this);
     }
 
