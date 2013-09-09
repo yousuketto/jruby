@@ -196,7 +196,6 @@
     <build.date>${maven.build.timestamp}</build.date>
     <Constants.java>org/jruby/runtime/Constants.java</Constants.java>
     <jruby.compile.memory>512M</jruby.compile.memory>
-    <jruby.launch.memory>1024M</jruby.launch.memory>
     <jruby.test.memory>1024M</jruby.test.memory>
     <jruby.test.memory.permgen>512M</jruby.test.memory.permgen>
     <maven.test.skip>true</maven.test.skip>
