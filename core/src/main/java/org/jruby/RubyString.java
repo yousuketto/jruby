@@ -136,6 +136,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     private ByteList value;
     
+    //variables used for dtrace
     public static JRuby provider = Provider.getInstance();
     private static Method methodStringCreate;
     private static Probe probeStringCreate;
