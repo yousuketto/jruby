@@ -41,7 +41,7 @@ module DTrace
     private
     def probe
       <<-eoprobe
-ruby$target:::hash-create
+JRuby*:::hashCreate
 /arg1/
 {
   printf("%d %s %d\\n", arg0, copyinstr(arg1), arg2);

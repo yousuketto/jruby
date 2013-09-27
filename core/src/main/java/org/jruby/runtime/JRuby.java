@@ -53,5 +53,6 @@ public interface JRuby extends Provider {
     @FunctionName("org.jruby.RubyBasicObject()") void objectCreate(String className, String fileName, int lineNo);
     @FunctionName("org.jruby.RubyString()") void stringCreate(int length, String fileName, int lineNo);
     @FunctionName("org.jruby.RubyArray()") void arrayCreate(int length, String fileName, int lineNo);
+    @FunctionName("org.jruby.RubyHash()") void hashCreate(int length, String fileName, int lineNo);
 
 }
