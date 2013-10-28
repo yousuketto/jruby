@@ -45,7 +45,7 @@ public class DalvikBytecodeAdapter {
      */
     public void push(String sym) {
         loadLocal(0);
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "symbol", new TypeId[]{TypeId.get(ThreadContext.class)}, Bootstrap.symbol(), sym);
+//        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "symbol", new TypeId[]{TypeId.get(ThreadContext.class)}, Bootstrap.symbol(), sym);
     }
     
     public void pushRuntime() {
@@ -67,8 +67,8 @@ public class DalvikBytecodeAdapter {
     
     public void invokeOther(String name, int arity) {
         TypeId[] types = params(TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class), TypeId.get(IRubyObject.class), arity);
-        DalvikCallHelper.invokeOther(TypeId.get(IRubyObject.class), "invoke:" + JavaNameMangler.mangleMethodName(name),
-                types, Bootstrap.invoke());
+//        DalvikCallHelper.invokeOther(TypeId.get(IRubyObject.class), "invoke:" + JavaNameMangler.mangleMethodName(name),
+//                types, Bootstrap.invoke());
     }
     
     public void invokeSelf(String name, int arity) {
@@ -78,8 +78,8 @@ public class DalvikBytecodeAdapter {
     
     public void invokeSuper(String name, int arity) {
         TypeId[] types = params(TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class), TypeId.get(IRubyObject.class), arity);
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "invokeSuper:" + JavaNameMangler.mangleMethodName(name), types, 
-                new Handle(Opcodes.H_INVOKESTATIC, "dummy", "dummy", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;J)Ljava/lang/invoke/CallSite;"));
+//        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "invokeSuper:" + JavaNameMangler.mangleMethodName(name), types,
+//                new Handle(Opcodes.H_INVOKESTATIC, "dummy", "dummy", "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;J)Ljava/lang/invoke/CallSite;"));
     }
     
     public void invokeHelper(TypeId returntype, String name, TypeId... params) {
@@ -87,13 +87,13 @@ public class DalvikBytecodeAdapter {
     }
     
     public void searchConst(String name) {
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "searchConst:" + name, 
-                new TypeId[]{TypeId.get(ThreadContext.class), TypeId.get(StaticScope.class)}, Bootstrap.searchConst());
+//        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "searchConst:" + name,
+//                new TypeId[]{TypeId.get(ThreadContext.class), TypeId.get(StaticScope.class)}, Bootstrap.searchConst());
     }
     
     public void inheritanceSearchConst(String name) {
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "inheritanceSearchConst:" + name, 
-                new TypeId[]{TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class)}, Bootstrap.inheritanceSearchConst());
+//        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "inheritanceSearchConst:" + name,
+//                new TypeId[]{TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class)}, Bootstrap.inheritanceSearchConst());
     }
     
     public void goTo(Label label) {
@@ -155,13 +155,13 @@ public class DalvikBytecodeAdapter {
     }
     
     public void putField(String name) {
-        DalvikCallHelper.invoke(TypeId.VOID, "ivarSet:" + JavaNameMangler.mangleMethodName(name), 
-                new TypeId[]{TypeId.get(IRubyObject.class), TypeId.get(IRubyObject.class)}, Bootstrap.ivar());
+//        DalvikCallHelper.invoke(TypeId.VOID, "ivarSet:" + JavaNameMangler.mangleMethodName(name),
+//                new TypeId[]{TypeId.get(IRubyObject.class), TypeId.get(IRubyObject.class)}, Bootstrap.ivar());
     }
     
     public void getField(String name) {
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "ivarGet:" + JavaNameMangler.mangleMethodName(name), 
-                new TypeId[]{TypeId.get(IRubyObject.class)}, Bootstrap.ivar());
+//        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "ivarGet:" + JavaNameMangler.mangleMethodName(name),
+//                new TypeId[]{TypeId.get(IRubyObject.class)}, Bootstrap.ivar());
     }
     
     public void returnValue() {
@@ -170,7 +170,7 @@ public class DalvikBytecodeAdapter {
     
     public void array(int length) {
         TypeId[] types = params(TypeId.get(ThreadContext.class), TypeId.get(IRubyObject.class), length);
-        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "array", types, Bootstrap.array());
+//        DalvikCallHelper.invoke(TypeId.get(IRubyObject.class), "array", types, Bootstrap.array());
     }
     
     public int newLocal(String name, TypeId type) {

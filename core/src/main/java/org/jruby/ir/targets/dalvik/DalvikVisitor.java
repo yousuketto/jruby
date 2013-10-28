@@ -29,13 +29,9 @@ import org.jruby.ir.instructions.defined.MethodDefinedInstr;
 import org.jruby.ir.instructions.defined.MethodIsPublicInstr;
 import org.jruby.ir.instructions.defined.RestoreErrorInfoInstr;
 import org.jruby.ir.instructions.defined.SuperMethodBoundInstr;
-import org.jruby.ir.instructions.ruby18.ReceiveOptArgInstr18;
-import org.jruby.ir.instructions.ruby18.ReceiveRestArgInstr18;
 import org.jruby.ir.instructions.ruby19.BuildLambdaInstr;
 import org.jruby.ir.instructions.ruby19.GetEncodingInstr;
-import org.jruby.ir.instructions.ruby19.ReceiveOptArgInstr19;
 import org.jruby.ir.instructions.ruby19.ReceivePostReqdArgInstr;
-import org.jruby.ir.instructions.ruby19.ReceiveRestArgInstr19;
 import org.jruby.ir.operands.Array;
 import org.jruby.ir.operands.AsString;
 import org.jruby.ir.operands.Backref;
@@ -306,11 +302,6 @@ public class DalvikVisitor extends IRVisitor {
     public void ClassSuperInstr(ClassSuperInstr classsuperinstr) {
         super.ClassSuperInstr(classsuperinstr);    //To change body of overridden methods use File | Settings | File Templates.
     }
-
-    @Override
-    public void ClosureReturnInstr(ClosureReturnInstr closurereturninstr) {
-        super.ClosureReturnInstr(closurereturninstr);    //To change body of overridden methods use File | Settings | File Templates.
-    }
     
     @Override
     public void ConstMissingInstr(ConstMissingInstr constmissinginstr) {
@@ -574,11 +565,6 @@ public class DalvikVisitor extends IRVisitor {
         // TODO: private consts
         dalvik.method().inheritanceSearchConst(inheritancesearchconstinstr.getConstName());
         dalvik.method().storeLocal(dalvik.methodData().local(inheritancesearchconstinstr.getResult()));
-    }
-    
-    @Override
-    public void InstanceOfInstr(InstanceOfInstr instanceofinstr) {
-        super.InstanceOfInstr(instanceofinstr);    //To change body of overridden methods use File | Settings | File Templates.
     }
 
     @Override
@@ -1006,17 +992,6 @@ public class DalvikVisitor extends IRVisitor {
         super.SuperMethodBoundInstr(supermethodboundinstr);    //To change body of overridden methods use File | Settings | File Templates.
     }
 
-    // ruby 1.8 specific
-    @Override
-    public void ReceiveOptArgInstr18(ReceiveOptArgInstr18 receiveoptarginstr) {
-        super.ReceiveOptArgInstr18(receiveoptarginstr);    //To change body of overridden methods use File | Settings | File Templates.
-    }
-
-    @Override
-    public void ReceiveRestArgInstr18(ReceiveRestArgInstr18 receiverestarginstr) {
-        super.ReceiveRestArgInstr18(receiverestarginstr);    //To change body of overridden methods use File | Settings | File Templates.
-    }
-
     // ruby 1.9 specific
     @Override
     public void BuildLambdaInstr(BuildLambdaInstr buildlambdainstr) {
@@ -1029,8 +1004,8 @@ public class DalvikVisitor extends IRVisitor {
     }
 
     @Override
-    public void ReceiveOptArgInstr19(ReceiveOptArgInstr19 receiveoptarginstr) {
-        super.ReceiveOptArgInstr19(receiveoptarginstr);    //To change body of overridden methods use File | Settings | File Templates.
+    public void ReceiveOptArgInstr(ReceiveOptArgInstr receiveoptarginstr) {
+        super.ReceiveOptArgInstr(receiveoptarginstr);    //To change body of overridden methods use File | Settings | File Templates.
     }
 
     @Override
@@ -1039,8 +1014,8 @@ public class DalvikVisitor extends IRVisitor {
     }
 
     @Override
-    public void ReceiveRestArgInstr19(ReceiveRestArgInstr19 receiverestarginstr) {
-        super.ReceiveRestArgInstr19(receiverestarginstr);    //To change body of overridden methods use File | Settings | File Templates.
+    public void ReceiveRestArgInstr(ReceiveRestArgInstr receiverestarginstr) {
+        super.ReceiveRestArgInstr(receiverestarginstr);    //To change body of overridden methods use File | Settings | File Templates.
     }
     
     // operands

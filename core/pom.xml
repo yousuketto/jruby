@@ -201,6 +201,13 @@
       <version>${joda.time.version}</version>
       <type>jar</type>
     </dependency>
+    <dependency>
+      <groupId>com.google.dexmaker</groupId>
+      <artifactId>dexmaker</artifactId>
+      <version>1.0</version>
+      <type>jar</type>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
   <properties>
     <anno.sources>${project.basedir}/target/generated-sources</anno.sources>
