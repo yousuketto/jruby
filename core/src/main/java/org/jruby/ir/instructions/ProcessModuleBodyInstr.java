@@ -59,7 +59,7 @@ public class ProcessModuleBodyInstr extends Instr implements ResultInstr {
         InterpretedIRMethod bodyMethod = (InterpretedIRMethod)moduleBody.retrieve(context, self, currDynScope, temp);
 		  RubyModule implClass = bodyMethod.getImplementationClass();
         // SSS FIXME: Rather than pass the block implicitly, should we add %block as another operand to ProcessModuleBody, DefineModule instrs?
-        return bodyMethod.call(context, implClass, implClass, "", new IRubyObject[]{}, block);
+        return bodyMethod.call(context, implClass, implClass, "", block);
     }
 
     @Override

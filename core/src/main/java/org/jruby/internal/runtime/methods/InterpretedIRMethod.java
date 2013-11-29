@@ -29,7 +29,7 @@ public class InterpretedIRMethod extends DynamicMethod implements IRMethodArgs, 
     private final IRScope method;
     private Arity arity;
     boolean displayedCFG = false; // FIXME: Remove when we find nicer way of logging CFG
-    
+
     public InterpretedIRMethod(IRScope method, Visibility visibility, RubyModule implementationClass) {
         super(implementationClass, visibility, CallConfiguration.FrameNoneScopeNone);
         this.method = method;
@@ -41,7 +41,7 @@ public class InterpretedIRMethod extends DynamicMethod implements IRMethodArgs, 
     public InterpretedIRMethod(IRScope method, RubyModule implementationClass) {
         this(method, Visibility.PRIVATE, implementationClass);
     }
-    
+
     public IRScope getIRMethod() {
         return method;
     }
@@ -62,8 +62,7 @@ public class InterpretedIRMethod extends DynamicMethod implements IRMethodArgs, 
         return this.arity;
     }
 
-    @Override
-    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, Block block) {
+    private void prepareMethod(String name) {
         // SSS FIXME: Move this out of here to some other place?
         // Prepare method if not yet done so we know if the method has an explicit/implicit call protocol
         if (method.getInstrsForInterpretation() == null) method.prepareForInterpretation(false);
@@ -80,15 +79,63 @@ public class InterpretedIRMethod extends DynamicMethod implements IRMethodArgs, 
                 displayedCFG = true;
             }
         }
+    }
 
+    @Override
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, Block block) {
+        prepareMethod(name);
         if (method.hasExplicitCallProtocol()) {
-            return Interpreter.INTERPRET_METHOD(context, this, self, name, args, block, null, false);
+            return Interpreter.INTERPRET_METHOD(context, this, self, name, 0, null, null, block, null, false);
         } else {
             try {
                 // update call stacks (push: frame, class, scope, etc.)
                 context.preMethodFrameAndScope(getImplementationClass(), name, self, block, method.getStaticScope());
                 context.setCurrentVisibility(getVisibility());
-                return Interpreter.INTERPRET_METHOD(context, this, self, name, args, block, null, false);
+                return Interpreter.INTERPRET_METHOD(context, this, self, name, 0, null, null, block, null, false);
+            } finally {
+                // update call stacks (pop: ..)
+                context.popFrame();
+                context.popRubyClass();
+                context.popScope();
+            }
+        }
+    }
+
+    @Override
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject arg0, Block block) {
+        prepareMethod(name);
+        if (method.hasExplicitCallProtocol()) {
+            return Interpreter.INTERPRET_METHOD(context, this, self, name, 1, arg0, null, block, null, false);
+        } else {
+            try {
+                // update call stacks (push: frame, class, scope, etc.)
+                context.preMethodFrameAndScope(getImplementationClass(), name, self, block, method.getStaticScope());
+                context.setCurrentVisibility(getVisibility());
+                return Interpreter.INTERPRET_METHOD(context, this, self, name, 1, arg0, null, block, null, false);
+            } finally {
+                // update call stacks (pop: ..)
+                context.popFrame();
+                context.popRubyClass();
+                context.popScope();
+            }
+        }
+    }
+
+    @Override
+    public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args, Block block) {
+        prepareMethod(name);
+
+        int n = args.length;
+        IRubyObject arg0 = n >= 1 ? args[0] : null;
+
+        if (method.hasExplicitCallProtocol()) {
+            return Interpreter.INTERPRET_METHOD(context, this, self, name, n, arg0, args, block, null, false);
+        } else {
+            try {
+                // update call stacks (push: frame, class, scope, etc.)
+                context.preMethodFrameAndScope(getImplementationClass(), name, self, block, method.getStaticScope());
+                context.setCurrentVisibility(getVisibility());
+                return Interpreter.INTERPRET_METHOD(context, this, self, name, n, arg0, args, block, null, false);
             } finally {
                 // update call stacks (pop: ..)
                 context.popFrame();

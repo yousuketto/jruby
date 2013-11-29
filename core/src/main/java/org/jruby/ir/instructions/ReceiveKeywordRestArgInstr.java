@@ -25,16 +25,16 @@ public class ReceiveKeywordRestArgInstr extends ReceiveArgBase {
     }
 
     @Override
-    public IRubyObject receiveArg(ThreadContext context, int kwArgHashCount, IRubyObject[] args) {
+    public IRubyObject receiveArg(ThreadContext context, int kwArgHashCount, int numArgs, IRubyObject arg0, IRubyObject[] args) {
         if (kwArgHashCount == 0) {
             return RubyHash.newSmallHash(context.getRuntime());
         } else {
-            if (numUsedArgs == args.length) {
+            if (numUsedArgs == numArgs) {
                 /* throw ArgumentError */
-                Arity.raiseArgumentError(context.getRuntime(), args.length-1, numUsedArgs, -1);
+                Arity.raiseArgumentError(context.getRuntime(), numArgs - 1, numUsedArgs, -1);
             }
 
-            return args[args.length - 1];
+            return ReceiveArgBase.fetchArgFromArgs(numArgs - 1, arg0, args);
         }
     }
 }

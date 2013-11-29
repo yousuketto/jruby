@@ -44,7 +44,11 @@ public abstract class ReceiveArgBase extends Instr implements ResultInstr {
         return super.toString() + "(" + argIndex + ")";
     }
 
-    public IRubyObject receiveArg(ThreadContext context, int kwArgHashCount, IRubyObject[] args) {
+    public IRubyObject receiveArg(ThreadContext context, int kwArgHashCount, int numArgs, IRubyObject arg0, IRubyObject[] args) {
         throw new RuntimeException("ReceiveArgBase.interpret called! " + this.getClass().getName() + " does not define receiveArg");
+    }
+
+    public static IRubyObject fetchArgFromArgs(int index, IRubyObject arg0, IRubyObject[] args) {
+        return (index == 0) ? arg0 : args[index];
     }
 }

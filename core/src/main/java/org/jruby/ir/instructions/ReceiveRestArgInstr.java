@@ -42,13 +42,17 @@ public class ReceiveRestArgInstr extends ReceiveArgBase {
     private IRubyObject[] NO_PARAMS = new IRubyObject[0];
 
     @Override
-    public IRubyObject receiveArg(ThreadContext context, int kwArgLoss, IRubyObject[] parameters) {
+    public IRubyObject receiveArg(ThreadContext context, int kwArgLoss, int numArgs, IRubyObject arg0, IRubyObject[] parameters) {
         IRubyObject[] args;
-        int numAvailableArgs = parameters.length - numUsedArgs - kwArgLoss;
+        int numAvailableArgs = numArgs - numUsedArgs - kwArgLoss;
         if (numAvailableArgs <= 0) {
             args = NO_PARAMS;
         } else {
             args = new IRubyObject[numAvailableArgs];
+            // SSS: Quick simple hack
+            if (parameters == null) {
+                parameters = new IRubyObject[] { arg0 };
+            }
             System.arraycopy(parameters, argIndex, args, 0, numAvailableArgs);
         }
 

@@ -26,16 +26,16 @@ public class ReceiveKeywordArgInstr extends ReceiveArgBase {
     }
 
     @Override
-    public IRubyObject receiveArg(ThreadContext context, int kwArgHashCount, IRubyObject[] args) {
+    public IRubyObject receiveArg(ThreadContext context, int kwArgHashCount, int numArgs, IRubyObject arg0, IRubyObject[] args) {
         if (kwArgHashCount == 0) {
             return UndefinedValue.UNDEFINED;
         } else {
-            RubyHash lastArg = (RubyHash)args[args.length - 1];
-            if (numUsedArgs == args.length) {
+            if (numUsedArgs == numArgs) {
                 /* throw ArgumentError */
-                Arity.raiseArgumentError(context.getRuntime(), args.length-1, numUsedArgs, -1);
+                Arity.raiseArgumentError(context.getRuntime(), numArgs-1, numUsedArgs, -1);
             }
 
+            RubyHash lastArg = (RubyHash)ReceiveArgBase.fetchArgFromArgs(numArgs - 1, arg0, args);
             // If the key exists in the hash, delete and return it.
             RubySymbol argName = context.getRuntime().newSymbol(getResult().getName());
             if (lastArg.fastARef(argName) != null) {

@@ -193,7 +193,7 @@ public class Interpreter {
         try {
             runBeginEndBlocks(root.getBeginBlocks(), context, self, null); // FIXME: No temp vars yet...not needed?
             InterpretedIRMethod method = new InterpretedIRMethod(root, currModule);
-            IRubyObject rv =  method.call(context, self, currModule, "(root)", IRubyObject.NULL_ARRAY);
+            IRubyObject rv =  method.call(context, self, currModule, "(root)");
             runBeginEndBlocks(root.getEndBlocks(), context, self, null); // FIXME: No temp vars yet...not needed?
             if ((IRRuntimeHelpers.isDebug() || IRRuntimeHelpers.inProfileMode()) && interpInstrsCount > 10000) {
                 LOG.info("-- Interpreted instructions: {}", interpInstrsCount);
@@ -501,28 +501,31 @@ public class Interpreter {
         }
     }
 
-    private static void receiveArg(ThreadContext context, Instr i, Operation operation, IRubyObject[] args, int kwArgHashCount, DynamicScope currDynScope, Object[] temp, Object exception, Block block) {
+    private static void receiveArg(ThreadContext context, Instr i, Operation operation, int numArgs, IRubyObject arg0, IRubyObject[] args, int kwArgHashCount, DynamicScope currDynScope, Object[] temp, Block block, Object exception) {
+        // For all of the RECV_*_ARG cases, numArgs > 0 guaranteed
         Object result = null;
         ResultInstr instr = (ResultInstr)i;
         switch(operation) {
         case RECV_PRE_REQD_ARG:
             int argIndex = ((ReceivePreReqdArgInstr)instr).getArgIndex();
-            result = ((argIndex + kwArgHashCount) < args.length) ? args[argIndex] : context.nil; // SSS FIXME: This check is only required for closures, not methods
-            setResult(temp, currDynScope, instr.getResult(), result);
-            return;
-        case RECV_CLOSURE:
-            result = (block == Block.NULL_BLOCK) ? context.nil : context.runtime.newProc(Block.Type.PROC, block);
+            // SSS FIXME: This check is only required for closures, not methods
+            result = argIndex + kwArgHashCount < numArgs ? ReceiveArgBase.fetchArgFromArgs(argIndex, arg0, args)
+                                                         : context.nil;
             setResult(temp, currDynScope, instr.getResult(), result);
             return;
         case RECV_OPT_ARG:
-            result = ((ReceiveOptArgInstr)instr).receiveOptArg(args, kwArgHashCount);
+            result = ((ReceiveOptArgInstr)instr).receiveOptArg(numArgs, arg0, args, kwArgHashCount);
             // For blocks, missing arg translates to nil
             setResult(temp, currDynScope, instr.getResult(), result);
             return;
         case RECV_POST_REQD_ARG:
-            result = ((ReceivePostReqdArgInstr)instr).receivePostReqdArg(args, kwArgHashCount);
+            result = ((ReceivePostReqdArgInstr)instr).receivePostReqdArg(numArgs, arg0, args, kwArgHashCount);
             // For blocks, missing arg translates to nil
             setResult(temp, currDynScope, instr.getResult(), result == null ? context.nil : result);
+            return;
+        case RECV_CLOSURE:
+            result = (block == Block.NULL_BLOCK) ? context.nil : context.runtime.newProc(Block.Type.PROC, block);
+            setResult(temp, currDynScope, instr.getResult(), result);
             return;
         case RECV_EXCEPTION: {
             ReceiveExceptionInstr rei = (ReceiveExceptionInstr)instr;
@@ -540,11 +543,11 @@ public class Interpreter {
                 Helpers.throwException((Throwable)exception);
             }
             result = (exception instanceof RaiseException && rei.checkType) ? ((RaiseException)exception).getException() : exception;
-            setResult(temp, currDynScope, instr.getResult(), result);
-            return;
+            setResult(temp, currDynScope, ((ResultInstr)instr).getResult(), result);
+            break;
         }
         default:
-            result = ((ReceiveArgBase)instr).receiveArg(context, kwArgHashCount, args);
+            result = ((ReceiveArgBase)instr).receiveArg(context, kwArgHashCount, numArgs, arg0, args);
             setResult(temp, currDynScope, instr.getResult(), result);
             return;
         }
@@ -642,7 +645,7 @@ public class Interpreter {
     }
 
     private static IRubyObject interpret(ThreadContext context, IRubyObject self,
-            IRScope scope, Visibility visibility, RubyModule implClass, IRubyObject[] args, Block block, Block.Type blockType) {
+            IRScope scope, Visibility visibility, RubyModule implClass, int numArgs, IRubyObject arg0, IRubyObject[] args, Block block, Block.Type blockType) {
         Instr[] instrs = scope.getInstrsForInterpretation();
 
         // The base IR may not have been processed yet
@@ -654,7 +657,7 @@ public class Interpreter {
         int      ipc            = 0;
         Instr    instr          = null;
         Object   exception      = null;
-        int      kwArgHashCount = (scope.receivesKeywordArgs() && args[args.length - 1] instanceof RubyHash) ? 1 : 0;
+        int      kwArgHashCount = (scope.receivesKeywordArgs() && ReceiveArgBase.fetchArgFromArgs(numArgs-1, arg0, args) instanceof RubyHash) ? 1 : 0;
         DynamicScope currDynScope = context.getCurrentScope();
 
         // Counter tpCount = null;
@@ -687,24 +690,21 @@ public class Interpreter {
 
             try {
                 switch (operation.opClass) {
-                case ARG_OP: {
-                    receiveArg(context, instr, operation, args, kwArgHashCount, currDynScope, temp, exception, block);
+                case ARG_OP:
+                    receiveArg(context, instr, operation, numArgs, arg0, args, kwArgHashCount, currDynScope, temp, block, exception);
                     break;
-                }
-                case BRANCH_OP: {
+                case BRANCH_OP:
                     if (operation == Operation.JUMP) {
                         ipc = ((JumpInstr)instr).getJumpTarget().getTargetPC();
                     } else {
                         ipc = instr.interpretAndGetNewIPC(context, currDynScope, self, temp, ipc);
                     }
                     break;
-                }
-                case CALL_OP: {
+                case CALL_OP:
                     if (profile) updateCallSite(instr, scope, scopeVersion);
                     processCall(context, instr, operation, scope, currDynScope, temp, self, block, blockType);
                     break;
-                }
-                case BOOK_KEEPING_OP: {
+                case BOOK_KEEPING_OP:
                     if (operation == Operation.PUSH_BINDING) {
                         // SSS NOTE: Method scopes only!
                         //
@@ -713,27 +713,24 @@ public class Interpreter {
                         currDynScope = DynamicScope.newDynamicScope(scope.getStaticScope());
                         context.pushScope(currDynScope);
                     } else {
-                        processBookKeepingOp(context, instr, operation, scope, args.length, self, block, implClass, visibility, profile);
+                        processBookKeepingOp(context, instr, operation, scope, numArgs, self, block, implClass, visibility, profile);
                     }
                     break;
-                }
                 case OTHER_OP: {
                     Object result = null;
                     switch(operation) {
                     // --------- Return flavored instructions --------
+                    case RETURN:
+                        return (IRubyObject)retrieveOp(((ReturnBase)instr).getReturnValue(), context, self, currDynScope, temp);
                     case BREAK: {
                         BreakInstr bi = (BreakInstr)instr;
                         IRubyObject rv = (IRubyObject)bi.getReturnValue().retrieve(context, self, currDynScope, temp);
                         // This also handles breaks in lambdas -- by converting them to a return
                         return IRRuntimeHelpers.initiateBreak(context, scope, bi.getScopeToReturnTo().getScopeId(), rv, blockType);
                     }
-                    case RETURN: {
-                        return (IRubyObject)retrieveOp(((ReturnBase)instr).getReturnValue(), context, self, currDynScope, temp);
-                    }
                     case NONLOCAL_RETURN: {
                         NonlocalReturnInstr ri = (NonlocalReturnInstr)instr;
                         IRubyObject rv = (IRubyObject)retrieveOp(ri.getReturnValue(), context, self, currDynScope, temp);
-                        ipc = n;
                         // If not in a lambda, check if this was a non-local return
                         if (!IRRuntimeHelpers.inLambda(blockType)) {
                             IRRuntimeHelpers.initiateNonLocalReturn(context, scope, ri.methodToReturnFrom, rv);
@@ -741,7 +738,7 @@ public class Interpreter {
                         return rv;
                     }
 
-                    // ---------- Common instruction ---------
+                    // ---------- Common instructions ---------
                     case COPY: {
                         CopyInstr c = (CopyInstr)instr;
                         result = retrieveOp(c.getSource(), context, self, currDynScope, temp);
@@ -775,9 +772,8 @@ public class Interpreter {
                         setResult(temp, currDynScope, instr, result);
                         break;
                     }
-
+                    }
                     break;
-                }
                 }
             } catch (Throwable t) {
                 if (debug) LOG.info("in scope: " + scope + ", caught Java throwable: " + t + "; excepting instr: " + instr);
@@ -799,9 +795,12 @@ public class Interpreter {
 
     public static IRubyObject INTERPRET_EVAL(ThreadContext context, IRubyObject self,
             IRScope scope, RubyModule clazz, IRubyObject[] args, String name, Block block, Block.Type blockType) {
+        int numArgs = args.length;
+        IRubyObject arg0 = numArgs >= 1 ? args[0] : null;
         try {
             ThreadContext.pushBacktrace(context, name, scope.getFileName(), context.getLine());
-            return interpret(context, self, scope, null, clazz, args, block, blockType);
+            // viz and implClass unused on this path
+            return interpret(context, self, scope, null, null, numArgs, arg0, args, block, blockType);
         } finally {
             ThreadContext.popBacktrace(context);
         }
@@ -809,16 +808,19 @@ public class Interpreter {
 
     public static IRubyObject INTERPRET_BLOCK(ThreadContext context, IRubyObject self,
             IRScope scope, IRubyObject[] args, String name, Block block, Block.Type blockType) {
+        int numArgs = args.length;
+        IRubyObject arg0 = numArgs >= 1 ? args[0] : null;
         try {
             ThreadContext.pushBacktrace(context, name, scope.getFileName(), context.getLine());
-            return interpret(context, self, scope, null, null, args, block, blockType);
+            // viz and implClass unused on this path
+            return interpret(context, self, scope, null, null, numArgs, arg0, args, block, blockType);
         } finally {
             ThreadContext.popBacktrace(context);
         }
     }
 
     public static IRubyObject INTERPRET_METHOD(ThreadContext context, InterpretedIRMethod irMethod,
-        IRubyObject self, String name, IRubyObject[] args, Block block, Block.Type blockType, boolean isTraceable) {
+        IRubyObject self, String name, int numArgs, IRubyObject arg0, IRubyObject[] args, Block block, Block.Type blockType, boolean isTraceable) {
         Ruby       runtime   = context.runtime;
         IRScope    scope     = irMethod.getIRMethod();
         RubyModule implClass = irMethod.getImplementationClass();
@@ -828,7 +830,7 @@ public class Interpreter {
         try {
             if (!syntheticMethod) ThreadContext.pushBacktrace(context, name, scope.getFileName(), context.getLine());
             if (isTraceable) methodPreTrace(runtime, context, name, implClass);
-            return interpret(context, self, scope, viz, implClass, args, block, blockType);
+            return interpret(context, self, scope, viz, implClass, numArgs, arg0, args, block, blockType);
         } finally {
             if (isTraceable) {
                 try {methodPostTrace(runtime, context, name, implClass);}
