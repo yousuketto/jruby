@@ -10,13 +10,17 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 
 public class BTrueInstr extends BranchInstr implements FixedArityInstr {
+    public BTrueInstr(Operation op, Operand v, Label jmpTarget) {
+        super(op, v, null, jmpTarget);
+    }
+
     public BTrueInstr(Operand v, Label jmpTarget) {
-        super(Operation.B_TRUE, v, null, jmpTarget);
+        this(Operation.B_TRUE, v, jmpTarget);
     }
 
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
-        return new BTrueInstr(getArg1().cloneForInlining(ii), ii.getRenamedLabel(getJumpTarget()));
+        return new BTrueInstr(getOperation(), getArg1().cloneForInlining(ii), ii.getRenamedLabel(getJumpTarget()));
     }
 
     public void visit(IRVisitor visitor) {
