@@ -708,8 +708,10 @@ public abstract class IRScope implements ParseResult {
 
         CompilerPass pass;
 
-        pass = new TypeAnalysisPass();
-        pass.run(this);
+        if (RubyInstanceConfig.IR_UNBOXING) {
+            pass = new TypeAnalysisPass();
+            pass.run(this);
+        }
 
         // For methods with unescaped bindings, inline the binding
         // by converting local var loads/store to tmp var loads/stores
