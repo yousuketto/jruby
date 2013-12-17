@@ -40,6 +40,7 @@ import org.jruby.ir.passes.CompilerPass;
 import org.jruby.ir.passes.CompilerPassScheduler;
 import org.jruby.ir.passes.DeadCodeElimination;
 import org.jruby.ir.passes.TypeAnalysisPass;
+import org.jruby.ir.passes.UnboxingPass;
 import org.jruby.ir.representations.BasicBlock;
 import org.jruby.ir.representations.CFG;
 import org.jruby.ir.representations.CFGLinearizer;
@@ -709,7 +710,9 @@ public abstract class IRScope implements ParseResult {
         CompilerPass pass;
 
         if (RubyInstanceConfig.IR_UNBOXING) {
-            pass = new TypeAnalysisPass();
+            // pass = new TypeAnalysisPass();
+            // pass.run(this);
+            pass = new UnboxingPass();
             pass.run(this);
         }
 

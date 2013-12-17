@@ -2,6 +2,8 @@ package org.jruby.ir.runtime;
 
 import org.jruby.Ruby;
 import org.jruby.RubyModule;
+import org.jruby.RubyFixnum;
+import org.jruby.RubyFloat;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.parser.StaticScope;
 import org.jruby.ir.IREvalScript;
@@ -176,5 +178,21 @@ public class IRRuntimeHelpers {
         DynamicMethod method = new CompiledIRMethod(handle, rubyName, filename, line, scope, visibility, containingClass, parameterDesc);
 
         return Helpers.addInstanceMethod(containingClass, rubyName, method, visibility, context, runtime);
+    }
+
+    public static double unboxFloat(IRubyObject val) {
+        if (val instanceof RubyFloat) {
+            return ((RubyFloat)val).getValue();
+        } else {
+            return ((RubyFixnum)val).getDoubleValue();
+        }
+    }
+
+    public static boolean flt(double v1, double v2) {
+        return v1 < v2;
+    }
+
+    public static boolean fgt(double v1, double v2) {
+        return v1 > v2;
     }
 };

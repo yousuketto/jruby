@@ -66,7 +66,7 @@ public abstract class DataFlowProblem {
         }
     }
 
-    private LinkedList<FlowGraphNode> getInitialWorkList() {
+    protected LinkedList<FlowGraphNode> getInitialWorkList() {
         LinkedList<FlowGraphNode> wl = new LinkedList<FlowGraphNode>();
         if (direction == DF_Direction.FORWARD) {
            ListIterator<BasicBlock> it = scope.cfg().getReversePostOrderTraverser();
@@ -116,6 +116,10 @@ public abstract class DataFlowProblem {
         return buf.toString();
     }
 
+    public FlowGraphNode getFlowGraphNode(BasicBlock b) {
+        return basicBlockToFlowGraph.get(b.getID());
+    }
+
 /* -------------- Packaged/protected fields and methods below ---------------- */
     int addDataFlowVar(DataFlowVar v) {
         // We want unique ids for dataflow variables
@@ -127,9 +131,6 @@ public abstract class DataFlowProblem {
 /* -------------- Protected fields and methods below ---------------- */
     protected List<FlowGraphNode>    flowGraphNodes;
     protected IRScope scope;
-    protected FlowGraphNode getFlowGraphNode(BasicBlock b) {
-        return basicBlockToFlowGraph.get(b.getID());
-    }
 
 /* -------------- Private fields and methods below ---------------- */
     private int     nextVariableId;

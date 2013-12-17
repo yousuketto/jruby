@@ -6,6 +6,7 @@ import org.jruby.ir.instructions.ResultInstr;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.transformations.inlining.InlinerInfo;
+import org.jruby.ir.IRVisitor;
 
 import java.util.Map;
 
@@ -55,5 +56,10 @@ public class AluInstr extends Instr implements ResultInstr {
     @Override
     public String toString() {
         return result + " = " + getOperation() + "(" + a1 + ", " + a2 + ")";
+    }
+
+    @Override
+    public void visit(IRVisitor visitor) {
+        visitor.AluInstr(this);
     }
 }

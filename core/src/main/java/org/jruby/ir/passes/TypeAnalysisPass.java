@@ -224,6 +224,8 @@ public class TypeAnalysisPass extends CompilerPass {
                                 modified = true;
                             } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
                                 setOperandType(scope, i, dst, Fixnum.class);
+                            } else {
+                                setOperandType(scope, i, dst, null);
                             }
                         } else {
                             setOperandType(scope, i, dst, null);

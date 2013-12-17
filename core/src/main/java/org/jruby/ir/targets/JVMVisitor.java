@@ -4,6 +4,7 @@ import org.jruby.Ruby;
 import org.jruby.RubyBoolean;
 import org.jruby.RubyClass;
 import org.jruby.RubyModule;
+import org.jruby.RubyFloat;
 import org.jruby.RubyString;
 import org.jruby.compiler.impl.SkinnyMethodAdapter;
 import org.jruby.internal.runtime.methods.CompiledIRMethod;
@@ -18,6 +19,7 @@ import org.jruby.ir.IRScriptBody;
 import org.jruby.ir.Tuple;
 import org.jruby.ir.runtime.IRRuntimeHelpers;
 import org.jruby.ir.instructions.*;
+import org.jruby.ir.instructions.boxing.*;
 import org.jruby.ir.instructions.defined.BackrefIsMatchDataInstr;
 import org.jruby.ir.instructions.defined.ClassVarIsDefinedInstr;
 import org.jruby.ir.instructions.defined.GetBackrefInstr;
@@ -41,6 +43,7 @@ import org.jruby.ir.operands.CompoundArray;
 import org.jruby.ir.operands.CompoundString;
 import org.jruby.ir.operands.CurrentScope;
 import org.jruby.ir.operands.DynamicSymbol;
+import org.jruby.ir.operands.Float;
 import org.jruby.ir.operands.Fixnum;
 import org.jruby.ir.operands.GlobalVariable;
 import org.jruby.ir.operands.Hash;
@@ -313,6 +316,78 @@ public class JVMVisitor extends IRVisitor {
         jvm.method().invokeVirtual(Type.getType(Block.class), Method.getMethod("boolean isGiven()"));
         jvm.method().invokeVirtual(Type.getType(Ruby.class), Method.getMethod("org.jruby.RubyBoolean newBoolean(boolean)"));
         jvmStoreLocal(blockGivenInstr.getResult());
+    }
+
+    private void loadFloatArg(Operand arg) {
+        if (arg instanceof Variable) {
+            visit(arg);
+        } else {
+            double val;
+            if (arg instanceof Float) {
+                val = ((Float)arg).value;
+            } else if (arg instanceof Fixnum) {
+                val = (double)((Fixnum)arg).value;
+            } else {
+                val = 0.0/0.0;
+            }
+            jvm.method().adapter.ldc(val);
+        }
+    }
+
+    @Override
+    public void BoxFloatInstr(BoxFloatInstr instr) {
+        IRBytecodeAdapter   m = jvm.method();
+        SkinnyMethodAdapter a = m.adapter;
+
+        // Load runtime
+        m.loadContext();
+        a.getfield(p(ThreadContext.class), "runtime", ci(Ruby.class));
+
+        // Get unboxed float
+        loadFloatArg(instr.getValue());
+
+        // Box the float
+        a.invokevirtual(p(Ruby.class), "newFloat", sig(RubyFloat.class, double.class));
+
+        // Store it
+        int index = getJVMLocalVarIndex(instr.getResult());
+        jvm.method().storeLocal(index);
+    }
+
+    @Override
+    public void UnboxFloatInstr(UnboxFloatInstr instr) {
+        // Load boxed value
+        visit(instr.getValue());
+
+        // Unbox it
+        jvm.method().invokeIRHelper("unboxFloat", sig(double.class, IRubyObject.class));
+
+        // Store it
+        int index = getJVMLocalVarIndex(instr.getResult());
+        jvm.method().storeLocal(index);
+    }
+
+    public void AluInstr(AluInstr instr) {
+        IRBytecodeAdapter   m = jvm.method();
+        SkinnyMethodAdapter a = m.adapter;
+
+        // Load args
+        loadFloatArg(instr.getArg1());
+        loadFloatArg(instr.getArg2());
+
+        // Compute result
+        switch (instr.getOperation()) {
+        case FADD: a.dadd(); break;
+        case FSUB: a.dsub(); break;
+        case FMUL: a.dmul(); break;
+        case FDIV: a.ddiv(); break;
+        case FLT: m.invokeIRHelper("flt", sig(boolean.class, double.class, double.class)); break; // annoying to have to do it in a method
+        case FGT: m.invokeIRHelper("fgt", sig(boolean.class, double.class, double.class)); break; // annoying to have to do it in a method
+        }
+
+        // Store it
+        int index = getJVMLocalVarIndex(instr.getResult());
+        m.storeLocal(index);
     }
 
     @Override

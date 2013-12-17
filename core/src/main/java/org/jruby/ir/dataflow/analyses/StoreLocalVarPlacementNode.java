@@ -119,7 +119,7 @@ public class StoreLocalVarPlacementNode extends FlowGraphNode {
 
             // If this instruction can raise an exception and we are going to be rescued,
             // spill all dirty vars before the instruction!
-            if (i.canRaiseException() && (rescueNode != null)) {
+            if (i.canRaiseException() && rescueNode != null) {
                 dirtyVars.clear();
             }
 
@@ -167,8 +167,7 @@ public class StoreLocalVarPlacementNode extends FlowGraphNode {
     }
 
     public boolean addStores(Map<Operand, Operand> varRenameMap, Set<LocalVariable> excTargetDirtyVars) {
-        StoreLocalVarPlacementProblem bsp = (StoreLocalVarPlacementProblem) problem;
-        IRScope scope = bsp.getScope();
+        IRScope scope = problem.getScope();
 
         boolean addedStores            = false;
         boolean isClosure              = scope instanceof IRClosure;

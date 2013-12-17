@@ -6,6 +6,7 @@ import org.jruby.ir.instructions.ResultInstr;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.transformations.inlining.InlinerInfo;
+import org.jruby.ir.IRVisitor;
 
 public class UnboxFloatInstr extends UnboxInstr {
     public UnboxFloatInstr(Variable dst, Operand val) {
@@ -15,5 +16,10 @@ public class UnboxFloatInstr extends UnboxInstr {
     @Override
     public Instr cloneForInlining(InlinerInfo ii) {
         return new UnboxFloatInstr(ii.getRenamedVariable(getResult()), getValue().cloneForInlining(ii));
+    }
+
+    @Override
+    public void visit(IRVisitor visitor) {
+        visitor.UnboxFloatInstr(this);
     }
 }
