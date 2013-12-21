@@ -16,7 +16,7 @@ public class TemporaryVariable extends Variable {
 
     public TemporaryVariable(int offset) {
         super(OperandType.TEMPORARY_VARIABLE);
-        
+
         this.offset = offset;
         this.name = getPrefix() + offset;
     }
@@ -57,10 +57,9 @@ public class TemporaryVariable extends Variable {
         return getName();
     }
 
-    protected String getPrefix() {
+    public String getPrefix() {
         return "%v_";
     }
-
 
     @Override
     public Variable clone(InlinerInfo ii) {

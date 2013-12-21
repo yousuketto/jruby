@@ -234,6 +234,9 @@ public class IRBytecodeAdapter {
 
     public int newLocal(String name, Type type) {
         int index = variableCount++;
+        if (type == Type.DOUBLE_TYPE || type == Type.LONG_TYPE) {
+            variableCount++;
+        }
         variableTypes.put(index, type);
         variableNames.put(index, name);
         return index;

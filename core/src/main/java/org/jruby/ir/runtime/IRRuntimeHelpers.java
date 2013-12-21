@@ -188,11 +188,15 @@ public class IRRuntimeHelpers {
         }
     }
 
-    public static boolean flt(double v1, double v2) {
-        return v1 < v2;
+    public static double flt(double v1, double v2) {
+        return v1 < v2 ? 1.0 : 0.0;
     }
 
-    public static boolean fgt(double v1, double v2) {
-        return v1 > v2;
+    public static double fgt(double v1, double v2) {
+        return v1 > v2 ? 1.0 : 0.0;
+    }
+
+    public static boolean feq(double v) {
+        return v == 1.0;
     }
 };

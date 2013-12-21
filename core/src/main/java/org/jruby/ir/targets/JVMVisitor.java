@@ -16,6 +16,7 @@ import org.jruby.ir.IRMethod;
 import org.jruby.ir.IRModuleBody;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScriptBody;
+import org.jruby.ir.Operation;
 import org.jruby.ir.Tuple;
 import org.jruby.ir.runtime.IRRuntimeHelpers;
 import org.jruby.ir.instructions.*;
@@ -139,12 +140,12 @@ public class JVMVisitor extends IRVisitor {
     public String emitScope(IRScope scope, String name, int arity) {
         this.currentScope = scope;
         name = name + scope.getLineNumber();
-        jvm.pushmethod(name, arity);
 
         Tuple<Instr[], Map<Integer,Label[]>> t = scope.prepareForCompilation();
         Instr[] instrs = t.a;
         Map<Integer, Label[]> jumpTable = t.b;
 
+        jvm.pushmethod(name, arity);
         IRBytecodeAdapter m = jvm.method();
         for (int i = 0; i < instrs.length; i++) {
             Instr instr = instrs[i];
@@ -220,14 +221,22 @@ public class JVMVisitor extends IRVisitor {
         if (operand.hasKnownValue()) {
             operand.visit(this);
         } else if (operand instanceof Variable) {
-            emitVariable((Variable)operand);
+            jvmLoadLocal((Variable)operand);
         } else {
             operand.visit(this);
         }
     }
 
+    private boolean isFloatVar(Variable v) {
+        return v instanceof TemporaryVariable && v.getName().equals("%f_" + ((TemporaryVariable)v).offset);
+    }
+
     private int getJVMLocalVarIndex(Variable variable) {
-        return jvm.methodData().local(variable);
+        if (isFloatVar(variable)) {
+            return jvm.methodData().local(variable, JVM.DOUBLE_TYPE);
+        } else {
+            return jvm.methodData().local(variable);
+        }
     }
 
     private int getJVMLocalVarIndex(String specialVar) {
@@ -239,7 +248,11 @@ public class JVMVisitor extends IRVisitor {
     }
 
     private void jvmStoreLocal(Variable variable) {
-        jvm.method().storeLocal(getJVMLocalVarIndex(variable));
+        if (isFloatVar(variable)) {
+            jvm.method().adapter.dstore(getJVMLocalVarIndex(variable));
+        } else {
+            jvm.method().storeLocal(getJVMLocalVarIndex(variable));
+        }
     }
 
     private void jvmStoreLocal(String specialVar) {
@@ -247,20 +260,16 @@ public class JVMVisitor extends IRVisitor {
     }
 
     private void jvmLoadLocal(Variable variable) {
-        jvm.method().loadLocal(getJVMLocalVarIndex(variable));
+        if (isFloatVar(variable)) {
+            jvm.method().adapter.dload(getJVMLocalVarIndex(variable));
+        } else {
+            jvm.method().loadLocal(getJVMLocalVarIndex(variable));
+        }
     }
 
     private void jvmLoadLocal(String specialVar) {
         jvm.method().loadLocal(getJVMLocalVarIndex(specialVar));
     }
-
-    public void emitVariable(Variable variable) {
-//        System.out.println("variable: " + variable);
-        int index = getJVMLocalVarIndex(variable);
-//        System.out.println("index: " + index);
-        jvm.method().loadLocal(index);
-    }
-
 
     // JVM maintains a stack of ClassData (for nested classes being compiled)
     // Each class maintains a stack of MethodData (for methods being compiled in the class)
@@ -305,7 +314,11 @@ public class JVMVisitor extends IRVisitor {
     @Override
     public void BFalseInstr(BFalseInstr bFalseInstr) {
         visit(bFalseInstr.getArg1());
-        jvm.method().isTrue();
+        if (bFalseInstr.getOperation() == Operation.B_FALSE_UNBOXED) {
+            jvm.method().invokeIRHelper("feq", sig(boolean.class, double.class));
+        } else {
+            jvm.method().isTrue();
+        }
         jvm.method().bfalse(getJVMLabel(bFalseInstr.getJumpTarget()));
     }
 
@@ -324,11 +337,12 @@ public class JVMVisitor extends IRVisitor {
         } else {
             double val;
             if (arg instanceof Float) {
-                val = ((Float)arg).value;
+                val = (double)((Float)arg).value;
             } else if (arg instanceof Fixnum) {
                 val = (double)((Fixnum)arg).value;
             } else {
-                val = 0.0/0.0;
+                // Should not happen -- so, forcing an exception.
+                throw new RuntimeException("Non-float/fixnum in loadFloatArg!" + arg);
             }
             jvm.method().adapter.ldc(val);
         }
@@ -350,8 +364,7 @@ public class JVMVisitor extends IRVisitor {
         a.invokevirtual(p(Ruby.class), "newFloat", sig(RubyFloat.class, double.class));
 
         // Store it
-        int index = getJVMLocalVarIndex(instr.getResult());
-        jvm.method().storeLocal(index);
+        jvmStoreLocal(instr.getResult());
     }
 
     @Override
@@ -363,8 +376,7 @@ public class JVMVisitor extends IRVisitor {
         jvm.method().invokeIRHelper("unboxFloat", sig(double.class, IRubyObject.class));
 
         // Store it
-        int index = getJVMLocalVarIndex(instr.getResult());
-        jvm.method().storeLocal(index);
+        jvmStoreLocal(instr.getResult());
     }
 
     public void AluInstr(AluInstr instr) {
@@ -381,13 +393,13 @@ public class JVMVisitor extends IRVisitor {
         case FSUB: a.dsub(); break;
         case FMUL: a.dmul(); break;
         case FDIV: a.ddiv(); break;
-        case FLT: m.invokeIRHelper("flt", sig(boolean.class, double.class, double.class)); break; // annoying to have to do it in a method
-        case FGT: m.invokeIRHelper("fgt", sig(boolean.class, double.class, double.class)); break; // annoying to have to do it in a method
+        case FLT: m.invokeIRHelper("flt", sig(double.class, double.class, double.class)); break; // annoying to have to do it in a method
+        case FGT: m.invokeIRHelper("fgt", sig(double.class, double.class, double.class)); break; // annoying to have to do it in a method
+        default: throw new RuntimeException("UNHANDLED!");
         }
 
         // Store it
-        int index = getJVMLocalVarIndex(instr.getResult());
-        m.storeLocal(index);
+        jvmStoreLocal(instr.getResult());
     }
 
     @Override
@@ -425,7 +437,11 @@ public class JVMVisitor extends IRVisitor {
     @Override
     public void BTrueInstr(BTrueInstr btrueinstr) {
         visit(btrueinstr.getArg1());
-        jvm.method().isTrue();
+        if (btrueinstr.getOperation() == Operation.B_TRUE_UNBOXED) {
+            jvm.method().invokeIRHelper("feq_true", sig(boolean.class, double.class));
+        } else {
+            jvm.method().isTrue();
+        }
         jvm.method().btrue(getJVMLabel(btrueinstr.getJumpTarget()));
     }
 
@@ -507,9 +523,13 @@ public class JVMVisitor extends IRVisitor {
 
     @Override
     public void CopyInstr(CopyInstr copyinstr) {
-        int index = getJVMLocalVarIndex(copyinstr.getResult());
-        visit(copyinstr.getSource());
-        jvm.method().storeLocal(index);
+        Operand src = copyinstr.getSource();
+        if (copyinstr.getOperation() == Operation.COPY_UNBOXED) {
+            loadFloatArg(src);
+        } else {
+            visit(src);
+        }
+        jvmStoreLocal(copyinstr.getResult());
     }
 
     @Override
