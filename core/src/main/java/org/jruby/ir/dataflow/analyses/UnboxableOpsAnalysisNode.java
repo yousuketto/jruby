@@ -35,6 +35,7 @@ import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
+import org.jruby.ir.representations.CFG;
 import org.jruby.ir.representations.BasicBlock;
 import org.jruby.ir.util.Edge;
 
@@ -47,6 +48,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     public void init() {
         outTypes = new HashMap<Variable, Class>();
         unboxedVarsOut = new HashSet<Variable>();
+        unboxedDirtyVarsOut = new HashSet<Variable>();
     }
 
     public void buildDataFlowVars(Instr i) {
@@ -57,6 +59,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     public void initSolnForNode() {
         inTypes = new HashMap<Variable, Class>();
         unboxedVarsIn = new HashSet<Variable>();
+        unboxedDirtyVarsIn = new HashSet<Variable>();
     }
 
     public void compute_MEET(Edge e, BasicBlock source, FlowGraphNode pred) {
@@ -67,16 +70,17 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             Class c2 = inTypes.get(v);
             if (c2 == null) {
                 inTypes.put(v, c1);  // TOP --> class
-                outTypes.put(v, c1); // Init outTypes to inTypes
             } else if (c1 != c2) {
                 inTypes.put(v, Object.class); // TOP/class --> BOTTOM
-                outTypes.put(v, Object.class); // Init outTypes to inTypes
             }
         }
 
 
         // Ignore rescue entries -- everything is unboxed, as necessary.
-        if (!source.isRescueEntry()) unboxedVarsIn.addAll(n.unboxedVarsOut);
+        if (!source.isRescueEntry()) {
+            unboxedVarsIn.addAll(n.unboxedVarsOut);
+            unboxedDirtyVarsIn.addAll(n.unboxedDirtyVarsOut);
+        }
     }
 
     private Class getOperandType(Map<Variable, Class> types, Operand o) {
@@ -95,14 +99,12 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         }
     }
 
-    private boolean setOperandType(Map<Variable, Class> types, Variable v, Class newType) {
+    private void setOperandType(Map<Variable, Class> types, Variable v, Class newType) {
         Class vType = types.get(v);
         if (newType == null) {
             types.remove(v);
-            return false;
         } else {
             types.put(v, newType);
-            return true;
         }
     }
 
@@ -145,11 +147,10 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     }
 
     public boolean applyTransferFunction() {
-        boolean changed = false;
-
         // Rescue node, if any
         boolean hasRescuer = getNonExitBBExceptionTargetNode() != null;
 
+        Map<Variable, Class> tmpTypes = new HashMap<Variable, Class>(inTypes);
         Set<Variable> unboxedVars = new HashSet<Variable>(unboxedVarsIn);
         Set<Variable> unboxedDirtyVars = new HashSet<Variable>();
 
@@ -161,10 +162,8 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                 if (i instanceof CopyInstr) {
                     // Copies are easy
                     Operand src = ((CopyInstr)i).getSource();
-                    Class srcType = getOperandType(outTypes, src);
-                    if (setOperandType(outTypes, dst, srcType)) {
-                        changed = true;
-                    }
+                    Class srcType = getOperandType(tmpTypes, src);
+                    setOperandType(tmpTypes, dst, srcType);
 
                     // If we have an unboxed type for 'src', we can leave this unboxed.
                     //
@@ -191,15 +190,13 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                         Operand[] args = c.getCallArgs();
                         if (args.length == 1 && m.resemblesALUOp()) {
                             Operand a = args[0];
-                            Class receiverType = getOperandType(outTypes, r);
-                            Class argType = getOperandType(outTypes, a);
+                            Class receiverType = getOperandType(tmpTypes, r);
+                            Class argType = getOperandType(tmpTypes, a);
                             // Optimistically assume that call is an ALU op
                             if (receiverType == Float.class ||
                                 (receiverType == Fixnum.class && argType == Float.class))
                             {
-                                if (setOperandType(outTypes, dst, Float.class)) {
-                                    changed = true;
-                                }
+                                setOperandType(tmpTypes, dst, Float.class);
 
                                 // If 'r' and 'a' are not already in unboxed forms at this point,
                                 // they will get unboxed after this, because we want to opt. this call
@@ -211,27 +208,19 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                                 }
                                 dirtied = true;
                             } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
-                                if (setOperandType(outTypes, dst, Fixnum.class)) {
-                                    changed = true;
-                                }
+                                setOperandType(tmpTypes, dst, Fixnum.class);
                             } else {
-                                if (setOperandType(outTypes, dst, Object.class)) {
-                                    changed = true;
-                                }
+                                setOperandType(tmpTypes, dst, Object.class);
                             }
                         } else {
-                            if (setOperandType(outTypes, dst, Object.class)) {
-                                changed = true;
-                            }
+                            setOperandType(tmpTypes, dst, Object.class);
                         }
                     }
                 } else {
                     // We dont know how to optimize this instruction.
                     // So, we assume we dont know type of the result.
                     // TOP/class --> BOTTOM
-                    if (setOperandType(outTypes, dst, Object.class)) {
-                        changed = true;
-                    }
+                    setOperandType(tmpTypes, dst, Object.class);
                 }
 
                 if (dirtied) {
@@ -249,9 +238,11 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             }
         }
 
-        changed = changed || !unboxedVars.equals(unboxedVarsOut);
+        boolean changed = !tmpTypes.equals(outTypes) || !unboxedVars.equals(unboxedVarsOut) || !unboxedDirtyVars.equals(unboxedDirtyVarsOut);
         if (changed) {
             unboxedVarsOut = unboxedVars;
+            unboxedDirtyVarsOut = unboxedDirtyVars;
+            outTypes = tmpTypes;
         }
 
         return changed;
@@ -322,8 +313,8 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             // Vars used by this instruction that only exist in unboxed form
             // will have to get boxed before it is executed
             for (Variable v: i.getUsedVariables()) {
-                // if (unboxedDirtyVars.contains(v)) {
-                if (unboxedVars.contains(v)) {
+                if (unboxedDirtyVars.contains(v)) {
+                //if (unboxedVars.contains(v)) {
                     varsToBox.add(v);
                 }
             }
@@ -382,25 +373,31 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 
         // Compute UNION(unboxedVarsIn(all-successors)) - this.unboxedVarsOut
         // All vars in this new set have to be unboxed on exit from this BB
+        // Ignore entry BB since nothing has been dirtied yet.
         Set<Variable> succUnboxedVars = new HashSet<Variable>();
-        for (Edge e: problem.getScope().cfg().getOutgoingEdges(basicBlock)) {
-            BasicBlock b = (BasicBlock)e.getDestination().getData();
-            UnboxableOpsAnalysisNode x = (UnboxableOpsAnalysisNode)problem.getFlowGraphNode(b);
-            succUnboxedVars.addAll(x.unboxedVarsIn);
+        CFG cfg = problem.getScope().cfg();
+        BitSet liveVarsSet = null;
+        LiveVariablesProblem lvp = null;
+        if (basicBlock != cfg.getEntryBB()) {
+            for (Edge e: cfg.getOutgoingEdges(basicBlock)) {
+                BasicBlock b = (BasicBlock)e.getDestination().getData();
+                UnboxableOpsAnalysisNode x = (UnboxableOpsAnalysisNode)problem.getFlowGraphNode(b);
+                succUnboxedVars.addAll(x.unboxedVarsIn);
+            }
+
+            succUnboxedVars.removeAll(unboxedVarsOut);
+
+            // Only worry about vars live on exit
+            lvp = (LiveVariablesProblem)problem.getScope().getDataFlowSolution(DataFlowConstants.LVP_NAME);
+            liveVarsSet = ((LiveVariableNode)lvp.getFlowGraphNode(basicBlock)).getLiveInBitSet();
         }
-
-        succUnboxedVars.removeAll(unboxedVarsOut);
-
-        // Only worry about vars live on exit
-        LiveVariablesProblem lvp = (LiveVariablesProblem)problem.getScope().getDataFlowSolution(DataFlowConstants.LVP_NAME);
-        BitSet liveVarsSet = ((LiveVariableNode)lvp.getFlowGraphNode(basicBlock)).getLiveInBitSet();
 
         // Rescue node, if any
         IRScope scope = this.problem.getScope();
         boolean hasRescuer = getNonExitBBExceptionTargetNode() != null;
 
         Set<Variable> unboxedVars = new HashSet<Variable>(unboxedVarsIn);
-        Set<Variable> unboxedDirtyVars = new HashSet<Variable>();
+        Set<Variable> unboxedDirtyVars = new HashSet<Variable>(unboxedDirtyVarsIn);
         List<Instr> newInstrs = new ArrayList<Instr>();
         boolean unboxedLiveVars = false;
 
@@ -525,6 +522,9 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 
     Set<Variable> unboxedVarsIn;    // On entry to flow graph node: variables that exist in unboxed form
     Set<Variable> unboxedVarsOut;   // On exit from flow graph node: variables that exist in unboxed form
+
+    Set<Variable> unboxedDirtyVarsIn;    // On entry to flow graph node: variables that exist in unboxed form
+    Set<Variable> unboxedDirtyVarsOut;   // On exit from flow graph node: variables that exist in unboxed form
 
     Map<Variable, Class> inTypes;   // On entry to flow graph node:  known types of variables
     Map<Variable, Class> outTypes;  // On exit from flow graph node: known types of variables
