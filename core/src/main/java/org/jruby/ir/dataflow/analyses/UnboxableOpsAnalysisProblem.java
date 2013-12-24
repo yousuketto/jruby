@@ -44,6 +44,8 @@ public class UnboxableOpsAnalysisProblem extends DataFlowProblem {
     }
 
     public void unbox() {
+        // System.out.println("-- scope before unboxing--");
+        // System.out.println("\nInstrs:\n" + getScope().cfg().toStringInstrs());
         Map<Variable, TemporaryVariable> unboxMap = new HashMap<Variable, TemporaryVariable>();
         for (FlowGraphNode n : getInitialWorkList()) {
             ((UnboxableOpsAnalysisNode) n).unbox(unboxMap);

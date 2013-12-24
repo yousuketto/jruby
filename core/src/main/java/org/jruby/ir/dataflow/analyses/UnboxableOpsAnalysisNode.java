@@ -108,12 +108,12 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         }
     }
 
-    private void updateUnboxedVarsInfo(Instr i, Set<Variable> unboxedVars, Set<Variable> unboxedDirtyVars, Variable dst, boolean hasRescuer) {
+    private void updateUnboxedVarsInfo(Instr i, Set<Variable> unboxedVars, Set<Variable> unboxedDirtyVars, Variable dst, boolean hasRescuer, boolean isDFBarrier) {
         // Special treatment for instructions that can raise exceptions
         if (i.canRaiseException()) {
             if (hasRescuer) {
                 // If we are going to be rescued,
-                // box all unboxed dirty vars before we execute the instr
+                // box all unboxed dirty vars before we execute the instr.
                 unboxedDirtyVars.clear();
             } else {
                 // We are going to exit if an exception is raised.
@@ -129,6 +129,23 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                 }
             }
         }
+
+        if (isDFBarrier) {
+            // All dirty unboxed vars will get reboxed.
+            unboxedDirtyVars.clear();
+
+            // We have to re-unbox local variables as necessary since we don't
+            // know how they are going to change once we get past this instruction.
+            List<Variable> lvs = new ArrayList<Variable>();
+            for (Variable v: unboxedVars) {
+                if (v instanceof LocalVariable) {
+                    lvs.add(v);
+                }
+            }
+            unboxedVars.removeAll(lvs);
+        }
+
+        // FIXME: Also global variables .. see LVA / StoreLocalVar analysis.
 
         // B_TRUE and B_FALSE have unboxed forms and their operands
         // needn't get boxed back.
@@ -149,92 +166,103 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     public boolean applyTransferFunction() {
         // Rescue node, if any
         boolean hasRescuer = getNonExitBBExceptionTargetNode() != null;
+        boolean scopeBindingHasEscaped = problem.getScope().bindingHasEscaped();
 
         Map<Variable, Class> tmpTypes = new HashMap<Variable, Class>(inTypes);
         Set<Variable> unboxedVars = new HashSet<Variable>(unboxedVarsIn);
         Set<Variable> unboxedDirtyVars = new HashSet<Variable>();
 
         for (Instr i : basicBlock.getInstrs()) {
+            Variable dst = null;
+            boolean dirtied = false;
+            boolean hitDFBarrier = false;
             if (i instanceof ResultInstr) {
-                boolean dirtied = false;
-                Variable dst = ((ResultInstr) i).getResult();
+                dst = ((ResultInstr) i).getResult();
+            }
 
-                if (i instanceof CopyInstr) {
-                    // Copies are easy
-                    Operand src = ((CopyInstr)i).getSource();
-                    Class srcType = getOperandType(tmpTypes, src);
-                    setOperandType(tmpTypes, dst, srcType);
+            if (i instanceof CopyInstr) {
+                // Copies are easy
+                Operand src = ((CopyInstr)i).getSource();
+                Class srcType = getOperandType(tmpTypes, src);
+                setOperandType(tmpTypes, dst, srcType);
 
-                    // If we have an unboxed type for 'src', we can leave this unboxed.
-                    //
-                    // FIXME: However, if 'src' is a constant, this could unnecessarily
-                    // leave 'src' unboxed and lead to a boxing instruction further down
-                    // at the use site of 'dst'. This indicates that leaving this unboxed
-                    // should ideally be done 'on-demand'. This indicates that this could
-                    // be a backward-flow algo OR that this algo should be run on a
-                    // dataflow graph / SSA graph.
-                    if (srcType == Float.class) {
-                        dirtied = true;
-                    }
-                } else if (i instanceof CallBase) {
-                    // Process calls specially -- these are what we want to optimize!
-                    CallBase c = (CallBase)i;
-                    Operand  o = c.getClosureArg(null);
-                    if (o != null) {
-                        // We have to either force all types to bottom after the call
-                        // OR mimic how LVA handles this.
-                        // FIXME: To be completed
-                    } else {
-                        MethAddr m = c.getMethodAddr();
-                        Operand  r = c.getReceiver();
-                        Operand[] args = c.getCallArgs();
-                        if (args.length == 1 && m.resemblesALUOp()) {
-                            Operand a = args[0];
-                            Class receiverType = getOperandType(tmpTypes, r);
-                            Class argType = getOperandType(tmpTypes, a);
-                            // Optimistically assume that call is an ALU op
-                            if (receiverType == Float.class ||
-                                (receiverType == Fixnum.class && argType == Float.class))
-                            {
-                                setOperandType(tmpTypes, dst, Float.class);
+                // If we have an unboxed type for 'src', we can leave this unboxed.
+                //
+                // FIXME: However, if 'src' is a constant, this could unnecessarily
+                // leave 'src' unboxed and lead to a boxing instruction further down
+                // at the use site of 'dst'. This indicates that leaving this unboxed
+                // should ideally be done 'on-demand'. This indicates that this could
+                // be a backward-flow algo OR that this algo should be run on a
+                // dataflow graph / SSA graph.
+                if (srcType == Float.class) {
+                    dirtied = true;
+                }
+            } else if (i instanceof CallBase) {
+                // Process calls specially -- these are what we want to optimize!
+                CallBase c = (CallBase)i;
+                Operand  o = c.getClosureArg(null);
+                // If this is a dataflow barrier -- mark all local vars but %self and %block live
+                if (scopeBindingHasEscaped || c.targetRequiresCallersBinding()) {
+                    hitDFBarrier = true;
+                } else if (o == null) {
+                    MethAddr m = c.getMethodAddr();
+                    Operand  r = c.getReceiver();
+                    Operand[] args = c.getCallArgs();
+                    if (args.length == 1 && m.resemblesALUOp()) {
+                        Operand a = args[0];
+                        Class receiverType = getOperandType(tmpTypes, r);
+                        Class argType = getOperandType(tmpTypes, a);
+                        // Optimistically assume that call is an ALU op
+                        if (receiverType == Float.class ||
+                            (receiverType == Fixnum.class && argType == Float.class))
+                        {
+                            setOperandType(tmpTypes, dst, Float.class);
 
-                                // If 'r' and 'a' are not already in unboxed forms at this point,
-                                // they will get unboxed after this, because we want to opt. this call
-                                if (r instanceof Variable) {
-                                    unboxedVars.add((Variable)r);
-                                }
-                                if (a instanceof Variable) {
-                                    unboxedVars.add((Variable)a);
-                                }
-                                dirtied = true;
-                            } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
-                                setOperandType(tmpTypes, dst, Fixnum.class);
-                            } else {
-                                setOperandType(tmpTypes, dst, Object.class);
+                            // If 'r' and 'a' are not already in unboxed forms at this point,
+                            // they will get unboxed after this, because we want to opt. this call
+                            if (r instanceof Variable) {
+                                unboxedVars.add((Variable)r);
                             }
+                            if (a instanceof Variable) {
+                                unboxedVars.add((Variable)a);
+                            }
+                            dirtied = true;
+                        } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
+                            setOperandType(tmpTypes, dst, Fixnum.class);
                         } else {
                             setOperandType(tmpTypes, dst, Object.class);
                         }
+                    } else {
+                        setOperandType(tmpTypes, dst, Object.class);
                     }
                 } else {
-                    // We dont know how to optimize this instruction.
-                    // So, we assume we dont know type of the result.
-                    // TOP/class --> BOTTOM
-                    setOperandType(tmpTypes, dst, Object.class);
+                    if (o instanceof WrappedIRClosure) {
+                        // We have to either force all information to BOTTOM after the call
+                        // or push current state into the closure and analyze it and refresh
+                        // state after call using final state from closure.
+                        //
+                        // FIXME: Temporarily, do the conservative thing.
+                        // This can be fixed up later.
+                        hitDFBarrier = true;
+                    } else {
+                        // Cannot analyze
+                        hitDFBarrier = true;
+                    }
                 }
+            } else {
+                // We dont know how to optimize this instruction.
+                // So, we assume we dont know type of the result.
+                // TOP/class --> BOTTOM
+                setOperandType(tmpTypes, dst, Object.class);
+            }
 
-                if (dirtied) {
-                    unboxedVars.add(dst);
-                    unboxedDirtyVars.add(dst);
-                } else {
-                    // Since the instruction didn't run in unboxed form,
-                    // dirty unboxed vars will have to get boxed here.
-                    updateUnboxedVarsInfo(i, unboxedVars, unboxedDirtyVars, dst, hasRescuer);
-                }
+            if (dirtied) {
+                unboxedVars.add(dst);
+                unboxedDirtyVars.add(dst);
             } else {
                 // Since the instruction didn't run in unboxed form,
                 // dirty unboxed vars will have to get boxed here.
-                updateUnboxedVarsInfo(i, unboxedVars, unboxedDirtyVars, null, hasRescuer);
+                updateUnboxedVarsInfo(i, unboxedVars, unboxedDirtyVars, dst, hasRescuer, hitDFBarrier);
             }
         }
 
@@ -284,7 +312,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         return getUnboxedOperand(unboxedVars, unboxMap, arg, newInstrs, true);
     }
 
-    private void boxRequiredVars(Instr i, Set<Variable> unboxedVars, Set<Variable> unboxedDirtyVars, Map<Variable, TemporaryVariable> unboxMap, Variable dst, boolean hasRescuer, List<Instr> newInstrs) {
+    private void boxRequiredVars(Instr i, Set<Variable> unboxedVars, Set<Variable> unboxedDirtyVars, Map<Variable, TemporaryVariable> unboxMap, Variable dst, boolean hasRescuer, boolean isDFBarrier, List<Instr> newInstrs) {
         // Special treatment for instructions that can raise exceptions
         HashSet<Variable> varsToBox = new HashSet<Variable>();
         if (i.canRaiseException()) {
@@ -303,6 +331,21 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                     }
                 }
             }
+        }
+
+        if (isDFBarrier) {
+            // All dirty unboxed vars will get reboxed.
+            varsToBox.addAll(unboxedDirtyVars);
+
+            // We have to re-unbox local variables as necessary since we don't
+            // know how they are going to change once we get past this instruction.
+            List<Variable> lvs = new ArrayList<Variable>();
+            for (Variable v: unboxedVars) {
+                if (v instanceof LocalVariable) {
+                    lvs.add(v);
+                }
+            }
+            unboxedVars.removeAll(lvs);
         }
 
         // B_TRUE and B_FALSE have unboxed forms and their operands
@@ -351,14 +394,16 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 
 
     public void unbox(Map<Variable, TemporaryVariable> unboxMap) {
-/*
-        System.out.println("BB : " + basicBlock + " in " + this.problem.getScope().getName());
+        //System.out.println("BB : " + basicBlock + " in " + this.problem.getScope().getName());
+        /*
         System.out.println("-- known types on entry:");
         for (Variable v: inTypes.keySet()) {
             if (inTypes.get(v) != Object.class) {
                 System.out.println(v + "-->" + inTypes.get(v));
             }
         }
+        */
+        /*
         System.out.print("-- unboxed vars on entry:");
         for (Variable v: unboxedVarsIn) {
             System.out.print(" " + v);
@@ -369,11 +414,12 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             System.out.print(" " + v);
         }
         System.out.println("------");
-*/
+        */
 
         // Compute UNION(unboxedVarsIn(all-successors)) - this.unboxedVarsOut
         // All vars in this new set have to be unboxed on exit from this BB
         // Ignore entry BB since nothing has been dirtied yet.
+        boolean scopeBindingHasEscaped = problem.getScope().bindingHasEscaped();
         Set<Variable> succUnboxedVars = new HashSet<Variable>();
         CFG cfg = problem.getScope().cfg();
         BitSet liveVarsSet = null;
@@ -402,6 +448,9 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         boolean unboxedLiveVars = false;
 
         for (Instr i : basicBlock.getInstrs()) {
+            Variable dst = null;
+            boolean dirtied = false;
+            boolean hitDFBarrier = false;
             //System.out.println("ORIG: " + i);
             if (i.getOperation().transfersControl()) {
                 // Add unboxing instrs.
@@ -411,11 +460,10 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                     }
                 }
                 unboxedLiveVars = true;
-            }
-
-            if (i instanceof ResultInstr) {
-                boolean dirtied = false;
-                Variable dst = ((ResultInstr) i).getResult();
+            } else {
+                if (i instanceof ResultInstr) {
+                    dst = ((ResultInstr) i).getResult();
+                }
 
                 if (i instanceof CopyInstr) {
                     // Copies are easy
@@ -441,11 +489,9 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                     // Process calls specially -- these are what we want to optimize!
                     CallBase c = (CallBase)i;
                     Operand  o = c.getClosureArg(null);
-                    if (o != null) {
-                        // We have to either force all types to bottom after the call
-                        // OR mimic how LVA handles this.
-                        // FIXME: To be completed
-                    } else {
+                    if (scopeBindingHasEscaped || c.targetRequiresCallersBinding()) {
+                        hitDFBarrier = true;
+                    } else if (o == null) {
                         MethAddr m = c.getMethodAddr();
                         Operand  r = c.getReceiver();
                         Operand[] args = c.getCallArgs();
@@ -471,6 +517,19 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                         } else {
                             setOperandType(inTypes, dst, Object.class);
                         }
+                    } else {
+                        if (o instanceof WrappedIRClosure) {
+                            // We have to either force all information to BOTTOM after the call
+                            // or push current state into the closure and analyze it and refresh
+                            // state after call using final state from closure.
+                            //
+                            // FIXME: Temporarily, do the conservative thing.
+                            // This can be fixed up later.
+                            hitDFBarrier = true;
+                        } else {
+                            // Cannot analyze
+                            hitDFBarrier = true;
+                        }
                     }
                 } else {
                     // We dont know how to optimize this instruction.
@@ -478,19 +537,15 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                     // TOP/class --> BOTTOM
                     setOperandType(inTypes, dst, Object.class);
                 }
+            }
 
-                if (dirtied) {
-                    unboxedVars.add(dst);
-                    unboxedDirtyVars.add(dst);
-                } else {
-                    // Since the instruction didn't run in unboxed form,
-                    // dirty unboxed vars will have to get boxed here.
-                    boxRequiredVars(i, unboxedVars, unboxedDirtyVars, unboxMap, dst, hasRescuer, newInstrs);
-                }
+            if (dirtied) {
+                unboxedVars.add(dst);
+                unboxedDirtyVars.add(dst);
             } else {
                 // Since the instruction didn't run in unboxed form,
                 // dirty unboxed vars will have to get boxed here.
-                boxRequiredVars(i, unboxedVars, unboxedDirtyVars, unboxMap, null, hasRescuer, newInstrs);
+                boxRequiredVars(i, unboxedVars, unboxedDirtyVars, unboxMap, dst, hasRescuer, hitDFBarrier, newInstrs);
             }
         }
 
@@ -511,8 +566,6 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 */
 
         basicBlock.replaceInstrs(newInstrs);
-        if (problem.getScope().getName().equals("mandelbrot_foo")) {
-        }
     }
 
     @Override

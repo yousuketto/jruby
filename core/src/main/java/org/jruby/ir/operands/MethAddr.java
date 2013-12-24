@@ -16,7 +16,7 @@ public class MethAddr extends Reference {
     public MethAddr(String name) {
         super(OperandType.METH_ADDR, name);
     }
-    
+
     @Override
     public String toString() {
         return "'" + getName() + "'";
@@ -36,15 +36,18 @@ public class MethAddr extends Reference {
     public boolean equals(Object o) {
         return (o instanceof MethAddr) && ((MethAddr)o).getName().equals(getName());
     }
-    
+
     @Override
     public int hashCode() {
         return getName().hashCode();
-    }    
+    }
 
     public boolean resemblesALUOp() {
         String n = getName();
-        return n.equals("+") || n.equals("-") || n.equals("*") || n.equals("/") || n.equals(">") || n.equals("<");
+        return n.equals("+") || n.equals("-") || n.equals("*") || n.equals("/") ||
+            n.equals("|") || n.equals("&") || n.equals(">>") || n.equals("<<") ||
+            n.equals(">") || n.equals("<") ||
+            n.equals("==") || n.equals("!=");
     }
 
     public Operation getUnboxedOp(Class unboxedType) {
