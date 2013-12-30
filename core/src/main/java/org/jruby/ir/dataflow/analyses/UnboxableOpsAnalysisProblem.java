@@ -26,6 +26,8 @@ import org.jruby.ir.representations.BasicBlock;
 // Type of a variable will change at most twice: TOP --> class --> BOTTOM
 
 public class UnboxableOpsAnalysisProblem extends DataFlowProblem {
+    public final static String NAME = "UnboxableOpsAnalysis";
+
     public UnboxableOpsAnalysisProblem() {
         super(DataFlowProblem.DF_Direction.FORWARD);
     }

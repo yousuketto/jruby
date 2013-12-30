@@ -40,15 +40,52 @@ import org.jruby.ir.representations.BasicBlock;
 import org.jruby.ir.util.Edge;
 
 public class UnboxableOpsAnalysisNode extends FlowGraphNode {
+    private class UnboxState {
+        Set<Variable> unboxedVars;      // variables that exist in unboxed form
+        Set<Variable> unboxedDirtyVars; // variables that exist in unboxed form and are dirty
+        Map<Variable, Class> types;     // known types of variables
+
+        public UnboxState() {
+            types = new HashMap<Variable, Class>();
+            unboxedVars = new HashSet<Variable>();
+            unboxedDirtyVars = new HashSet<Variable>();
+        }
+
+        public UnboxState(UnboxState init) {
+            types = new HashMap<Variable, Class>(init.types);
+            unboxedVars = new HashSet<Variable>(init.unboxedVars);
+            unboxedDirtyVars = new HashSet<Variable>(init.unboxedDirtyVars);
+        }
+
+        public void computeMEET(UnboxState other) {
+            for (Variable v: other.types.keySet()) {
+                Class c1 = types.get(v);
+                Class c2 = other.types.get(v);
+                if (c1 == null) {
+                    types.put(v, c2);  // TOP --> class
+                } else if (c1 != c2) {
+                    types.put(v, Object.class); // TOP/class --> BOTTOM
+                }
+            }
+
+            unboxedVars.addAll(other.unboxedVars);
+            unboxedDirtyVars.addAll(other.unboxedDirtyVars);
+        }
+
+        public boolean equals(UnboxState other) {
+            return types.equals(other.types) &&
+                unboxedVars.equals(other.unboxedVars) &&
+                unboxedDirtyVars.equals(other.unboxedDirtyVars);
+        }
+    }
+
     public UnboxableOpsAnalysisNode(DataFlowProblem prob, BasicBlock n) {
         super(prob, n);
     }
 
     @Override
     public void init() {
-        outTypes = new HashMap<Variable, Class>();
-        unboxedVarsOut = new HashSet<Variable>();
-        unboxedDirtyVarsOut = new HashSet<Variable>();
+        outState = new UnboxState();
     }
 
     public void buildDataFlowVars(Instr i) {
@@ -57,33 +94,17 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     }
 
     public void initSolnForNode() {
-        inTypes = new HashMap<Variable, Class>();
-        unboxedVarsIn = new HashSet<Variable>();
-        unboxedDirtyVarsIn = new HashSet<Variable>();
+        inState = new UnboxState();
     }
 
     public void compute_MEET(Edge e, BasicBlock source, FlowGraphNode pred) {
-        UnboxableOpsAnalysisNode n = (UnboxableOpsAnalysisNode) pred;
-        Map<Variable, Class> predOutTypes = n.outTypes;
-        for (Variable v: predOutTypes.keySet()) {
-            Class c1 = predOutTypes.get(v);
-            Class c2 = inTypes.get(v);
-            if (c2 == null) {
-                inTypes.put(v, c1);  // TOP --> class
-            } else if (c1 != c2) {
-                inTypes.put(v, Object.class); // TOP/class --> BOTTOM
-            }
-        }
-
-
         // Ignore rescue entries -- everything is unboxed, as necessary.
         if (!source.isRescueEntry()) {
-            unboxedVarsIn.addAll(n.unboxedVarsOut);
-            unboxedDirtyVarsIn.addAll(n.unboxedDirtyVarsOut);
+            inState.computeMEET(((UnboxableOpsAnalysisNode)pred).outState);
         }
     }
 
-    private Class getOperandType(Map<Variable, Class> types, Operand o) {
+    private Class getOperandType(UnboxState state, Operand o) {
         // FIXME: This does not walk up lexical scope hierarchy
         //
         // For example, local vars in closures might belong to an outer scope
@@ -93,56 +114,56 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         } else if (o instanceof Fixnum) {
             return Fixnum.class;
         } else if (o instanceof Variable) {
-            return types.get((Variable)o);
+            return state.types.get((Variable)o);
         } else {
             return null;
         }
     }
 
-    private void setOperandType(Map<Variable, Class> types, Variable v, Class newType) {
-        Class vType = types.get(v);
+    private void setOperandType(UnboxState state, Variable v, Class newType) {
+        Class vType = state.types.get(v);
         if (newType == null) {
-            types.remove(v);
+            state.types.remove(v);
         } else {
-            types.put(v, newType);
+            state.types.put(v, newType);
         }
     }
 
-    private void updateUnboxedVarsInfo(Instr i, Set<Variable> unboxedVars, Set<Variable> unboxedDirtyVars, Variable dst, boolean hasRescuer, boolean isDFBarrier) {
+    private void updateUnboxedVarsInfo(Instr i, UnboxState state, Variable dst, boolean hasRescuer, boolean isDFBarrier) {
         // Special treatment for instructions that can raise exceptions
         if (i.canRaiseException()) {
             if (hasRescuer) {
                 // If we are going to be rescued,
                 // box all unboxed dirty vars before we execute the instr.
-                unboxedDirtyVars.clear();
+                state.unboxedDirtyVars.clear();
             } else {
                 // We are going to exit if an exception is raised.
                 // So, only need to bother with dirty live local vars for closures
                 if (this.problem.getScope() instanceof IRClosure) {
                     HashSet<Variable> varsToRemove = new HashSet<Variable>();
-                    for (Variable v: unboxedDirtyVars) {
+                    for (Variable v: state.unboxedDirtyVars) {
                         if (v instanceof LocalVariable) {
                             varsToRemove.add(v);
                         }
                     }
-                    unboxedDirtyVars.removeAll(varsToRemove);
+                    state.unboxedDirtyVars.removeAll(varsToRemove);
                 }
             }
         }
 
         if (isDFBarrier) {
             // All dirty unboxed vars will get reboxed.
-            unboxedDirtyVars.clear();
+            state.unboxedDirtyVars.clear();
 
             // We have to re-unbox local variables as necessary since we don't
             // know how they are going to change once we get past this instruction.
             List<Variable> lvs = new ArrayList<Variable>();
-            for (Variable v: unboxedVars) {
+            for (Variable v: state.unboxedVars) {
                 if (v instanceof LocalVariable) {
                     lvs.add(v);
                 }
             }
-            unboxedVars.removeAll(lvs);
+            state.unboxedVars.removeAll(lvs);
         }
 
         // FIXME: Also global variables .. see LVA / StoreLocalVar analysis.
@@ -153,13 +174,13 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         if (op != Operation.B_TRUE && op != Operation.B_FALSE) {
             // Vars used by this instruction that only exist in unboxed form
             // will have to get boxed before it is executed
-            unboxedDirtyVars.removeAll(i.getUsedVariables());
+            state.unboxedDirtyVars.removeAll(i.getUsedVariables());
         }
 
         // If the instruction writes into 'dst', it will be in boxed form.
         if (dst != null) {
-            unboxedVars.remove(dst);
-            unboxedDirtyVars.remove(dst);
+            state.unboxedVars.remove(dst);
+            state.unboxedDirtyVars.remove(dst);
         }
     }
 
@@ -168,23 +189,21 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         boolean hasRescuer = getNonExitBBExceptionTargetNode() != null;
         boolean scopeBindingHasEscaped = problem.getScope().bindingHasEscaped();
 
-        Map<Variable, Class> tmpTypes = new HashMap<Variable, Class>(inTypes);
-        Set<Variable> unboxedVars = new HashSet<Variable>(unboxedVarsIn);
-        Set<Variable> unboxedDirtyVars = new HashSet<Variable>();
+        UnboxState tmpState = new UnboxState(inState);
 
         for (Instr i : basicBlock.getInstrs()) {
             Variable dst = null;
             boolean dirtied = false;
             boolean hitDFBarrier = false;
             if (i instanceof ResultInstr) {
-                dst = ((ResultInstr) i).getResult();
+                dst = ((ResultInstr)i).getResult();
             }
 
             if (i instanceof CopyInstr) {
                 // Copies are easy
                 Operand src = ((CopyInstr)i).getSource();
-                Class srcType = getOperandType(tmpTypes, src);
-                setOperandType(tmpTypes, dst, srcType);
+                Class srcType = getOperandType(tmpState, src);
+                setOperandType(tmpState, dst, srcType);
 
                 // If we have an unboxed type for 'src', we can leave this unboxed.
                 //
@@ -210,42 +229,39 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                     Operand[] args = c.getCallArgs();
                     if (args.length == 1 && m.resemblesALUOp()) {
                         Operand a = args[0];
-                        Class receiverType = getOperandType(tmpTypes, r);
-                        Class argType = getOperandType(tmpTypes, a);
+                        Class receiverType = getOperandType(tmpState, r);
+                        Class argType = getOperandType(tmpState, a);
                         // Optimistically assume that call is an ALU op
                         if (receiverType == Float.class ||
                             (receiverType == Fixnum.class && argType == Float.class))
                         {
-                            setOperandType(tmpTypes, dst, Float.class);
+                            setOperandType(tmpState, dst, Float.class);
 
                             // If 'r' and 'a' are not already in unboxed forms at this point,
                             // they will get unboxed after this, because we want to opt. this call
                             if (r instanceof Variable) {
-                                unboxedVars.add((Variable)r);
+                                tmpState.unboxedVars.add((Variable)r);
                             }
                             if (a instanceof Variable) {
-                                unboxedVars.add((Variable)a);
+                                tmpState.unboxedVars.add((Variable)a);
                             }
                             dirtied = true;
                         } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
-                            setOperandType(tmpTypes, dst, Fixnum.class);
+                            setOperandType(tmpState, dst, Fixnum.class);
                         } else {
-                            setOperandType(tmpTypes, dst, Object.class);
+                            setOperandType(tmpState, dst, Object.class);
                         }
                     } else {
-                        setOperandType(tmpTypes, dst, Object.class);
+                        setOperandType(tmpState, dst, Object.class);
                     }
                 } else {
                     if (o instanceof WrappedIRClosure) {
-                        // We have to either force all information to BOTTOM after the call
-                        // or push current state into the closure and analyze it and refresh
-                        // state after call using final state from closure.
-                        //
-                        // FIXME: Temporarily, do the conservative thing.
-                        // This can be fixed up later.
+                        // Since binding can escape in arbitrary ways in the general case,
+                        // assume the worst for now. If we are guaranteed that the closure binding
+                        // is not used outside the closure itself, we can avoid worst-case behavior.
                         hitDFBarrier = true;
                     } else {
-                        // Cannot analyze
+                        // Black hole -- cannot analyze
                         hitDFBarrier = true;
                     }
                 }
@@ -253,27 +269,25 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                 // We dont know how to optimize this instruction.
                 // So, we assume we dont know type of the result.
                 // TOP/class --> BOTTOM
-                setOperandType(tmpTypes, dst, Object.class);
+                setOperandType(tmpState, dst, Object.class);
             }
 
             if (dirtied) {
-                unboxedVars.add(dst);
-                unboxedDirtyVars.add(dst);
+                tmpState.unboxedVars.add(dst);
+                tmpState.unboxedDirtyVars.add(dst);
             } else {
                 // Since the instruction didn't run in unboxed form,
                 // dirty unboxed vars will have to get boxed here.
-                updateUnboxedVarsInfo(i, unboxedVars, unboxedDirtyVars, dst, hasRescuer, hitDFBarrier);
+                updateUnboxedVarsInfo(i, tmpState, dst, hasRescuer, hitDFBarrier);
             }
         }
 
-        boolean changed = !tmpTypes.equals(outTypes) || !unboxedVars.equals(unboxedVarsOut) || !unboxedDirtyVars.equals(unboxedDirtyVarsOut);
-        if (changed) {
-            unboxedVarsOut = unboxedVars;
-            unboxedDirtyVarsOut = unboxedDirtyVars;
-            outTypes = tmpTypes;
+        if (outState.equals(tmpState)) {
+            return false;
+        } else {
+            outState = tmpState;
+            return true;
         }
-
-        return changed;
     }
 
     private TemporaryVariable getUnboxedVar(Map<Variable, TemporaryVariable> unboxMap, Variable v) {
@@ -312,19 +326,19 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         return getUnboxedOperand(unboxedVars, unboxMap, arg, newInstrs, true);
     }
 
-    private void boxRequiredVars(Instr i, Set<Variable> unboxedVars, Set<Variable> unboxedDirtyVars, Map<Variable, TemporaryVariable> unboxMap, Variable dst, boolean hasRescuer, boolean isDFBarrier, List<Instr> newInstrs) {
+    private void boxRequiredVars(Instr i, UnboxState state, Map<Variable, TemporaryVariable> unboxMap, Variable dst, boolean hasRescuer, boolean isDFBarrier, List<Instr> newInstrs) {
         // Special treatment for instructions that can raise exceptions
         HashSet<Variable> varsToBox = new HashSet<Variable>();
         if (i.canRaiseException()) {
             if (hasRescuer) {
                 // If we are going to be rescued,
                 // box all unboxed dirty vars before we execute the instr
-                varsToBox.addAll(unboxedDirtyVars);
+                varsToBox.addAll(state.unboxedDirtyVars);
             } else {
                 // We are going to exit if an exception is raised.
                 // So, only need to bother with dirty live local vars for closures
                 if (this.problem.getScope() instanceof IRClosure) {
-                    for (Variable v: unboxedDirtyVars) {
+                    for (Variable v: state.unboxedDirtyVars) {
                         if (v instanceof LocalVariable) {
                             varsToBox.add(v);
                         }
@@ -335,17 +349,17 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 
         if (isDFBarrier) {
             // All dirty unboxed vars will get reboxed.
-            varsToBox.addAll(unboxedDirtyVars);
+            varsToBox.addAll(state.unboxedDirtyVars);
 
             // We have to re-unbox local variables as necessary since we don't
             // know how they are going to change once we get past this instruction.
             List<Variable> lvs = new ArrayList<Variable>();
-            for (Variable v: unboxedVars) {
+            for (Variable v: state.unboxedVars) {
                 if (v instanceof LocalVariable) {
                     lvs.add(v);
                 }
             }
-            unboxedVars.removeAll(lvs);
+            state.unboxedVars.removeAll(lvs);
         }
 
         // B_TRUE and B_FALSE have unboxed forms and their operands
@@ -356,7 +370,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             // Vars used by this instruction that only exist in unboxed form
             // will have to get boxed before it is executed
             for (Variable v: i.getUsedVariables()) {
-                if (unboxedDirtyVars.contains(v)) {
+                if (state.unboxedDirtyVars.contains(v)) {
                 //if (unboxedVars.contains(v)) {
                     varsToBox.add(v);
                 }
@@ -366,14 +380,14 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         // Add boxing instrs.
         for (Variable v: varsToBox) {
             newInstrs.add(new BoxFloatInstr(v, getUnboxedVar(unboxMap, v)));
-            unboxedDirtyVars.remove(v);
+            state.unboxedDirtyVars.remove(v);
         }
 
         // Add 'i' itself
         if (isBranch) {
             BranchInstr bi = (BranchInstr)i;
             Operand a = bi.getArg1();
-            Operand ua = getUnboxedOperand(unboxedVars, unboxMap, a, newInstrs, false);
+            Operand ua = getUnboxedOperand(state.unboxedVars, unboxMap, a, newInstrs, false);
             if (ua == a) {
                 newInstrs.add(i);
             } else if (op == Operation.B_TRUE) {
@@ -387,34 +401,30 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 
         // If the instruction writes into 'dst', it will be in boxed form.
         if (dst != null) {
-            unboxedVars.remove(dst);
-            unboxedDirtyVars.remove(dst);
+            state.unboxedVars.remove(dst);
+            state.unboxedDirtyVars.remove(dst);
         }
     }
 
 
     public void unbox(Map<Variable, TemporaryVariable> unboxMap) {
-        //System.out.println("BB : " + basicBlock + " in " + this.problem.getScope().getName());
-        /*
-        System.out.println("-- known types on entry:");
-        for (Variable v: inTypes.keySet()) {
-            if (inTypes.get(v) != Object.class) {
-                System.out.println(v + "-->" + inTypes.get(v));
-            }
-        }
-        */
-        /*
-        System.out.print("-- unboxed vars on entry:");
-        for (Variable v: unboxedVarsIn) {
-            System.out.print(" " + v);
-        }
-        System.out.println("------");
-        System.out.print("-- unboxed vars on exit:");
-        for (Variable v: unboxedVarsOut) {
-            System.out.print(" " + v);
-        }
-        System.out.println("------");
-        */
+        // System.out.println("BB : " + basicBlock + " in " + this.problem.getScope().getName());
+        // System.out.println("-- known types on entry:");
+        // for (Variable v: inState.types.keySet()) {
+        //     if (inState.types.get(v) != Object.class) {
+        //         System.out.println(v + "-->" + inState.types.get(v));
+        //     }
+        // }
+        // System.out.print("-- unboxed vars on entry:");
+        // for (Variable v: inState.unboxedVars) {
+        //     System.out.print(" " + v);
+        // }
+        // System.out.println("------");
+        // System.out.print("-- unboxed vars on exit:");
+        // for (Variable v: outState.unboxedVars) {
+        //     System.out.print(" " + v);
+        // }
+        // System.out.println("------");
 
         // Compute UNION(unboxedVarsIn(all-successors)) - this.unboxedVarsOut
         // All vars in this new set have to be unboxed on exit from this BB
@@ -428,10 +438,10 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             for (Edge e: cfg.getOutgoingEdges(basicBlock)) {
                 BasicBlock b = (BasicBlock)e.getDestination().getData();
                 UnboxableOpsAnalysisNode x = (UnboxableOpsAnalysisNode)problem.getFlowGraphNode(b);
-                succUnboxedVars.addAll(x.unboxedVarsIn);
+                succUnboxedVars.addAll(x.inState.unboxedVars);
             }
 
-            succUnboxedVars.removeAll(unboxedVarsOut);
+            succUnboxedVars.removeAll(outState.unboxedVars);
 
             // Only worry about vars live on exit
             lvp = (LiveVariablesProblem)problem.getScope().getDataFlowSolution(DataFlowConstants.LVP_NAME);
@@ -442,9 +452,8 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         IRScope scope = this.problem.getScope();
         boolean hasRescuer = getNonExitBBExceptionTargetNode() != null;
 
-        Set<Variable> unboxedVars = new HashSet<Variable>(unboxedVarsIn);
-        Set<Variable> unboxedDirtyVars = new HashSet<Variable>(unboxedDirtyVarsIn);
         List<Instr> newInstrs = new ArrayList<Instr>();
+        UnboxState tmpState = new UnboxState(inState);
         boolean unboxedLiveVars = false;
 
         for (Instr i : basicBlock.getInstrs()) {
@@ -468,8 +477,8 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                 if (i instanceof CopyInstr) {
                     // Copies are easy
                     Operand src = ((CopyInstr)i).getSource();
-                    Class srcType = getOperandType(inTypes, src);
-                    setOperandType(inTypes, dst, srcType);
+                    Class srcType = getOperandType(tmpState, src);
+                    setOperandType(tmpState, dst, srcType);
 
                     // If we have an unboxed type for 'src', we can leave this unboxed.
                     //
@@ -497,25 +506,25 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                         Operand[] args = c.getCallArgs();
                         if (args.length == 1 && m.resemblesALUOp()) {
                             Operand a = args[0];
-                            Class receiverType = getOperandType(inTypes, r);
-                            Class argType = getOperandType(inTypes, a);
+                            Class receiverType = getOperandType(tmpState, r);
+                            Class argType = getOperandType(tmpState, a);
                             // Optimistically assume that call is an ALU op
                             if (receiverType == Float.class ||
                                 (receiverType == Fixnum.class && argType == Float.class))
                             {
-                                setOperandType(inTypes, dst, Float.class);
-                                r = getUnboxedOperand(unboxedVars, unboxMap, r, newInstrs);
-                                a = getUnboxedOperand(unboxedVars, unboxMap, a, newInstrs);
+                                setOperandType(tmpState, dst, Float.class);
+                                r = getUnboxedOperand(tmpState.unboxedVars, unboxMap, r, newInstrs);
+                                a = getUnboxedOperand(tmpState.unboxedVars, unboxMap, a, newInstrs);
                                 TemporaryVariable unboxedDst = getUnboxedVar(unboxMap, dst);
                                 newInstrs.add(new AluInstr(m.getUnboxedOp(Float.class), unboxedDst, r, a));
                                 dirtied = true;
                             } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
-                                setOperandType(inTypes, dst, Fixnum.class);
+                                setOperandType(tmpState, dst, Fixnum.class);
                             } else {
-                                setOperandType(inTypes, dst, Object.class);
+                                setOperandType(tmpState, dst, Object.class);
                             }
                         } else {
-                            setOperandType(inTypes, dst, Object.class);
+                            setOperandType(tmpState, dst, Object.class);
                         }
                     } else {
                         if (o instanceof WrappedIRClosure) {
@@ -535,17 +544,17 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                     // We dont know how to optimize this instruction.
                     // So, we assume we dont know type of the result.
                     // TOP/class --> BOTTOM
-                    setOperandType(inTypes, dst, Object.class);
+                    setOperandType(tmpState, dst, Object.class);
                 }
             }
 
             if (dirtied) {
-                unboxedVars.add(dst);
-                unboxedDirtyVars.add(dst);
+                tmpState.unboxedVars.add(dst);
+                tmpState.unboxedDirtyVars.add(dst);
             } else {
                 // Since the instruction didn't run in unboxed form,
                 // dirty unboxed vars will have to get boxed here.
-                boxRequiredVars(i, unboxedVars, unboxedDirtyVars, unboxMap, dst, hasRescuer, hitDFBarrier, newInstrs);
+                boxRequiredVars(i, tmpState, unboxMap, dst, hasRescuer, hitDFBarrier, newInstrs);
             }
         }
 
@@ -573,12 +582,6 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         return "";
     }
 
-    Set<Variable> unboxedVarsIn;    // On entry to flow graph node: variables that exist in unboxed form
-    Set<Variable> unboxedVarsOut;   // On exit from flow graph node: variables that exist in unboxed form
-
-    Set<Variable> unboxedDirtyVarsIn;    // On entry to flow graph node: variables that exist in unboxed form
-    Set<Variable> unboxedDirtyVarsOut;   // On exit from flow graph node: variables that exist in unboxed form
-
-    Map<Variable, Class> inTypes;   // On entry to flow graph node:  known types of variables
-    Map<Variable, Class> outTypes;  // On exit from flow graph node: known types of variables
+    UnboxState inState;
+    UnboxState outState;
 }
