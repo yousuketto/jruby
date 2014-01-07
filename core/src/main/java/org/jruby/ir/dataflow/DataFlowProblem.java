@@ -120,6 +120,14 @@ public abstract class DataFlowProblem {
         return basicBlockToFlowGraph.get(b.getID());
     }
 
+    public FlowGraphNode getEntryNode() {
+        return getFlowGraphNode(scope.cfg().getEntryBB());
+    }
+
+    public FlowGraphNode getExitNode() {
+        return getFlowGraphNode(scope.cfg().getExitBB());
+    }
+
 /* -------------- Packaged/protected fields and methods below ---------------- */
     int addDataFlowVar(DataFlowVar v) {
         // We want unique ids for dataflow variables
@@ -129,7 +137,7 @@ public abstract class DataFlowProblem {
     }
 
 /* -------------- Protected fields and methods below ---------------- */
-    protected List<FlowGraphNode>    flowGraphNodes;
+    protected List<FlowGraphNode> flowGraphNodes;
     protected IRScope scope;
 
 /* -------------- Private fields and methods below ---------------- */

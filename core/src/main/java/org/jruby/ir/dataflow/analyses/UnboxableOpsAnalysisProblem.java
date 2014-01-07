@@ -5,6 +5,7 @@ import java.util.Map;
 import org.jruby.ir.IRClosure;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.dataflow.DataFlowProblem;
+import org.jruby.ir.dataflow.DataFlowConstants;
 import org.jruby.ir.dataflow.FlowGraphNode;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.Variable;
@@ -52,5 +53,8 @@ public class UnboxableOpsAnalysisProblem extends DataFlowProblem {
         for (FlowGraphNode n : getInitialWorkList()) {
             ((UnboxableOpsAnalysisNode) n).unbox(unboxMap);
         }
+
+        // SSS FIXME: This should be done differently
+        getScope().setDataFlowSolution(DataFlowConstants.LVP_NAME, null);
     }
 }

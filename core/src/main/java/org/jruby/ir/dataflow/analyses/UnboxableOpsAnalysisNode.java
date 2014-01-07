@@ -16,6 +16,7 @@ import org.jruby.ir.Operation;
 import org.jruby.ir.dataflow.DataFlowConstants;
 import org.jruby.ir.dataflow.DataFlowProblem;
 import org.jruby.ir.dataflow.FlowGraphNode;
+import org.jruby.ir.instructions.BreakInstr;
 import org.jruby.ir.instructions.BFalseInstr;
 import org.jruby.ir.instructions.BTrueInstr;
 import org.jruby.ir.instructions.BranchInstr;
@@ -57,17 +58,24 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             unboxedDirtyVars = new HashSet<Variable>(init.unboxedDirtyVars);
         }
 
-        public void computeMEET(UnboxState other) {
-            for (Variable v: other.types.keySet()) {
-                Class c1 = types.get(v);
-                Class c2 = other.types.get(v);
-                if (c1 == null) {
-                    types.put(v, c2);  // TOP --> class
-                } else if (c1 != c2) {
-                    types.put(v, Object.class); // TOP/class --> BOTTOM
+        public void computeMEETForTypes(UnboxState other, boolean localVarsOnly) {
+            Map<Variable, Class> otherTypes = other.types;
+            for (Variable v: otherTypes.keySet()) {
+                if (!localVarsOnly || v instanceof LocalVariable) {
+                    Class c1 = types.get(v);
+                    Class c2 = otherTypes.get(v);
+                    if (c1 == null) {
+                        types.put(v, c2);  // TOP --> class
+                    } else if (c1 != c2) {
+                        types.put(v, Object.class); // TOP/class --> BOTTOM
+                    }
                 }
             }
+        }
 
+        public void computeMEET(UnboxState other) {
+            computeMEETForTypes(other, false);
+            // Aggressive: Set union
             unboxedVars.addAll(other.unboxedVars);
             unboxedDirtyVars.addAll(other.unboxedDirtyVars);
         }
@@ -76,6 +84,25 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             return types.equals(other.types) &&
                 unboxedVars.equals(other.unboxedVars) &&
                 unboxedDirtyVars.equals(other.unboxedDirtyVars);
+        }
+
+        public void debugOut() {
+            System.out.print("-- Known types:");
+            for (Variable v: types.keySet()) {
+                if (types.get(v) != Object.class) {
+                    System.out.println(v + "-->" + types.get(v));
+                }
+            }
+            System.out.print("-- Unboxed vars:");
+            for (Variable v: unboxedVars) {
+                System.out.print(" " + v);
+            }
+            System.out.println("------");
+            System.out.print("-- Unboxed dirty vars:");
+            for (Variable v: unboxedDirtyVars) {
+                System.out.print(" " + v);
+            }
+            System.out.println("------");
         }
     }
 
@@ -94,7 +121,15 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     }
 
     public void initSolnForNode() {
-        inState = new UnboxState();
+        IRScope s = problem.getScope();
+        if (s instanceof IRClosure && basicBlock == s.getCFG().getEntryBB()) {
+            // If it is not null, it has already been initialized
+            if (inState == null) {
+                inState = new UnboxState();
+            }
+        } else {
+            inState = new UnboxState();
+        }
     }
 
     public void compute_MEET(Edge e, BasicBlock source, FlowGraphNode pred) {
@@ -105,10 +140,6 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     }
 
     private Class getOperandType(UnboxState state, Operand o) {
-        // FIXME: This does not walk up lexical scope hierarchy
-        //
-        // For example, local vars in closures might belong to an outer scope
-        // and we might know something about the type there.
         if (o instanceof Float) {
             return Float.class;
         } else if (o instanceof Fixnum) {
@@ -130,6 +161,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
     }
 
     private void updateUnboxedVarsInfo(Instr i, UnboxState state, Variable dst, boolean hasRescuer, boolean isDFBarrier) {
+        HashSet<Variable> varsToBox = new HashSet<Variable>();
         // Special treatment for instructions that can raise exceptions
         if (i.canRaiseException()) {
             if (hasRescuer) {
@@ -140,20 +172,22 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                 // We are going to exit if an exception is raised.
                 // So, only need to bother with dirty live local vars for closures
                 if (this.problem.getScope() instanceof IRClosure) {
-                    HashSet<Variable> varsToRemove = new HashSet<Variable>();
                     for (Variable v: state.unboxedDirtyVars) {
                         if (v instanceof LocalVariable) {
-                            varsToRemove.add(v);
+                            varsToBox.add(v);
                         }
                     }
-                    state.unboxedDirtyVars.removeAll(varsToRemove);
                 }
             }
         }
 
         if (isDFBarrier) {
-            // All dirty unboxed vars will get reboxed.
-            state.unboxedDirtyVars.clear();
+            // All dirty unboxed local vars will get reboxed.
+            for (Variable v: state.unboxedDirtyVars) {
+                if (v instanceof LocalVariable) {
+                    varsToBox.add(v);
+                }
+            }
 
             // We have to re-unbox local variables as necessary since we don't
             // know how they are going to change once we get past this instruction.
@@ -165,6 +199,9 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             }
             state.unboxedVars.removeAll(lvs);
         }
+
+        // Update set of unboxed dirty vars
+        state.unboxedDirtyVars.removeAll(varsToBox);
 
         // FIXME: Also global variables .. see LVA / StoreLocalVar analysis.
 
@@ -220,10 +257,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                 // Process calls specially -- these are what we want to optimize!
                 CallBase c = (CallBase)i;
                 Operand  o = c.getClosureArg(null);
-                // If this is a dataflow barrier -- mark all local vars but %self and %block live
-                if (scopeBindingHasEscaped || c.targetRequiresCallersBinding()) {
-                    hitDFBarrier = true;
-                } else if (o == null) {
+                if (o == null) {
                     MethAddr m = c.getMethodAddr();
                     Operand  r = c.getReceiver();
                     Operand[] args = c.getCallArgs();
@@ -246,19 +280,56 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                                 tmpState.unboxedVars.add((Variable)a);
                             }
                             dirtied = true;
-                        } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
-                            setOperandType(tmpState, dst, Fixnum.class);
                         } else {
-                            setOperandType(tmpState, dst, Object.class);
+                            if (receiverType == Fixnum.class && argType == Fixnum.class) {
+                                setOperandType(tmpState, dst, Fixnum.class);
+                            } else {
+                                setOperandType(tmpState, dst, Object.class);
+                            }
+
+                            if (c.targetRequiresCallersBinding()) {
+                                hitDFBarrier = true;
+                            }
                         }
                     } else {
                         setOperandType(tmpState, dst, Object.class);
                     }
                 } else {
                     if (o instanceof WrappedIRClosure) {
-                        // Since binding can escape in arbitrary ways in the general case,
-                        // assume the worst for now. If we are guaranteed that the closure binding
-                        // is not used outside the closure itself, we can avoid worst-case behavior.
+                        // Fetch the nested unboxing-analysis problem, creating one if necessary
+                        IRClosure cl = ((WrappedIRClosure)o).getClosure();
+                        UnboxableOpsAnalysisProblem subProblem = (UnboxableOpsAnalysisProblem)cl.getDataFlowSolution(DataFlowConstants.UNBOXING);
+                        if (subProblem == null) {
+                            subProblem = new UnboxableOpsAnalysisProblem();
+                            subProblem.setup(cl);
+                            cl.setDataFlowSolution(DataFlowConstants.UNBOXING, subProblem);
+                        }
+
+                        UnboxableOpsAnalysisNode exitNode  = (UnboxableOpsAnalysisNode)subProblem.getExitNode();
+                        UnboxableOpsAnalysisNode entryNode = (UnboxableOpsAnalysisNode)subProblem.getEntryNode();
+
+                        // Init it to MEET(state-on-entry, state-on-exit).
+                        // The meet is required to account for participation of the closure in a loop.
+                        // Ex: f = 0.0; n.times { f += 10; }
+                        entryNode.inState = new UnboxState();
+                        for (Variable v: tmpState.types.keySet()) {
+                            if (v instanceof LocalVariable) {
+                                entryNode.inState.types.put(v, tmpState.types.get(v));
+                            }
+                        }
+                        entryNode.inState.computeMEET(exitNode.outState);
+
+                        // Compute solution
+                        subProblem.compute_MOP_Solution();
+
+                        // Update types to MEET(new-state-on-exit, current-state)
+                        tmpState.computeMEETForTypes(exitNode.outState, true);
+
+                        // As for unboxed var state, since binding can escape in
+                        // arbitrary ways in the general case, assume the worst for now.
+                        // If we are guaranteed that the closure binding is not used
+                        // outside the closure itself, we can avoid worst-case behavior
+                        // and only clear vars that are modified in the closure.
                         hitDFBarrier = true;
                     } else {
                         // Black hole -- cannot analyze
@@ -290,13 +361,20 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         }
     }
 
-    private TemporaryVariable getUnboxedVar(Map<Variable, TemporaryVariable> unboxMap, Variable v) {
+    private TemporaryVariable getUnboxedVar(Map<Variable, TemporaryVariable> unboxMap, Variable v, boolean createNew) {
         TemporaryVariable unboxedVar = unboxMap.get(v);
-        if (unboxedVar == null) {
+        if (unboxedVar == null && createNew) {
             unboxedVar = this.problem.getScope().getNewFloatVariable();
             unboxMap.put(v, unboxedVar);
+        } else if (unboxedVar == null) {
+            // FIXME: throw an exception here
+            System.out.println("ERROR: No unboxed var for : " + v);
         }
         return unboxedVar;
+    }
+
+    private TemporaryVariable getUnboxedVar(Map<Variable, TemporaryVariable> unboxMap, Variable v) {
+        return getUnboxedVar(unboxMap, v, true);
     }
 
     private Operand getUnboxedOperand(Set<Variable> unboxedVars, Map<Variable, TemporaryVariable> unboxMap, Operand arg, List<Instr> newInstrs, boolean unbox) {
@@ -308,7 +386,9 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                 TemporaryVariable unboxedVar = getUnboxedVar(unboxMap, v);
                 // Unbox if 'v' is not already unboxed
                 if (!isUnboxed) {
+                    // System.out.println("guo: UNBOXING for " + v);
                     newInstrs.add(new UnboxFloatInstr(unboxedVar, v));
+                    unboxedVars.add(v);
                 }
 
                 return unboxedVar;
@@ -328,28 +408,39 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 
     private void boxRequiredVars(Instr i, UnboxState state, Map<Variable, TemporaryVariable> unboxMap, Variable dst, boolean hasRescuer, boolean isDFBarrier, List<Instr> newInstrs) {
         // Special treatment for instructions that can raise exceptions
+        boolean isClosure = this.problem.getScope() instanceof IRClosure;
         HashSet<Variable> varsToBox = new HashSet<Variable>();
         if (i.canRaiseException()) {
             if (hasRescuer) {
                 // If we are going to be rescued,
                 // box all unboxed dirty vars before we execute the instr
                 varsToBox.addAll(state.unboxedDirtyVars);
-            } else {
+            } else if (isClosure) {
                 // We are going to exit if an exception is raised.
                 // So, only need to bother with dirty live local vars for closures
-                if (this.problem.getScope() instanceof IRClosure) {
-                    for (Variable v: state.unboxedDirtyVars) {
-                        if (v instanceof LocalVariable) {
-                            varsToBox.add(v);
-                        }
+                for (Variable v: state.unboxedDirtyVars) {
+                    if (v instanceof LocalVariable) {
+                        varsToBox.add(v);
                     }
                 }
             }
         }
 
+        if (isClosure && (i instanceof ReturnInstr || i instanceof BreakInstr)) {
+            for (Variable v: state.unboxedDirtyVars) {
+                if (v instanceof LocalVariable) {
+                    varsToBox.add(v);
+                }
+            }
+        }
+
         if (isDFBarrier) {
-            // All dirty unboxed vars will get reboxed.
-            varsToBox.addAll(state.unboxedDirtyVars);
+            // All dirty unboxed (local) vars will get reboxed.
+            for (Variable v: state.unboxedDirtyVars) {
+                if (v instanceof LocalVariable) {
+                    varsToBox.add(v);
+                }
+            }
 
             // We have to re-unbox local variables as necessary since we don't
             // know how they are going to change once we get past this instruction.
@@ -371,7 +462,6 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             // will have to get boxed before it is executed
             for (Variable v: i.getUsedVariables()) {
                 if (state.unboxedDirtyVars.contains(v)) {
-                //if (unboxedVars.contains(v)) {
                     varsToBox.add(v);
                 }
             }
@@ -428,29 +518,28 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
 
         // Compute UNION(unboxedVarsIn(all-successors)) - this.unboxedVarsOut
         // All vars in this new set have to be unboxed on exit from this BB
-        // Ignore entry BB since nothing has been dirtied yet.
         boolean scopeBindingHasEscaped = problem.getScope().bindingHasEscaped();
         Set<Variable> succUnboxedVars = new HashSet<Variable>();
         CFG cfg = problem.getScope().cfg();
-        BitSet liveVarsSet = null;
-        LiveVariablesProblem lvp = null;
-        if (basicBlock != cfg.getEntryBB()) {
-            for (Edge e: cfg.getOutgoingEdges(basicBlock)) {
-                BasicBlock b = (BasicBlock)e.getDestination().getData();
+
+        for (Edge e: cfg.getOutgoingEdges(basicBlock)) {
+            BasicBlock b = (BasicBlock)e.getDestination().getData();
+            if (b != cfg.getExitBB()) {
                 UnboxableOpsAnalysisNode x = (UnboxableOpsAnalysisNode)problem.getFlowGraphNode(b);
                 succUnboxedVars.addAll(x.inState.unboxedVars);
             }
-
-            succUnboxedVars.removeAll(outState.unboxedVars);
-
-            // Only worry about vars live on exit
-            lvp = (LiveVariablesProblem)problem.getScope().getDataFlowSolution(DataFlowConstants.LVP_NAME);
-            liveVarsSet = ((LiveVariableNode)lvp.getFlowGraphNode(basicBlock)).getLiveInBitSet();
         }
+
+        succUnboxedVars.removeAll(outState.unboxedVars);
+
+        // Only worry about vars live on exit from the BB
+        LiveVariablesProblem lvp = (LiveVariablesProblem)problem.getScope().getDataFlowSolution(DataFlowConstants.LVP_NAME);
+        BitSet liveVarsSet = ((LiveVariableNode)lvp.getFlowGraphNode(basicBlock)).getLiveInBitSet();
 
         // Rescue node, if any
         IRScope scope = this.problem.getScope();
         boolean hasRescuer = getNonExitBBExceptionTargetNode() != null;
+        boolean isClosure = scope instanceof IRClosure;
 
         List<Instr> newInstrs = new ArrayList<Instr>();
         UnboxState tmpState = new UnboxState(inState);
@@ -460,12 +549,14 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
             Variable dst = null;
             boolean dirtied = false;
             boolean hitDFBarrier = false;
-            //System.out.println("ORIG: " + i);
+            // System.out.println("ORIG: " + i);
             if (i.getOperation().transfersControl()) {
                 // Add unboxing instrs.
                 for (Variable v: succUnboxedVars) {
                     if (liveVarsSet.get(lvp.getDFVar(v).getId())) {
+                        // System.out.println("suv: UNBOXING for " + v);
                         newInstrs.add(new UnboxFloatInstr(getUnboxedVar(unboxMap, v), v));
+                        tmpState.unboxedVars.add(v);
                     }
                 }
                 unboxedLiveVars = true;
@@ -498,9 +589,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                     // Process calls specially -- these are what we want to optimize!
                     CallBase c = (CallBase)i;
                     Operand  o = c.getClosureArg(null);
-                    if (scopeBindingHasEscaped || c.targetRequiresCallersBinding()) {
-                        hitDFBarrier = true;
-                    } else if (o == null) {
+                    if (o == null) {
                         MethAddr m = c.getMethodAddr();
                         Operand  r = c.getReceiver();
                         Operand[] args = c.getCallArgs();
@@ -518,22 +607,43 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
                                 TemporaryVariable unboxedDst = getUnboxedVar(unboxMap, dst);
                                 newInstrs.add(new AluInstr(m.getUnboxedOp(Float.class), unboxedDst, r, a));
                                 dirtied = true;
-                            } else if (receiverType == Fixnum.class && argType == Fixnum.class) {
-                                setOperandType(tmpState, dst, Fixnum.class);
                             } else {
-                                setOperandType(tmpState, dst, Object.class);
+                                if (receiverType == Fixnum.class && argType == Fixnum.class) {
+                                    setOperandType(tmpState, dst, Fixnum.class);
+                                } else {
+                                    setOperandType(tmpState, dst, Object.class);
+                                }
+
+                                if (c.targetRequiresCallersBinding()) {
+                                    hitDFBarrier = true;
+                                }
                             }
                         } else {
                             setOperandType(tmpState, dst, Object.class);
                         }
                     } else {
                         if (o instanceof WrappedIRClosure) {
-                            // We have to either force all information to BOTTOM after the call
-                            // or push current state into the closure and analyze it and refresh
-                            // state after call using final state from closure.
-                            //
-                            // FIXME: Temporarily, do the conservative thing.
-                            // This can be fixed up later.
+                            // Since binding can escape in arbitrary ways in the general case,
+                            // assume the worst for now. If we are guaranteed that the closure binding
+                            // is not used outside the closure itself, we can avoid worst-case behavior.
+                            hitDFBarrier = true;
+
+                            // Fetch the nested unboxing-analysis problem, creating one if necessary
+                            IRClosure cl = ((WrappedIRClosure)o).getClosure();
+                            UnboxableOpsAnalysisProblem subProblem = (UnboxableOpsAnalysisProblem)cl.getDataFlowSolution(DataFlowConstants.UNBOXING);
+                            UnboxableOpsAnalysisNode exitNode  = (UnboxableOpsAnalysisNode)subProblem.getExitNode();
+
+                            // Compute solution
+                            subProblem.unbox();
+
+                            // Update types to MEET(new-state-on-exit, current-state)
+                            tmpState.computeMEETForTypes(exitNode.outState, true);
+
+                            // As for unboxed var state, since binding can escape in
+                            // arbitrary ways in the general case, assume the worst for now.
+                            // If we are guaranteed that the closure binding is not used
+                            // outside the closure itself, we can avoid worst-case behavior
+                            // and only clear vars that are modified in the closure.
                             hitDFBarrier = true;
                         } else {
                             // Cannot analyze
@@ -562,6 +672,7 @@ public class UnboxableOpsAnalysisNode extends FlowGraphNode {
         if (!unboxedLiveVars) {
             for (Variable v: succUnboxedVars) {
                 if (liveVarsSet.get(lvp.getDFVar(v).getId())) {
+                    // System.out.println("suv: UNBOXING for " + v);
                     newInstrs.add(new UnboxFloatInstr(getUnboxedVar(unboxMap, v), v));
                 }
             }

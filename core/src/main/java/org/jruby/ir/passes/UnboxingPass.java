@@ -26,10 +26,6 @@ public class UnboxingPass extends CompilerPass {
         problem.compute_MOP_Solution();
         problem.unbox();
 
-        for (IRClosure cl: scope.getClosures()) {
-            run(cl, true);
-        }
-
         // SSS FIXME: This should be done differently
         problem.getScope().setDataFlowSolution(DataFlowConstants.LVP_NAME, null);
 
