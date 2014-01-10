@@ -34,11 +34,6 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import static org.jruby.RubyEnumerator.enumeratorize;
-import static org.jruby.util.Numeric.checkInteger;
-import static org.jruby.util.Numeric.f_gcd;
-import static org.jruby.util.Numeric.f_lcm;
-
 import org.jcodings.Encoding;
 import org.jcodings.exception.EncodingException;
 import org.jcodings.specific.ASCIIEncoding;
@@ -53,6 +48,12 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.util.ByteList;
 import org.jruby.util.Numeric;
+
+import static org.jruby.RubyEnumerator.enumeratorizeWithSize;
+import static org.jruby.util.Numeric.checkInteger;
+import static org.jruby.util.Numeric.f_gcd;
+import static org.jruby.util.Numeric.f_lcm;
+import static org.jruby.RubyEnumerator.SizeFn;
 
 /** Implementation of the Integer class.
  *
@@ -132,7 +133,7 @@ public abstract class RubyInteger extends RubyNumeric {
             }
             return this;
         } else {
-            return enumeratorize(context.runtime, this, "upto", to);
+            return enumeratorizeWithSize(context, this, "upto", new IRubyObject[] { to }, uptoSize(context, this, to));
         }
     }
 
@@ -172,6 +173,15 @@ public abstract class RubyInteger extends RubyNumeric {
         }
     }
 
+    private static SizeFn uptoSize(final ThreadContext context, final IRubyObject from, final IRubyObject to) {
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                return intervalStepSize(context, from, to, RubyFixnum.one(context.runtime), false);
+            }
+        };
+    }
+
     /** int_downto
      * 
      */
@@ -186,7 +196,7 @@ public abstract class RubyInteger extends RubyNumeric {
             }
             return this;
         } else {
-            return enumeratorize(context.runtime, this, "downto", to);
+            return enumeratorizeWithSize(context, this, "downto", new IRubyObject[] { to }, downToSize(context, this, to));
         }
     }
 
@@ -226,6 +236,15 @@ public abstract class RubyInteger extends RubyNumeric {
         }
     }
 
+    private static SizeFn downToSize(final ThreadContext context, final IRubyObject from, final IRubyObject to) {
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                return intervalStepSize(context, from, to, RubyFixnum.newFixnum(context.runtime, -1), false);
+            }
+        };
+    }
+
     @JRubyMethod
     public IRubyObject times(ThreadContext context, Block block) {
         if (block.isGiven()) {
@@ -241,8 +260,24 @@ public abstract class RubyInteger extends RubyNumeric {
             }
             return this;
         } else {
-            return enumeratorize(context.runtime, this, "times");
+            return enumeratorizeWithSize(context, this, "times", timesSizeFn(context.runtime));
         }
+    }
+
+    protected SizeFn timesSizeFn(final Ruby runtime) {
+        final RubyInteger self = this;
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                RubyFixnum zero = RubyFixnum.zero(runtime);
+                if ((self instanceof RubyFixnum && getLongValue() < 0)
+                        || self.callMethod("<", zero).isTrue()) {
+                    return zero;
+                }
+
+                return self;
+            }
+        };
     }
 
     /** int_succ

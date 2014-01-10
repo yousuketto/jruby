@@ -28,6 +28,7 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby.util.cli;
 
+import com.oracle.truffle.api.Truffle;
 import org.jruby.CompatVersion;
 import org.jruby.Ruby;
 import org.jruby.RubyInstanceConfig;
@@ -233,7 +234,17 @@ public class ArgumentProcessor {
                     // siphon off additional args 'jruby -K ~/scripts/foo'.  Also better error
                     // processing.
                     String eArg = grabValue(getArgumentError("provide a value for -K"));
+
                     config.setKCode(KCode.create(null, eArg));
+
+                    // source encoding
+                    config.setSourceEncoding(config.getKCode().getEncoding().toString());
+
+                    // set external encoding if not already specified
+                    if (config.getExternalEncoding() == null) {
+                        config.setExternalEncoding(config.getKCode().getEncoding().toString());
+                    }
+
                     break;
                 case 'l':
                     config.setProcessLineEnds(true);
@@ -336,6 +347,8 @@ public class ArgumentProcessor {
                         config.setCompileMode(RubyInstanceConfig.CompileMode.FORCE);
                     } else if (extendedOption.equals("+CIR")) {
                         config.setCompileMode(RubyInstanceConfig.CompileMode.FORCEIR);
+                    } else if (extendedOption.equals("+T")) {
+                        config.setCompileMode(RubyInstanceConfig.CompileMode.TRUFFLE);
                     } else {
                         MainExitException mee = new MainExitException(1, "jruby: invalid extended option " + extendedOption + " (-X will list valid options)\n");
                         mee.setUsageError(true);
@@ -513,10 +526,10 @@ public class ArgumentProcessor {
             // try cwd first
             fullName = JRubyFile.create(config.getCurrentDirectory(), scriptName);
             if (fullName.exists() && fullName.isFile()) {
-                if (RubyInstanceConfig.DEBUG_SCRIPT_RESOLUTION) {
-                    config.getError().println("Found: " + fullName.getAbsolutePath());
-                }
+                logScriptResolutionSuccess(fullName.getAbsolutePath());
                 return scriptName;
+            } else {
+                logScriptResolutionFailure(config.getCurrentDirectory());
             }
         } catch (Exception e) {
             // keep going, try bin/#{scriptName}
@@ -524,10 +537,10 @@ public class ArgumentProcessor {
         try {
             fullName = JRubyFile.create(config.getJRubyHome(), "bin/" + scriptName);
             if (fullName.exists() && fullName.isFile()) {
-                if (RubyInstanceConfig.DEBUG_SCRIPT_RESOLUTION) {
-                    config.getError().println("Found: " + fullName.getAbsolutePath());
-                }
+                logScriptResolutionSuccess(fullName.getAbsolutePath());
                 return fullName.getAbsolutePath();
+            } else {
+                logScriptResolutionFailure(config.getJRubyHome() + "/bin");
             }
         } catch (Exception e) {
             // keep going, try PATH
@@ -543,17 +556,16 @@ public class ArgumentProcessor {
                 for (int i = 0; i < paths.length; i++) {
                     fullName = JRubyFile.create(new File(paths[i]).getAbsolutePath(), scriptName);
                     if (fullName.exists() && fullName.isFile()) {
-                        if (RubyInstanceConfig.DEBUG_SCRIPT_RESOLUTION) {
-                            config.getError().println("Found: " + fullName.getAbsolutePath());
-                        }
+                        logScriptResolutionSuccess(fullName.getAbsolutePath());
                         return fullName.getAbsolutePath();
                     }
                 }
+                logScriptResolutionFailure("PATH=" + path);
             }
         } catch (Exception e) {
             // will fall back to JRuby::Commands
         }
-        if (config.isDebug()) {
+        if (config.isDebug() || RubyInstanceConfig.DEBUG_SCRIPT_RESOLUTION) {
             config.getError().println("warning: could not resolve -S script on filesystem: " + scriptName);
         }
         return null;
@@ -581,5 +593,16 @@ public class ArgumentProcessor {
         }
         return null;
     }
-    
+
+    private void logScriptResolutionSuccess(String path) {
+        if (RubyInstanceConfig.DEBUG_SCRIPT_RESOLUTION) {
+            config.getError().println("Found: " + path);
+        }
+    }
+
+    private void logScriptResolutionFailure(String path) {
+        if (RubyInstanceConfig.DEBUG_SCRIPT_RESOLUTION) {
+            config.getError().println("Searched: " + path);
+        }
+    }
 }

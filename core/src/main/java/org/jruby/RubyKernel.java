@@ -79,6 +79,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Map;
 
+import static org.jruby.RubyEnumerator.enumeratorizeWithSize;
 import static org.jruby.anno.FrameField.BLOCK;
 import static org.jruby.anno.FrameField.FILENAME;
 import static org.jruby.anno.FrameField.LASTLINE;
@@ -86,6 +87,7 @@ import static org.jruby.anno.FrameField.METHODNAME;
 import static org.jruby.runtime.Visibility.PRIVATE;
 import static org.jruby.runtime.Visibility.PROTECTED;
 import static org.jruby.runtime.Visibility.PUBLIC;
+import static org.jruby.RubyEnumerator.SizeFn;
 
 /**
  * Note: For CVS history, see KernelModule.java.
@@ -477,10 +479,9 @@ public class RubyKernel {
     public static IRubyObject p(ThreadContext context, IRubyObject recv, IRubyObject[] args) {
         Ruby runtime = context.runtime;
         IRubyObject defout = runtime.getGlobalVariables().get("$>");
-
-        for (int i = 0; i < args.length; i++) {
-            if (args[i] != null) {
-                defout.callMethod(context, "write", RubyObject.inspect(context, args[i]));
+        for (IRubyObject arg: args) {
+            if (arg != null) {
+                defout.callMethod(context, "write", RubyObject.inspect(context, arg));
                 defout.callMethod(context, "write", runtime.newString("\n"));
             }
         }
@@ -877,10 +878,7 @@ public class RubyKernel {
     }
 
     private static IRubyObject requireCommon(Ruby runtime, IRubyObject recv, IRubyObject name, Block block) {
-        if (runtime.getLoadService().require(name.convertToString().toString())) {
-            return runtime.getTrue();
-        }
-        return runtime.getFalse();
+        return runtime.newBoolean(runtime.getLoadService().require(name.convertToString().toString()));
     }
 
     public static IRubyObject load(IRubyObject recv, IRubyObject[] args, Block block) {
@@ -1219,11 +1217,12 @@ public class RubyKernel {
 
     @JRubyMethod(name = "loop", module = true, visibility = PRIVATE)
     public static IRubyObject loop(ThreadContext context, IRubyObject recv, Block block) {
+        Ruby runtime = context.runtime;
         if (!block.isGiven()) {
-            return RubyEnumerator.enumeratorize(context.runtime, recv, "loop");
+            return RubyEnumerator.enumeratorizeWithSize(context, recv, "loop", loopSizeFn(context));
         }
-        IRubyObject nil = context.runtime.getNil();
-        RubyClass stopIteration = context.runtime.getStopIteration();
+        IRubyObject nil = runtime.getNil();
+        RubyClass stopIteration = runtime.getStopIteration();
         try {
             while (true) {
                 block.yieldSpecific(context);
@@ -1236,6 +1235,15 @@ public class RubyKernel {
             }
         }
         return nil;
+    }
+
+    private static SizeFn loopSizeFn(final ThreadContext context) {
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                return RubyFloat.newFloat(context.runtime, RubyFloat.INFINITY);
+            }
+        };
     }
 
     @JRubyMethod(required = 2, optional = 1, module = true, visibility = PRIVATE)
@@ -1621,10 +1629,9 @@ public class RubyKernel {
     }
     
     @JRubyMethod(name = {"to_enum", "enum_for"}, optional = 1, rest = true)
-    public static IRubyObject obj_to_enum(ThreadContext context, IRubyObject self, IRubyObject[] args, Block block) {
-        Ruby runtime = context.runtime;
+    public static IRubyObject obj_to_enum(final ThreadContext context, IRubyObject self, IRubyObject[] args, final Block block) {
         String method = "each";
-        IRubyObject size = null;
+        SizeFn sizeFn = null;
 
         if (args.length > 0) {
             method = args[0].asJavaString();
@@ -1632,10 +1639,15 @@ public class RubyKernel {
         }
 
         if (block.isGiven()) {
-            size = RubyProc.newProc(runtime, block, block.type);
+            sizeFn = new SizeFn() {
+                @Override
+                public IRubyObject size(IRubyObject[] args) {
+                    return block.call(context, args);
+                }
+            };
         }
 
-        return RubyEnumerator.enumeratorizeWithSize(context, self, method, args, size);
+        return enumeratorizeWithSize(context, self, method, args, sizeFn);
     }
 
     @JRubyMethod(name = { "__method__", "__callee__" }, module = true, visibility = PRIVATE, reads = METHODNAME, omit = true)

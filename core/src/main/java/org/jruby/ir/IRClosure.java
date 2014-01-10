@@ -40,13 +40,15 @@ public class IRClosure extends IRScope {
     // for-loop body closures are special in that they dont really define a new variable scope.
     // They just silently reuse the parent scope.  This changes how variables are allocated (see IRMethod.java).
     private boolean isForLoopBody;
+    private boolean isBeginEndBlock;
 
     // Block parameters
     private List<Operand> blockArgs;
 
     /** The parameter names, for Proc#parameters */
     private String[] parameterList;
-
+    private Arity arity;
+    private int argumentType;
     public boolean addedGEBForUncaughtBreaks;
 
     /** Used by cloning code */
@@ -65,6 +67,8 @@ public class IRClosure extends IRScope {
         this(manager, lexicalParent, lexicalParent.getFileName(), lineNumber, staticScope, isForLoopBody ? "_FOR_LOOP_" : "_CLOSURE_");
         this.isForLoopBody = isForLoopBody;
         this.blockArgs = new ArrayList<Operand>();
+        this.argumentType = argumentType;
+        this.arity = arity;
 
         if (getManager().isDryRun()) {
             this.body = null;
@@ -73,14 +77,8 @@ public class IRClosure extends IRScope {
             if ((staticScope != null) && !isForLoopBody) ((IRStaticScope)staticScope).setIRScope(this);
         }
 
-        // set nesting depth -- after isForLoopBody value is set
-        int n = 0;
-        IRScope s = this;
-        while (s instanceof IRClosure) {
-            if (!s.isForLoopBody()) n++;
-            s = s.getLexicalParent();
-        }
-        this.nestingDepth = n;
+        // increase nesting depth if needed after isForLoopBody value is set
+        if (!isForLoopBody) this.nestingDepth++;
     }
 
     // Used by IREvalScript
@@ -97,12 +95,20 @@ public class IRClosure extends IRScope {
 
         // set nesting depth
         int n = 0;
-        IRScope s = this;
+        IRScope s = this.getLexicalParent();
         while (s instanceof IRClosure) {
             if (!s.isForLoopBody()) n++;
             s = s.getLexicalParent();
         }
         this.nestingDepth = n;
+    }
+
+    public void setBeginEndBlock() {
+        this.isBeginEndBlock = true;
+    }
+
+    public boolean isBeginEndBlock() {
+        return isBeginEndBlock;
     }
 
     public void setParameterList(String[] parameterList) {
@@ -139,8 +145,9 @@ public class IRClosure extends IRScope {
         return getNewLabel("CL" + closureId + "_LBL");
     }
 
-    public String getScopeName() {
-        return "Closure";
+    @Override
+    public IRScopeType getScopeType() {
+        return IRScopeType.CLOSURE;
     }
 
     @Override
@@ -288,17 +295,21 @@ public class IRClosure extends IRScope {
         return blockVar;
     }
 
-    public IRClosure cloneForClonedInstr(InlinerInfo ii) {
+    public IRClosure cloneForInlining(InlinerInfo ii) {
+        // FIXME: This is buggy! Is this not dependent on clone-mode??
         IRClosure clonedClosure = new IRClosure(this, ii.getNewLexicalParentForClosure());
+        CFG clonedCFG = new CFG(clonedClosure);
+        clonedClosure.setCFG(clonedCFG);
+
         clonedClosure.isForLoopBody = this.isForLoopBody;
         clonedClosure.nestingDepth  = this.nestingDepth;
         clonedClosure.parameterList = this.parameterList;
 
         // Create a new inliner info object
-        ii = ii.cloneForCloningClosure(clonedClosure);
+        InlinerInfo clonedII = ii.cloneForCloningClosure(clonedClosure);
 
-        // clone the cfg, and all instructions
-        clonedClosure.setCFG(getCFG().cloneForCloningClosure(clonedClosure, ii));
+        // Clone the cfg and all instructions
+        clonedCFG.cloneForCloningClosure(getCFG(), clonedClosure, clonedII);
 
         return clonedClosure;
     }
@@ -338,5 +349,20 @@ public class IRClosure extends IRScope {
         addedGEBForUncaughtBreaks = true;
 
         return true;
+    }
+
+    @Override
+    public void setName(String name) {
+        // We can distinguish closures only with parent scope name
+        String fullName = getLexicalParent().getName() + name;
+        super.setName(fullName);
+    }
+
+    public Arity getArity() {
+        return arity;
+    }
+
+    public int getArgumentType() {
+        return argumentType;
     }
 }

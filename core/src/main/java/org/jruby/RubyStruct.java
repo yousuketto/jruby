@@ -32,13 +32,15 @@
  ***** END LICENSE BLOCK *****/
 package org.jruby;
 
-import static org.jruby.RubyEnumerator.enumeratorize;
-
-
-import org.jruby.anno.JRubyMethod;
 import org.jruby.anno.JRubyClass;
+import org.jruby.anno.JRubyMethod;
+import org.jruby.common.IRubyWarnings.ID;
+import org.jruby.exceptions.RaiseException;
+import org.jruby.internal.runtime.methods.CallConfiguration;
+import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
+import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.Helpers;
 import org.jruby.runtime.ObjectAllocator;
 import org.jruby.runtime.ThreadContext;
@@ -48,16 +50,12 @@ import org.jruby.runtime.marshal.MarshalStream;
 import org.jruby.runtime.marshal.UnmarshalStream;
 import org.jruby.util.ByteList;
 import org.jruby.util.IdUtil;
-import org.jruby.common.IRubyWarnings.ID;
-import org.jruby.exceptions.RaiseException;
-import org.jruby.internal.runtime.methods.CallConfiguration;
-import org.jruby.internal.runtime.methods.DynamicMethod;
-import org.jruby.runtime.ClassIndex;
 
-import static org.jruby.runtime.Visibility.*;
-
+import static org.jruby.RubyEnumerator.enumeratorizeWithSize;
 import static org.jruby.runtime.Helpers.invokedynamic;
+import static org.jruby.runtime.Visibility.PRIVATE;
 import static org.jruby.runtime.invokedynamic.MethodNames.HASH;
+import static org.jruby.RubyEnumerator.SizeFn;
 
 /**
  * @author  jpetersen
@@ -442,9 +440,13 @@ public class RubyStruct extends RubyObject {
     public RubyArray members19() {
         return members19(classOf(), Block.NULL_BLOCK);
     }
-    
+
     @JRubyMethod
-    public RubyArray select(ThreadContext context, Block block) {
+    public IRubyObject select(ThreadContext context, Block block) {
+        if (!block.isGiven()) {
+            return enumeratorizeWithSize(context, this, "select", enumSizeFn());
+        }
+
         RubyArray array = RubyArray.newArray(context.runtime);
         
         for (int i = 0; i < values.length; i++) {
@@ -454,6 +456,16 @@ public class RubyStruct extends RubyObject {
         }
         
         return array;
+    }
+
+    private SizeFn enumSizeFn() {
+        final RubyStruct self = this;
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                return self.size();
+            }
+        };
     }
 
     public IRubyObject set(IRubyObject value, int index) {
@@ -596,7 +608,7 @@ public class RubyStruct extends RubyObject {
 
     @JRubyMethod
     public IRubyObject each(final ThreadContext context, final Block block) {
-        return block.isGiven() ? eachInternal(context, block) : enumeratorize(context.runtime, this, "each");
+        return block.isGiven() ? eachInternal(context, block) : enumeratorizeWithSize(context, this, "each", enumSizeFn());
     }
 
     public IRubyObject each_pairInternal(ThreadContext context, Block block) {
@@ -611,7 +623,7 @@ public class RubyStruct extends RubyObject {
 
     @JRubyMethod
     public IRubyObject each_pair(final ThreadContext context, final Block block) {
-        return block.isGiven() ? each_pairInternal(context, block) : enumeratorize(context.runtime, this, "each_pair");
+        return block.isGiven() ? each_pairInternal(context, block) : enumeratorizeWithSize(context, this, "each_pair", enumSizeFn());
     }
 
     @JRubyMethod(name = "[]", required = 1)

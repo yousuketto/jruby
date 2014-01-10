@@ -118,12 +118,6 @@ public class IRBuilder {
     protected static final Operand[] NO_ARGS = new Operand[]{};
     protected static final UnexecutableNil U_NIL = UnexecutableNil.U_NIL;
 
-    private static String  rubyVersion = "1.8"; // default is 1.8
-
-    public static void setRubyVersion(String rubyVersion) {
-        IRBuilder.rubyVersion = rubyVersion;
-    }
-
     private Operand buildOperand(Node node, IRScope s) throws NotCompilableException {
         switch (node.getNodeType()) {
             case ALIASNODE: return buildAlias((AliasNode) node, s);
@@ -449,7 +443,9 @@ public class IRBuilder {
         // catchUncaughtBreakInLambdas(closure);
 
         Variable lambda = s.getNewTemporaryVariable();
-        s.addInstr(new BuildLambdaInstr(lambda, closure, node.getPosition()));
+        // SSS FIXME: Is this the right self here?
+        WrappedIRClosure lambdaBody = new WrappedIRClosure(getSelf(s), closure);
+        s.addInstr(new BuildLambdaInstr(lambda, lambdaBody, node.getPosition()));
         return lambda;
     }
 
@@ -463,7 +459,7 @@ public class IRBuilder {
     public Operand buildMultipleAsgn19(MultipleAsgn19Node multipleAsgnNode, IRScope s) {
         Operand  values = build(multipleAsgnNode.getValueNode(), s);
         Variable ret = getValueInTemporaryVariable(s, values);
-        s.addInstr(new ToAryInstr(ret, ret, manager.getFalse()));
+        s.addInstr(new ToAryInstr(ret, ret)); // FIXME: SSA-violating
         buildMultipleAsgn19Assignment(multipleAsgnNode, s, null, ret);
         return ret;
     }
@@ -566,7 +562,7 @@ public class IRBuilder {
     public void buildVersionSpecificAssignment(Node node, IRScope s, Variable v) {
         switch (node.getNodeType()) {
         case MULTIPLEASGN19NODE: {
-            s.addInstr(new ToAryInstr(v, v, manager.getFalse()));
+            s.addInstr(new ToAryInstr(v, v)); // FIXME: SSA-violating
             buildMultipleAsgn19Assignment((MultipleAsgn19Node)node, s, null, v);
             break;
         }
@@ -884,14 +880,10 @@ public class IRBuilder {
     // Wrap call in a rescue handler that catches the IRBreakJump
     private void receiveBreakException(IRScope s, Operand block, CallInstr callInstr) {
         // Check if we have to handle a break
-        if (block != null && block instanceof WrappedIRClosure) {
-            IRClosure closure = ((WrappedIRClosure)block).getClosure();
-            if (!closure.hasBreakInstrs) {
-                // No protection needed -- add the call and return
-                s.addInstr(callInstr);
-                return;
-            }
-        } else {
+        if (block == null ||
+            !(block instanceof WrappedIRClosure) ||
+            !(((WrappedIRClosure)block).getClosure()).hasBreakInstrs)
+        {
             // No protection needed -- add the call and return
             s.addInstr((Instr)callInstr);
             return;
@@ -1846,7 +1838,7 @@ public class IRBuilder {
                 Variable v = s.getNewTemporaryVariable();
                 addArgReceiveInstr(s, v, argIndex, post, numPreReqd, numPostRead);
                 if (s instanceof IRMethod) ((IRMethod)s).addArgDesc("rest", "");
-                s.addInstr(new ToAryInstr(v, v, manager.getFalse()));
+                s.addInstr(new ToAryInstr(v, v)); // FIXME: SSA-violating
                 buildMultipleAsgn19Assignment(childNode, s, v, null);
                 break;
             }
@@ -2017,7 +2009,7 @@ public class IRBuilder {
                     v = s.getNewTemporaryVariable();
                     if (isSplat) s.addInstr(new RestArgMultipleAsgnInstr(v, argsArray, preArgsCount, postArgsCount, index));
                     else s.addInstr(new ReqdArgMultipleAsgnInstr(v, argsArray, preArgsCount, postArgsCount, index));
-                    s.addInstr(new ToAryInstr(v, v, manager.getFalse()));
+                    s.addInstr(new ToAryInstr(v, v)); // FIXME: SSA-violating
                     argsArray = v;
                 }
                 // Build
@@ -2489,7 +2481,7 @@ public class IRBuilder {
             closure.addInstr(new ReturnInstr(closureRetVal));
         }
 
-        return new WrappedIRClosure(closure);
+        return new WrappedIRClosure(getSelf(s), closure);
     }
 
     public Operand buildGlobalAsgn(GlobalAsgnNode globalAsgnNode, IRScope s) {
@@ -2643,7 +2635,7 @@ public class IRBuilder {
             closure.addInstr(new ReturnInstr(closureRetVal));
         }
 
-        return new WrappedIRClosure(closure);
+        return new WrappedIRClosure(getSelf(s), closure);
     }
 
     public Operand buildLiteral(LiteralNode literalNode, IRScope s) {
@@ -3440,7 +3432,7 @@ public class IRBuilder {
     public Operand buildToAry(ToAryNode node, IRScope s) {
         Operand array = build(node.getValue(), s);
         Variable result = s.getNewTemporaryVariable();
-        s.addInstr(new ToAryInstr(result, array, manager.getFalse()));
+        s.addInstr(new ToAryInstr(result, array));
         return result;
     }
 

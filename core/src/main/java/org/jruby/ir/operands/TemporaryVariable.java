@@ -15,12 +15,23 @@ public class TemporaryVariable extends Variable {
     String name;
 
     public TemporaryVariable(int offset) {
+        this(OperandType.TEMPORARY_VARIABLE, offset);
+    }
+
+    public TemporaryVariable(OperandType type, int offset) {
+        super(type);
         this.offset = offset;
         this.name = getPrefix() + offset;
     }
 
-	 // Used for temporary variables like %current_module, %_arg_array
     public TemporaryVariable(String name, int offset) {
+        this(OperandType.TEMPORARY_VARIABLE, name, offset);
+    }
+
+    // Used for temporary variables like %current_module, %_arg_array
+    public TemporaryVariable(OperandType type, String name, int offset) {
+        super(type);
+
         this.offset = offset;
         this.name = name;
     }
@@ -48,17 +59,17 @@ public class TemporaryVariable extends Variable {
         return name.compareTo(((TemporaryVariable) other).name);
     }
 
-    protected String getPrefix() {
-        return "%v_";
-    }
-
     @Override
     public String toString() {
         return getName();
     }
 
+    public String getPrefix() {
+        return "%v_";
+    }
+
     @Override
-    public Variable cloneForCloningClosure(InlinerInfo ii) {
+    public Variable clone(InlinerInfo ii) {
         return new TemporaryVariable(name, offset);
     }
 

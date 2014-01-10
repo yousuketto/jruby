@@ -117,6 +117,8 @@ public class RubySymbol extends RubyObject implements MarshalEncoding {
 
         symbolClass.defineAnnotatedMethods(RubySymbol.class);
         symbolMetaClass.undefineMethod("new");
+
+        symbolClass.includeModule(runtime.getComparable());
         
         return symbolClass;
     }
@@ -302,7 +304,7 @@ public class RubySymbol extends RubyObject implements MarshalEncoding {
         Ruby runtime = context.runtime;
         
         return !(other instanceof RubySymbol) ? runtime.getNil() :
-                newShared(runtime).op_cmp19(context, ((RubySymbol)other).newShared(runtime));
+                newShared(runtime).op_cmp(context, ((RubySymbol)other).newShared(runtime));
     }
 
     @JRubyMethod

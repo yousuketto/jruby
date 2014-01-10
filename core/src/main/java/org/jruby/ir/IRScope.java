@@ -7,9 +7,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import org.jruby.ParseResult;
+import org.jruby.RubyInstanceConfig;
 
 import org.jruby.RubyModule;
-import org.jruby.exceptions.Unrescuable;
 import org.jruby.ir.dataflow.DataFlowProblem;
 import org.jruby.ir.instructions.BreakInstr;
 import org.jruby.ir.instructions.CallBase;
@@ -37,6 +38,8 @@ import org.jruby.ir.passes.AddLocalVarLoadStoreInstructions;
 import org.jruby.ir.passes.CompilerPass;
 import org.jruby.ir.passes.CompilerPassScheduler;
 import org.jruby.ir.passes.DeadCodeElimination;
+import org.jruby.ir.persistence.IRReaderDecoder;
+import org.jruby.ir.passes.UnboxingPass;
 import org.jruby.ir.representations.BasicBlock;
 import org.jruby.ir.representations.CFG;
 import org.jruby.ir.representations.CFGLinearizer;
@@ -74,7 +77,7 @@ import org.jruby.util.log.LoggerFactory;
  *
  * and so on ...
  */
-public abstract class IRScope {
+public abstract class IRScope implements ParseResult {
     private static final Logger LOG = LoggerFactory.getLogger("IRScope");
 
     private static Integer globalScopeCount = 0;
@@ -127,7 +130,9 @@ public abstract class IRScope {
 
     private Instr[] linearizedInstrArray;
     private List<BasicBlock> linearizedBBList;
+    private Map<Integer, Integer> rescueMap;
     protected int temporaryVariableIndex;
+    protected int floatVariableIndex;
 
     /** Keeps track of types of prefix indexes for variables and labels */
     private Map<String, Integer> nextVarIndex;
@@ -138,6 +143,9 @@ public abstract class IRScope {
     // List of all scopes this scope contains lexically.  This is not used
     // for execution, but is used during dry-runs for debugging.
     List<IRScope> lexicalChildren;
+
+    private int instructionsOffsetInfoPersistenceBuffer = -1;
+    private IRReaderDecoder persistenceStore = null;
 
     protected static class LocalVariableAllocator {
         public int nextSlot;
@@ -267,6 +275,7 @@ public abstract class IRScope {
         this.threadPollInstrsCount = s.threadPollInstrsCount;
         this.nextClosureIndex = s.nextClosureIndex;
         this.temporaryVariableIndex = s.temporaryVariableIndex;
+        this.floatVariableIndex = s.floatVariableIndex;
         this.hasLoops = s.hasLoops;
         this.hasUnusedImplicitBlockArg = s.hasUnusedImplicitBlockArg;
         this.instrList = null;
@@ -309,6 +318,7 @@ public abstract class IRScope {
         this.threadPollInstrsCount = 0;
         this.nextClosureIndex = 0;
         this.temporaryVariableIndex = -1;
+        this.floatVariableIndex = -1;
         this.instrList = new ArrayList<Instr>();
         this.nestedClosures = new ArrayList<IRClosure>();
         this.dfProbs = new HashMap<String, DataFlowProblem>();
@@ -344,7 +354,7 @@ public abstract class IRScope {
     }
 
     private final void setupLexicalContainment() {
-        if (manager.isDryRun()) {
+        if (manager.isDryRun() || RubyInstanceConfig.IR_PERSISTENCE) {
             lexicalChildren = new ArrayList<IRScope>();
             if (lexicalParent != null) lexicalParent.addChildScope(this);
         }
@@ -376,6 +386,10 @@ public abstract class IRScope {
 
     public List<IRScope> getLexicalScopes() {
         return lexicalChildren;
+    }
+
+    public void initNestedClosures() {
+        this.nestedClosures = new ArrayList<IRClosure>();
     }
 
     public void addClosure(IRClosure c) {
@@ -420,6 +434,10 @@ public abstract class IRScope {
     }
 
     public boolean isForLoopBody() {
+        return false;
+    }
+
+    public boolean isBeginEndBlock() {
         return false;
     }
 
@@ -504,7 +522,7 @@ public abstract class IRScope {
         return name;
     }
 
-    public void setName(String name) { // This is for IRClosure ;(
+    public void setName(String name) { // This is for IRClosure and IRMethod ;(
         this.name = name;
     }
 
@@ -613,13 +631,6 @@ public abstract class IRScope {
         return cfg;
     }
 
-    private void setupLabelPCs(HashMap<Label, Integer> labelIPCMap) {
-        for (BasicBlock b: linearizedBBList) {
-            Label l = b.getLabel();
-            l.setTargetPC(labelIPCMap.get(l));
-        }
-    }
-
     private Instr[] prepareInstructionsForInterpretation() {
         checkRelinearization();
 
@@ -641,7 +652,9 @@ public abstract class IRScope {
         List<Instr> newInstrs = new ArrayList<Instr>();
         int ipc = 0;
         for (BasicBlock b: linearizedBBList) {
-            labelIPCMap.put(b.getLabel(), ipc);
+            Label l = b.getLabel();
+            labelIPCMap.put(l, ipc);
+            l.setTargetPC(ipc);
             List<Instr> bbInstrs = b.getInstrs();
             int bbInstrsLength = bbInstrs.size();
             for (int i = 0; i < bbInstrsLength; i++) {
@@ -654,16 +667,27 @@ public abstract class IRScope {
 
                 if (!(instr instanceof ReceiveSelfInstr)) {
                     newInstrs.add(instr);
+                    instr.setIPC(ipc);
                     ipc++;
                 }
             }
         }
 
-        // Set up label PCs
-        setupLabelPCs(labelIPCMap);
+        // System.out.println("SCOPE: " + getName());
+        // System.out.println("INSTRS: " + cfg().toStringInstrs());
 
         // Exit BB ipc
         cfg().getExitBB().getLabel().setTargetPC(ipc + 1);
+
+        // Set up rescue map
+        this.rescueMap = new HashMap<Integer, Integer>();
+        for (BasicBlock b : linearizedBBList) {
+            BasicBlock rescuerBB = cfg().getRescuerBBFor(b);
+            int rescuerPC = (rescuerBB == null) ? -1 : rescuerBB.getLabel().getTargetPC();
+            for (Instr i : b.getInstrs()) {
+                rescueMap.put(i.getIPC(), rescuerPC);
+            }
+        }
 
         linearizedInstrArray = newInstrs.toArray(new Instr[newInstrs.size()]);
         return linearizedInstrArray;
@@ -685,10 +709,17 @@ public abstract class IRScope {
             pass.run(this);
         }
 
+        CompilerPass pass;
+
+        if (RubyInstanceConfig.IR_UNBOXING) {
+            pass = new UnboxingPass();
+            pass.run(this);
+        }
+
         // For methods with unescaped bindings, inline the binding
         // by converting local var loads/store to tmp var loads/stores
         if (this instanceof IRMethod && !this.bindingHasEscaped()) {
-            CompilerPass pass = new DeadCodeElimination();
+            pass = new DeadCodeElimination();
             if (pass.previouslyRun(this) == null) {
                 pass.run(this);
             }
@@ -701,6 +732,11 @@ public abstract class IRScope {
 
     /** Run any necessary passes to get the IR ready for interpretation */
     public synchronized Instr[] prepareForInterpretation(boolean isLambda) {
+        if (persistenceStore != null) {
+            instrList = persistenceStore.decodeInstructionsAt(this, instructionsOffsetInfoPersistenceBuffer);
+            computeScopeFlags();
+        }
+
         if (isLambda) {
             // Add a global ensure block to catch uncaught breaks
             // and throw a LocalJumpError.
@@ -723,6 +759,10 @@ public abstract class IRScope {
     /* SSS FIXME: Do we need to synchronize on this?  Cache this info in a scope field? */
     /** Run any necessary passes to get the IR ready for compilation */
     public Tuple<Instr[], Map<Integer,Label[]>> prepareForCompilation() {
+        if (persistenceStore != null) {
+            instrList = persistenceStore.decodeInstructionsAt(this, instructionsOffsetInfoPersistenceBuffer);
+        }
+
         // Build CFG and run compiler passes, if necessary
         if (getCFG() == null) runCompilerPasses();
 
@@ -759,6 +799,7 @@ public abstract class IRScope {
             for (Instr i : b.getInstrs()) {
                 if (!(i instanceof ReceiveSelfInstr)) {
                     newInstrs.add(i);
+                    i.setIPC(ipc);
                     ipc++;
                 }
             }
@@ -904,11 +945,11 @@ public abstract class IRScope {
         flagsComputed = true;
     }
 
-    public abstract String getScopeName();
+    public abstract IRScopeType getScopeType();
 
     @Override
     public String toString() {
-        return getScopeName() + " " + getName() + "[" + getFileName() + ":" + getLineNumber() + "]";
+        return getScopeType() + " " + getName() + "[" + getFileName() + ":" + getLineNumber() + "]";
     }
 
     public String toStringInstrs() {
@@ -928,20 +969,6 @@ public abstract class IRScope {
             for (IRClosure c: nestedClosures)
                 b.append(c.toStringBody());
             b.append("------------------------------------------------\n");
-        }
-
-        return b.toString();
-    }
-
-    public String toPersistableString() {
-        StringBuilder b = new StringBuilder();
-
-        b.append("Scope:<");
-        b.append(name);
-        b.append(">");
-        for (Instr instr : instrList) {
-            b.append("\n");
-            b.append(instr);
         }
 
         return b.toString();
@@ -1060,12 +1087,22 @@ public abstract class IRScope {
         return new TemporaryVariable(name, temporaryVariableIndex);
     }
 
-    public void resetTemporaryVariables() {
-        temporaryVariableIndex = -1;
+    public TemporaryVariable getNewFloatVariable() {
+        floatVariableIndex++;
+        return new TemporaryVariable("%f_" + floatVariableIndex, floatVariableIndex);
     }
 
-    public int getTemporaryVariableSize() {
+    public void resetTemporaryVariables() {
+        temporaryVariableIndex = -1;
+        floatVariableIndex = -1;
+    }
+
+    public int getTemporaryVariablesCount() {
         return temporaryVariableIndex + 1;
+    }
+
+    public int getFloatVariablesCount() {
+        return floatVariableIndex + 1;
     }
 
     // Generate a new variable for inlined code
@@ -1177,22 +1214,8 @@ public abstract class IRScope {
         return linearizedBBList;
     }
 
-    // SSS FIXME: Extremely inefficient
-    public int getRescuerPC(Instr excInstr) {
-        depends(cfg());
-
-        for (BasicBlock b : linearizedBBList) {
-            for (Instr i : b.getInstrs()) {
-                if (i == excInstr) {
-                    BasicBlock rescuerBB = cfg().getRescuerBBFor(b);
-                    return (rescuerBB == null) ? -1 : rescuerBB.getLabel().getTargetPC();
-                }
-            }
-        }
-
-        // SSS FIXME: Cannot happen! Throw runtime exception
-        LOG.error("Fell through looking for rescuer ipc for " + excInstr);
-        return -1;
+    public Map<Integer, Integer> getRescueMap() {
+        return this.rescueMap;
     }
 
     public List<BasicBlock> linearization() {
@@ -1266,15 +1289,16 @@ public abstract class IRScope {
         hasNonlocalReturns = false;
         canReceiveBreaks = false;
         canReceiveNonlocalReturns = false;
+        rescueMap = null;
 
         // Reset dataflow problems state
         resetDFProblemsState();
     }
 
-    public void inlineMethod(IRScope method, RubyModule implClass, int classToken, BasicBlock basicBlock, CallBase call) {
+    public void inlineMethod(IRScope method, RubyModule implClass, int classToken, BasicBlock basicBlock, CallBase call, boolean cloneHost) {
         // Inline
         depends(cfg());
-        new CFGInliner(cfg).inlineMethod(method, implClass, classToken, basicBlock, call);
+        new CFGInliner(cfg).inlineMethod(method, implClass, classToken, basicBlock, call, cloneHost);
 
         // Reset state
         resetState();
@@ -1284,7 +1308,6 @@ public abstract class IRScope {
             pass.run(this);
         }
     }
-
 
     public void buildCFG(List<Instr> instrList) {
         CFG newBuild = new CFG(this);
@@ -1365,5 +1388,10 @@ public abstract class IRScope {
      */
     public boolean isScriptScope() {
         return false;
+    }
+
+    public void savePersistenceInfo(int offset, IRReaderDecoder file) {
+        instructionsOffsetInfoPersistenceBuffer = offset;
+        persistenceStore = file;
     }
 }

@@ -5,7 +5,7 @@ import org.jruby.ir.Operation;
 import org.jruby.ir.operands.Label;
 import org.jruby.ir.operands.Operand;
 
-public class ExceptionRegionStartMarkerInstr extends Instr {
+public class ExceptionRegionStartMarkerInstr extends Instr implements FixedArityInstr {
     final public Label begin;
     final public Label end;
     final public Label firstRescueBlockLabel;
@@ -19,6 +19,11 @@ public class ExceptionRegionStartMarkerInstr extends Instr {
     }
 
     @Override
+    public Operand[] getOperands() {
+        return new Operand[] { begin, end, firstRescueBlockLabel };
+    }
+
+    @Override
     public String toString() {
         StringBuilder buf = new StringBuilder(super.toString());
 
@@ -26,10 +31,6 @@ public class ExceptionRegionStartMarkerInstr extends Instr {
         buf.append(")");
 
         return buf.toString();
-    }
-
-    public Operand[] getOperands() {
-        return EMPTY_OPERANDS;
     }
 
     @Override

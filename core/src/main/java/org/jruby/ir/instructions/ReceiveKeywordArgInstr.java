@@ -1,9 +1,7 @@
 package org.jruby.ir.instructions;
 
-import org.jruby.ir.IRVisitor;
 import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.Variable;
-import org.jruby.ir.transformations.inlining.InlinerInfo;
 import org.jruby.ir.Operation;
 import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
@@ -11,13 +9,20 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.RubyHash;
 import org.jruby.RubySymbol;
+import org.jruby.ir.operands.Fixnum;
+import org.jruby.ir.operands.Operand;
 
-public class ReceiveKeywordArgInstr extends ReceiveArgBase {
+public class ReceiveKeywordArgInstr extends ReceiveArgBase implements FixedArityInstr {
     public final int numUsedArgs;
 
     public ReceiveKeywordArgInstr(Variable result, int numUsedArgs) {
         super(Operation.RECV_KW_ARG, result, -1);
         this.numUsedArgs = numUsedArgs;
+    }
+
+    @Override
+    public Operand[] getOperands() {
+        return new Operand[] { new Fixnum(numUsedArgs) };
     }
 
     @Override

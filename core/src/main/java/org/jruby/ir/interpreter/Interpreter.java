@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.jruby.Ruby;
+import org.jruby.RubyFloat;
+import org.jruby.RubyFixnum;
 import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.ast.Node;
@@ -16,7 +18,6 @@ import org.jruby.ast.RootNode;
 import org.jruby.exceptions.RaiseException;
 import org.jruby.exceptions.Unrescuable;
 import org.jruby.internal.runtime.methods.InterpretedIRMethod;
-import org.jruby.internal.runtime.methods.DynamicMethod;
 import org.jruby.ir.Counter;
 import org.jruby.ir.IRBuilder;
 import org.jruby.ir.IRClosure;
@@ -24,8 +25,13 @@ import org.jruby.ir.IREvalScript;
 import org.jruby.ir.IRMethod;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScriptBody;
+import org.jruby.ir.IRTranslator;
 import org.jruby.ir.Operation;
 import org.jruby.ir.OpClass;
+import org.jruby.ir.instructions.boxing.AluInstr;
+import org.jruby.ir.instructions.boxing.BoxFloatInstr;
+import org.jruby.ir.instructions.boxing.BoxInstr;
+import org.jruby.ir.instructions.boxing.UnboxInstr;
 import org.jruby.ir.instructions.BreakInstr;
 import org.jruby.ir.instructions.CallBase;
 import org.jruby.ir.instructions.CheckArityInstr;
@@ -35,6 +41,7 @@ import org.jruby.ir.instructions.Instr;
 import org.jruby.ir.instructions.JumpInstr;
 import org.jruby.ir.instructions.LineNumberInstr;
 import org.jruby.ir.instructions.NonlocalReturnInstr;
+import org.jruby.ir.instructions.OneOperandBranchInstr;
 import org.jruby.ir.instructions.ReceiveArgBase;
 import org.jruby.ir.instructions.ReceiveExceptionInstr;
 import org.jruby.ir.instructions.ReceiveOptArgInstr;
@@ -49,6 +56,8 @@ import org.jruby.ir.instructions.specialized.OneFixnumArgNoBlockCallInstr;
 import org.jruby.ir.instructions.specialized.OneOperandArgNoBlockCallInstr;
 import org.jruby.ir.instructions.specialized.OneOperandArgNoBlockNoResultCallInstr;
 import org.jruby.ir.instructions.specialized.ZeroOperandArgNoBlockCallInstr;
+import org.jruby.ir.operands.Fixnum;
+import org.jruby.ir.operands.Float;
 import org.jruby.ir.operands.IRException;
 import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.Operand;
@@ -56,7 +65,6 @@ import org.jruby.ir.operands.Self;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
-import org.jruby.ir.representations.BasicBlock;
 import org.jruby.ir.runtime.IRRuntimeHelpers;
 import org.jruby.ir.runtime.IRBreakJump;
 import org.jruby.parser.IRStaticScope;
@@ -76,7 +84,7 @@ import org.jruby.runtime.ivars.VariableAccessor;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 
-public class Interpreter {
+public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
     private static class IRCallSite {
         IRScope  s;
         int      v; // scope version
@@ -124,6 +132,20 @@ public class Interpreter {
     private static HashMap<Long, CallSiteProfile> callProfile = new HashMap<Long, CallSiteProfile>();
     private static HashMap<Operation, Counter> opStats = new HashMap<Operation, Counter>();
 
+    // we do not need instances of Interpreter
+    // FIXME: Should we make it real singleton and get rid of static methods?
+    private Interpreter() {
+    }
+
+    private static class InterpreterHolder {
+        // FIXME: REmove static reference unless lifus does later
+        public static final Interpreter instance = new Interpreter();
+    }
+
+    public static Interpreter getInstance() {
+        return InterpreterHolder.instance;
+    }
+
     private static IRScope getEvalContainerScope(Ruby runtime, StaticScope evalScope) {
         // SSS FIXME: Weirdness here.  We cannot get the containing IR scope from evalScope because of static-scope wrapping
         // that is going on
@@ -139,18 +161,32 @@ public class Interpreter {
     }
 
     public static IRubyObject interpretCommonEval(Ruby runtime, String file, int lineNumber, String backtraceName, RootNode rootNode, IRubyObject self, Block block) {
-        // SSS FIXME: Is this required here since the IR version cannot change from eval-to-eval? This is much more of a global setting.
-        IRBuilder.setRubyVersion("1.9");
-
         StaticScope ss = rootNode.getStaticScope();
         IRScope containingIRScope = getEvalContainerScope(runtime, ss);
         IREvalScript evalScript = IRBuilder.createIRBuilder(runtime, runtime.getIRManager()).buildEvalRoot(ss, containingIRScope, file, lineNumber, rootNode);
         evalScript.prepareForInterpretation(false);
-//        evalScript.runCompilerPass(new CallSplitter());
         ThreadContext context = runtime.getCurrentContext();
-        runBeginEndBlocks(evalScript.getBeginBlocks(), context, self, null); // FIXME: No temp vars yet right?
-        IRubyObject rv = evalScript.call(context, self, evalScript.getStaticScope().getModule(), rootNode.getScope(), block, backtraceName);
-        runBeginEndBlocks(evalScript.getEndBlocks(), context, self, null); // FIXME: No temp vars right?
+
+        IRubyObject rv = null;
+        try {
+            DynamicScope s = rootNode.getScope();
+            context.pushScope(s);
+
+            // Since IR introduces additional local vars, we may need to grow the dynamic scope.
+            // To do that, IREvalScript has to tell the dyn-scope how many local vars there are.
+            // Since the same static scope (the scope within which the eval string showed up)
+            // might be shared by multiple eval-scripts, we cannot 'setIRScope(this)' once and
+            // forget about it.  We need to set this right before we are ready to grow the
+            // dynamic scope local var space.
+            ((IRStaticScope)evalScript.getStaticScope()).setIRScope(evalScript);
+            s.growIfNeeded();
+
+            runBeginEndBlocks(evalScript.getBeginBlocks(), context, self, null); // FIXME: No temp vars yet right?
+            rv = evalScript.call(context, self, evalScript.getStaticScope().getModule(), s, block, backtraceName);
+            runBeginEndBlocks(evalScript.getEndBlocks(), context, self, null); // FIXME: No temp vars right?
+        } finally {
+            context.popScope();
+        }
         return rv;
     }
 
@@ -168,15 +204,17 @@ public class Interpreter {
         for (IRClosure b: beBlocks) {
             // SSS FIXME: Should I piggyback on WrappedIRClosure.retrieve or just copy that code here?
             b.prepareForInterpretation(false);
-            Block blk = (Block)(new WrappedIRClosure(b)).retrieve(context, self, context.getCurrentScope(), temp);
+            Block blk = (Block)(new WrappedIRClosure(b.getSelf(), b)).retrieve(context, self, context.getCurrentScope(), temp);
             blk.yield(context, null);
         }
     }
 
-    public static IRubyObject interpret(Ruby runtime, Node rootNode, IRubyObject self) {
-        IRBuilder.setRubyVersion("1.9");
+    @Override
+    protected IRubyObject execute(Ruby runtime, IRScope scope, IRubyObject self) {
+        IRScriptBody root = (IRScriptBody) scope;
 
-        IRScriptBody root = (IRScriptBody) IRBuilder.createIRBuilder(runtime, runtime.getIRManager()).buildRoot((RootNode) rootNode);
+        // FIXME: Removed as part of merge...likely broken at this point in merge.
+    //    IRScriptBody root = (IRScriptBody) IRBuilder.createIRBuilder(runtime, runtime.getIRManager()).buildRoot((RootNode) rootNode);
 
         // We get the live object ball rolling here.  This give a valid value for the top
         // of this lexical tree.  All new scope can then retrieve and set based on lexical parent.
@@ -334,7 +372,7 @@ public class Interpreter {
             if (inlineCall) {
                 noInlining = false;
                 long start = new java.util.Date().getTime();
-                hs.inlineMethod(tgtMethod, implClass, classToken, null, call);
+                hs.inlineMethod(tgtMethod, implClass, classToken, null, call, !inlinedScopes.contains(hs));
                 inlinedScopes.add(hs);
                 long end = new java.util.Date().getTime();
                 // System.out.println("Inlined " + tgtMethod + " in " + hs +
@@ -348,7 +386,7 @@ public class Interpreter {
         }
 
         for (IRScope x: inlinedScopes) {
-            // update version count for 'hs'
+            // Update version count for inlined scopes
             scopeVersionMap.put(x, versionCount);
             // System.out.println("Updating version of " + x + " to " + versionCount);
             //System.out.println("--- pre-inline-instrs ---");
@@ -357,11 +395,11 @@ public class Interpreter {
             //System.out.println(x.getCFG().toStringInstrs());
         }
 
-        // reset
+        // Reset
         codeModificationsCount = 0;
         callProfile = new HashMap<Long, CallSiteProfile>();
 
-        // Every 1M thread polls, discard stats by reallocating the thread-poll count map
+        // Every 1M thread polls, discard stats
         if (globalThreadPollCount % 1000000 == 0)  {
             globalThreadPollCount = 0;
         }
@@ -466,6 +504,7 @@ public class Interpreter {
             temp[((TemporaryVariable)resultVar).offset] = result;
         } else {
             LocalVariable lv = (LocalVariable)resultVar;
+
             currDynScope.setValue((IRubyObject)result, lv.getLocation(), lv.getScopeDepth());
         }
     }
@@ -641,6 +680,36 @@ public class Interpreter {
         }
     }
 
+    private static double getFloatArg(double[] floats, Operand arg) {
+        if (arg instanceof Float) {
+            return ((Float)arg).value;
+        } else if (arg instanceof Fixnum) {
+            return (double)((Fixnum)arg).value;
+        } else if (arg instanceof TemporaryVariable) {
+            return floats[((TemporaryVariable)arg).offset];
+        } else {
+            return 0.0/0.0;
+        }
+    }
+
+    private static void setFloatVar(double[] floats, Variable var, double val) {
+        floats[((TemporaryVariable)var).offset] = val;
+    }
+
+    private static void computeResult(AluInstr instr, Operation op, double[] floats) {
+        Variable dst = instr.getResult();
+        double   a1  = getFloatArg(floats, instr.getArg1());
+        double   a2  = getFloatArg(floats, instr.getArg2());
+        switch (op) {
+        case FADD: setFloatVar(floats, dst, a1 + a2); break;
+        case FSUB: setFloatVar(floats, dst, a1 - a2); break;
+        case FMUL: setFloatVar(floats, dst, a1 * a2); break;
+        case FDIV: setFloatVar(floats, dst, a1 / a2); break;
+        case FLT: setFloatVar(floats, dst, a1 < a2 ? 1.0 : 0.0); break;
+        case FGT: setFloatVar(floats, dst, a1 > a2 ? 1.0 : 0.0); break;
+        }
+    }
+
     private static IRubyObject interpret(ThreadContext context, IRubyObject self,
             IRScope scope, Visibility visibility, RubyModule implClass, IRubyObject[] args, Block block, Block.Type blockType) {
         Instr[] instrs = scope.getInstrsForInterpretation();
@@ -648,8 +717,12 @@ public class Interpreter {
         // The base IR may not have been processed yet
         if (instrs == null) instrs = scope.prepareForInterpretation(blockType == Block.Type.LAMBDA);
 
-        int      numTempVars    = scope.getTemporaryVariableSize();
+        Map<Integer, Integer> rescueMap = scope.getRescueMap();
+
+        int      numTempVars    = scope.getTemporaryVariablesCount();
         Object[] temp           = numTempVars > 0 ? new Object[numTempVars] : null;
+        int      numFloatVars   = scope.getFloatVariablesCount();
+        double[] floats         = numFloatVars > 0 ? new double[numFloatVars] : null;
         int      n              = instrs.length;
         int      ipc            = 0;
         Instr    instr          = null;
@@ -687,15 +760,20 @@ public class Interpreter {
 
             try {
                 switch (operation.opClass) {
+                case ALU_OP: {
+                    computeResult((AluInstr)instr, operation, floats);
+                    break;
+                }
                 case ARG_OP: {
                     receiveArg(context, instr, operation, args, kwArgHashCount, currDynScope, temp, exception, block);
                     break;
                 }
                 case BRANCH_OP: {
-                    if (operation == Operation.JUMP) {
-                        ipc = ((JumpInstr)instr).getJumpTarget().getTargetPC();
-                    } else {
-                        ipc = instr.interpretAndGetNewIPC(context, currDynScope, self, temp, ipc);
+                    switch (operation) {
+                    case JUMP: ipc = ((JumpInstr)instr).getJumpTarget().getTargetPC(); break;
+                    case B_TRUE_UNBOXED: if (getFloatArg(floats, ((OneOperandBranchInstr)instr).getArg1()) == 1.0) ipc = ((OneOperandBranchInstr)instr).getJumpTarget().getTargetPC(); break;
+                    case B_FALSE_UNBOXED: if (getFloatArg(floats, ((OneOperandBranchInstr)instr).getArg1()) == 0.0) ipc = ((OneOperandBranchInstr)instr).getJumpTarget().getTargetPC(); break;
+                    default: ipc = instr.interpretAndGetNewIPC(context, currDynScope, self, temp, ipc); break;
                     }
                     break;
                 }
@@ -749,6 +827,12 @@ public class Interpreter {
                         break;
                     }
 
+                    case COPY_UNBOXED: {
+                        CopyInstr c = (CopyInstr)instr;
+                        setFloatVar(floats, c.getResult(), getFloatArg(floats, c.getSource()));
+                        break;
+                    }
+
                     case GET_FIELD: {
                         GetFieldInstr gfi = (GetFieldInstr)instr;
                         IRubyObject object = (IRubyObject)gfi.getSource().retrieve(context, self, currDynScope, temp);
@@ -769,6 +853,23 @@ public class Interpreter {
                         break;
                     }
 
+                    case BOX_FLOAT: {
+                        RubyFloat f = context.runtime.newFloat(getFloatArg(floats, ((BoxFloatInstr)instr).getValue()));
+                        setResult(temp, currDynScope, ((BoxInstr)instr).getResult(), f);
+                        break;
+                    }
+
+                    case UNBOX_FLOAT: {
+                        UnboxInstr ui = (UnboxInstr)instr;
+                        Object val = retrieveOp(ui.getValue(), context, self, currDynScope, temp);
+                        if (val instanceof RubyFloat) {
+                            floats[((TemporaryVariable)ui.getResult()).offset] = ((RubyFloat)val).getValue();
+                        } else {
+                            floats[((TemporaryVariable)ui.getResult()).offset] = ((RubyFixnum)val).getDoubleValue();
+                        }
+                        break;
+                    }
+
                     // ---------- All the rest ---------
                     default:
                         result = instr.interpret(context, currDynScope, self, temp, block);
@@ -781,7 +882,7 @@ public class Interpreter {
                 }
             } catch (Throwable t) {
                 if (debug) LOG.info("in scope: " + scope + ", caught Java throwable: " + t + "; excepting instr: " + instr);
-                ipc = scope.getRescuerPC(instr);
+                ipc = rescueMap.get(instr.getIPC());
                 if (debug) LOG.info("ipc for rescuer: " + ipc);
 
                 if (ipc == -1) {

@@ -77,7 +77,8 @@ public class Options {
     public static final Option<Boolean> INVOKEDYNAMIC_INVOCATION_SWITCHPOINT = bool(INVOKEDYNAMIC, "invokedynamic.invocation.switchpoint", true, "Use SwitchPoint for class modification guards on invocations.");
     public static final Option<Boolean> INVOKEDYNAMIC_INVOCATION_INDIRECT = bool(INVOKEDYNAMIC, "invokedynamic.invocation.indirect", true, "Also bind indirect method invokers to invokedynamic.");
     public static final Option<Boolean> INVOKEDYNAMIC_INVOCATION_JAVA = bool(INVOKEDYNAMIC, "invokedynamic.invocation.java", true, "Bind Ruby to Java invocations with invokedynamic.");
-    public static final Option<Boolean> INVOKEDYNAMIC_INVOCATION_ATTR = bool(INVOKEDYNAMIC, "invokedynamic.invocation.attr", true, "Bind Ruby attribue invocations directly to invokedynamic.");
+    public static final Option<Boolean> INVOKEDYNAMIC_INVOCATION_ATTR = bool(INVOKEDYNAMIC, "invokedynamic.invocation.attr", true, "Bind Ruby attribute invocations directly to invokedynamic.");
+    public static final Option<Boolean> INVOKEDYNAMIC_INVOCATION_FFI = bool(INVOKEDYNAMIC, "invokedynamic.invocation.ffi", true, "Bind Ruby FFI invocations directly to invokedynamic.");
     public static final Option<Boolean> INVOKEDYNAMIC_INVOCATION_FASTOPS = bool(INVOKEDYNAMIC, "invokedynamic.invocation.fastops", true, "Bind Fixnum and Float math using optimized logic.");
     public static final Option<Boolean> INVOKEDYNAMIC_CACHE = bool(INVOKEDYNAMIC, "invokedynamic.cache", true, "Use invokedynamic to load cached values like literals and constants.");
     public static final Option<Boolean> INVOKEDYNAMIC_CACHE_CONSTANTS = bool(INVOKEDYNAMIC, "invokedynamic.cache.constants", true, "Use invokedynamic to load constants.");
@@ -103,10 +104,17 @@ public class Options {
     public static final Option<Boolean> IR_DEBUG             = bool(IR, "ir.debug", false, "Debug generation of JRuby IR.");
     public static final Option<Boolean> IR_PROFILE           = bool(IR, "ir.profile", false, "[EXPT]: Profile IR code during interpretation.");
     public static final Option<Boolean> IR_COMPILER_DEBUG    = bool(IR, "ir.compiler.debug", false, "Debug compilation of JRuby IR.");
+    public static final Option<Boolean> IR_PERSISTENCE       = bool(IR, "ir.persistence", false, "Persist generation of JRuby IR.");
     public static final Option<Boolean> IR_VISUALIZER        = bool(IR, "ir.visualizer", false, "Visualization of JRuby IR.");
-    public static final Option<String>  IR_COMPILER_PASSES = string(IR, "ir.passes", "Specify comma delimeted list of passes to run.");
+    public static final Option<Boolean> IR_UNBOXING          = bool(IR, "ir.unboxing", false, "Implement unboxing opts.");
+    public static final Option<String>  IR_COMPILER_PASSES   = string(IR, "ir.passes", "Specify comma delimeted list of passes to run.");
+    public static final Option<Boolean> IR_READING           = bool(IR, "ir.reading", false, "Read JRuby IR file.");
     public static final Option<String>  IR_INLINE_COMPILER_PASSES = string(IR, "ir.inline_passes", "Specify comma delimeted list of passes to run after inlining a method.");
-    
+
+    public static final Option<Boolean> TRUFFLE_PRINT_RUNTIME = bool(TRUFFLE, "truffle.printRuntime", false, "Print the Truffle runtime class on startup.");
+    public static final Option<Boolean> TRUFFLE_DEBUG_NODES = bool(TRUFFLE, "truffle.debugNodes", false, "Add debug nodes.");
+    public static final Option<Boolean> TRUFFLE_TRACE_NODES = bool(TRUFFLE, "truffle.traceNodes", false, "Add trace nodes.");
+
     public static final Option<Boolean> NATIVE_ENABLED = bool(NATIVE, "native.enabled", true, "Enable/disable native code, including POSIX features and C exts.");
     public static final Option<Boolean> NATIVE_VERBOSE = bool(NATIVE, "native.verbose", false, "Enable verbose logging of native extension loading.");
     public static final Option<Boolean> FFI_COMPILE_DUMP = bool(NATIVE, "ffi.compile.dump", false, "Dump bytecode-generated FFI stubs to console.");
@@ -155,9 +163,10 @@ public class Options {
     public static final Option<Boolean> LOG_BACKTRACES = bool(DEBUG, "log.backtraces", false, "Log every time an exception backtrace is generated.");
     public static final Option<Boolean> LOG_CALLERS = bool(DEBUG, "log.callers", false, "Log every time a Kernel#caller backtrace is generated.");
     public static final Option<Boolean> LOG_WARNINGS = bool(DEBUG, "log.warnings", false, "Log every time a built-in warning backtrace is generated.");
-    public static final Option<String> LOGGER_CLASS = string(DEBUG, "logger.class", new String[] {"class name"}, "org.jruby.util.log.JavaUtilLoggingLogger", "Use specified class for logging.");
+    public static final Option<String> LOGGER_CLASS = string(DEBUG, "logger.class", new String[] {"class name"}, "org.jruby.util.log.StandardErrorLogger", "Use specified class for logging.");
     public static final Option<Boolean> DUMP_INSTANCE_VARS = bool(DEBUG, "dump.variables", false, "Dump class + instance var names on first new of Object subclasses.");
-    
+    public static final Option<Boolean> REWRITE_JAVA_TRACE = bool(DEBUG, "rewrite.java.trace", false, "Rewrite stack traces from exceptions raised in Java calls.");
+
     public static final Option<Boolean> JI_SETACCESSIBLE = bool(JAVA_INTEGRATION, "ji.setAccessible", true, "Try to set inaccessible Java methods to be accessible.");
     public static final Option<Boolean> JI_LOGCANSETACCESSIBLE = bool(JAVA_INTEGRATION, "ji.logCanSetAccessible", false, "Log whether setAccessible is working.");
     public static final Option<Boolean> JI_UPPER_CASE_PACKAGE_NAME_ALLOWED = bool(JAVA_INTEGRATION, "ji.upper.case.package.name.allowed", false, "Allow Capitalized Java pacakge names.");
@@ -187,6 +196,7 @@ public class Options {
     public static final Option<Boolean> CLI_PROPERTIES = bool(CLI, "cli.properties", false, "Print config properties. Same as --properties but runs script.");
     public static final Option<String> CLI_ENCODING_INTERNAL = string(CLI, "cli.encoding.internal", "Encoding name to use internally.");
     public static final Option<String> CLI_ENCODING_EXTERNAL = string(CLI, "cli.encoding.external", "Encoding name to treat external data.");
+    public static final Option<String> CLI_ENCODING_SOURCE = string(CLI, "cli.encoding.source", "Encoding name to treat source code.");
     public static final Option<String> CLI_RECORD_SEPARATOR = string(CLI, "cli.record.separator", "\n", "Default record separator.");
     public static final Option<String> CLI_BACKUP_EXTENSION = string(CLI, "cli.backup.extension", "Backup extension for in-place ARGV files. Same as -i.");
     public static final Option<ProfilingMode> CLI_PROFILING_MODE = enumeration(CLI, "cli.profiling.mode", ProfilingMode.class, ProfilingMode.OFF, "Enable instrumented profiling modes.");

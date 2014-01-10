@@ -54,6 +54,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
 import java.util.Enumeration;
+import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -1085,16 +1086,18 @@ public class RubyFile extends RubyIO implements EncodingCapable {
     @JRubyMethod
     public IRubyObject size(ThreadContext context) {
         Ruby runtime = context.runtime;
-        if ((openFile.getMode() & OpenFile.WRITABLE) != 0) {
-            flush();
-        }
+        
+        if ((openFile.getMode() & OpenFile.WRITABLE) != 0) flush();
+
+        // FIXME: jnr-posix is calling _osf_close + throwing random native exceptions with weird paths.
+        // Once these are fixed remove this full file stat path and go back to faster one.
+        if (Platform.IS_WINDOWS) return runtime.newFileStat(path, false).size();
 
         try {
-            FileStat stat = runtime.getPosix().fstat(
-                    getOpenFileChecked().getMainStreamSafe().getDescriptor().getFileDescriptor());
-            if (stat == null) {
-                throw runtime.newErrnoEACCESError(path);
-            }
+            FileDescriptor fd = getOpenFileChecked().getMainStreamSafe().getDescriptor().getFileDescriptor();
+            FileStat stat = runtime.getPosix().fstat(fd);
+                    
+            if (stat == null) throw runtime.newErrnoEACCESError(path);
 
             return runtime.newFixnum(stat.st_size());
         } catch (BadDescriptorException e) {
@@ -1419,10 +1422,13 @@ public class RubyFile extends RubyIO implements EncodingCapable {
         }
         return entry;
     }
-
+    
     public static ZipEntry getDirOrFileEntry(String jar, String path) throws IOException {
+        return getDirOrFileEntry(new JarFile(jar), path);
+    }    
+    
+    public static ZipEntry getDirOrFileEntry(ZipFile zf, String path) throws IOException {
         String dirPath = path + "/";
-        ZipFile zf = Ruby.getGlobalRuntime().getCurrentContext().runtime.getLoadService().getJarFile(jar);
         ZipEntry entry = zf.getEntry(dirPath); // first try as directory
         if (entry == null) {
             if (dirPath.length() == 1) {
@@ -1562,6 +1568,12 @@ public class RubyFile extends RubyIO implements EncodingCapable {
         Ruby runtime = context.runtime;
 
         String relativePath = get_path(context, args[0]).getUnicodeValue();
+
+        // Special /dev/null of windows
+        if (Platform.IS_WINDOWS && ("NUL:".equalsIgnoreCase(relativePath) || "NUL".equalsIgnoreCase(relativePath))) {
+            return runtime.newString("//./" + relativePath.substring(0, 3));
+        }
+
         String[] uriParts = splitURI(relativePath);
         String cwd;
 

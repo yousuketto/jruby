@@ -74,12 +74,15 @@ import org.jruby.util.SipHashInline;
 import org.jruby.util.Sprintf;
 import org.jruby.util.StringSupport;
 import org.jruby.util.TypeConverter;
+import org.jruby.util.io.EncodingUtils;
 import org.jruby.util.string.JavaCrypt;
 
 import java.nio.charset.Charset;
 import java.util.Locale;
 
+import static org.jruby.RubyComparable.invcmp;
 import static org.jruby.RubyEnumerator.enumeratorize;
+import static org.jruby.RubyEnumerator.enumeratorizeWithSize;
 import static org.jruby.anno.FrameField.BACKREF;
 import static org.jruby.runtime.Helpers.invokedynamic;
 import static org.jruby.runtime.Visibility.PRIVATE;
@@ -99,7 +102,7 @@ import static org.jruby.util.StringSupport.toLower;
 import static org.jruby.util.StringSupport.toUpper;
 import static org.jruby.util.StringSupport.unpackArg;
 import static org.jruby.util.StringSupport.unpackResult;
-import org.jruby.util.io.EncodingUtils;
+import static org.jruby.RubyEnumerator.SizeFn;
 
 /**
  * Implementation of Ruby String class
@@ -1045,39 +1048,23 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     @Override
     public final int compareTo(IRubyObject other) {
-        Ruby runtime = getRuntime();
-        if (other instanceof RubyString) {
-            RubyString otherString = (RubyString)other;
-            return op_cmp19(otherString);
-        }
-        return (int)op_cmpCommon(runtime.getCurrentContext(), other).convertToInteger().getLongValue();
+        return (int)op_cmp(getRuntime().getCurrentContext(), other).convertToInteger().getLongValue();
     }
 
     /* rb_str_cmp_m */
+    @JRubyMethod(name = "<=>")
     @Override
     public IRubyObject op_cmp(ThreadContext context, IRubyObject other) {
-        return op_cmp19(context, other);
-    }
-
-    @JRubyMethod(name = "<=>")
-    public IRubyObject op_cmp19(ThreadContext context, IRubyObject other) {
-        if (other instanceof RubyString) {
-            return context.runtime.newFixnum(op_cmp19((RubyString)other));
-        }
-        return op_cmpCommon(context, other);
-    }
-
-    private IRubyObject op_cmpCommon(ThreadContext context, IRubyObject other) {
         Ruby runtime = context.runtime;
-        // deal with case when "other" is not a string
-        if (other.respondsTo("to_str") && other.respondsTo("<=>")) {
-            IRubyObject result = invokedynamic(context, other, OP_CMP, this);
-            if (result.isNil()) return result;
-            if (result instanceof RubyFixnum) {
-                return RubyFixnum.newFixnum(runtime, -((RubyFixnum)result).getLongValue());
-            } else {
-                return RubyFixnum.zero(runtime).callMethod(context, "-", result);
-            }
+        if (other instanceof RubyString) {
+            return runtime.newFixnum(op_cmp((RubyString)other));
+        }
+        if (other.respondsTo("to_str")) {
+            IRubyObject tmp = other.callMethod(context, "to_str");
+            if (tmp instanceof RubyString)
+              return runtime.newFixnum(op_cmp((RubyString)tmp));
+        } else {
+            return invcmp(context, this, other);
         }
         return runtime.getNil();
     }
@@ -1264,10 +1251,6 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
      *
      */
     public final int op_cmp(RubyString other) {
-        return value.cmp(other.value);
-    }
-
-    public final int op_cmp19(RubyString other) {
         int ret = value.cmp(other.value);
         if (ret == 0 && !isComparableWith(other)) {
             return value.getEncoding().getIndex() > other.value.getEncoding().getIndex() ? 1 : -1;
@@ -1693,7 +1676,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     @JRubyMethod(name = ">=")
     public IRubyObject op_ge19(ThreadContext context, IRubyObject other) {
-        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp19((RubyString) other) >= 0);
+        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp((RubyString) other) >= 0);
         return RubyComparable.op_ge(context, this, other);
     }
 
@@ -1703,7 +1686,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     @JRubyMethod(name = ">")
     public IRubyObject op_gt19(ThreadContext context, IRubyObject other) {
-        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp19((RubyString) other) > 0);
+        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp((RubyString) other) > 0);
         return RubyComparable.op_gt(context, this, other);
     }
 
@@ -1713,7 +1696,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     @JRubyMethod(name = "<=")
     public IRubyObject op_le19(ThreadContext context, IRubyObject other) {
-        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp19((RubyString) other) <= 0);
+        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp((RubyString) other) <= 0);
         return RubyComparable.op_le(context, this, other);
     }
 
@@ -1723,7 +1706,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     @JRubyMethod(name = "<")
     public IRubyObject op_lt19(ThreadContext context, IRubyObject other) {
-        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp19((RubyString) other) < 0);
+        if (other instanceof RubyString) return context.runtime.newBoolean(op_cmp((RubyString) other) < 0);
         return RubyComparable.op_lt(context, this, other);
     }
 
@@ -2299,6 +2282,17 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
     public RubyFixnum bytesize() {
         return getRuntime().newFixnum(value.getRealSize());
     }
+
+    private SizeFn eachByteSizeFn() {
+        final RubyString self = this;
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                return self.bytesize();
+            }
+        };
+    }
+
     /** rb_str_empty
      *
      */
@@ -2365,6 +2359,8 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
             long c = ((RubyBignum) other).getLongValue();
             return concatNumeric(runtime, (int) c);
         }
+        
+        if (other instanceof RubySymbol) throw runtime.newTypeError("can't convert Symbol into String");
         return append19(other);
     }
 
@@ -3604,7 +3600,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     private IRubyObject uptoCommon19NoDigits(ThreadContext context, RubyString end, boolean excl, Block block, boolean asSymbol) {
         Ruby runtime = context.runtime;
-        int n = op_cmp19(end);
+        int n = op_cmp(end);
         if (n > 0 || (excl && n == 0)) return this;
         IRubyObject afterEnd = end.callMethod(context, "succ");
         RubyString current = strDup(context.runtime);
@@ -5727,7 +5723,7 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     @JRubyMethod(name = "each_byte")
     public IRubyObject each_byte19(ThreadContext context, Block block) {
-        return block.isGiven() ? each_byte(context, block) : enumeratorize(context.runtime, this, "each_byte");
+        return block.isGiven() ? each_byte(context, block) : enumeratorizeWithSize(context, this, "each_byte", eachByteSizeFn());
     }
 
     @JRubyMethod
@@ -5737,12 +5733,22 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     @JRubyMethod(name = "each_char")
     public IRubyObject each_char19(ThreadContext context, Block block) {
-        return block.isGiven() ? each_charCommon19(context, block) : enumeratorize(context.runtime, this, "each_char");
+        return block.isGiven() ? each_charCommon19(context, block) : enumeratorizeWithSize(context, this, "each_char", eachCharSizeFn());
     }
 
     @JRubyMethod(name = "chars")
     public IRubyObject chars19(ThreadContext context, Block block) {
-        return block.isGiven() ? each_charCommon19(context, block) : enumeratorize(context.runtime, this, "chars");
+        return block.isGiven() ? each_charCommon19(context, block) : enumeratorizeWithSize(context, this, "chars", eachCharSizeFn());
+    }
+
+    private SizeFn eachCharSizeFn() {
+        final RubyString self = this;
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                return self.length();
+            }
+        };
     }
 
     private IRubyObject each_charCommon19(ThreadContext context, Block block) {
@@ -5777,14 +5783,24 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
      */
     @JRubyMethod
     public IRubyObject each_codepoint(ThreadContext context, Block block) {
-        if (!block.isGiven()) return enumeratorize(context.runtime, this, "each_codepoint");
+        if (!block.isGiven()) return enumeratorizeWithSize(context, this, "each_codepoint", eachCodepointSizeFn());
         return singleByteOptimizable() ? each_byte(context, block) : each_codepointCommon(context, block);
     }
 
     @JRubyMethod
     public IRubyObject codepoints(ThreadContext context, Block block) {
-        if (!block.isGiven()) return enumeratorize(context.runtime, this, "codepoints");
+        if (!block.isGiven()) return enumeratorizeWithSize(context, this, "codepoints", eachCodepointSizeFn());
         return singleByteOptimizable() ? each_byte(context, block) : each_codepointCommon(context, block);
+    }
+
+    private SizeFn eachCodepointSizeFn() {
+        final RubyString self = this;
+        return new SizeFn() {
+            @Override
+            public IRubyObject size(IRubyObject[] args) {
+                return self.length();
+            }
+        };
     }
 
     private IRubyObject each_codepointCommon(ThreadContext context, Block block) {

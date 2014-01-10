@@ -17,7 +17,7 @@ import org.jruby.runtime.builtin.IRubyObject;
 
 import java.util.Map;
 
-public class Match2Instr extends Instr implements ResultInstr {
+public class Match2Instr extends Instr implements ResultInstr, FixedArityInstr {
     private Variable result;
     private Operand receiver;
     private Operand arg;
@@ -37,6 +37,14 @@ public class Match2Instr extends Instr implements ResultInstr {
         return new Operand[] { receiver, arg };
     }
 
+    public Operand getArg() {
+        return arg;
+    }
+
+    public Operand getReceiver() {
+        return receiver;
+    }
+
     @Override
     public String toString() {
         return super.toString() + "(" + receiver + ", " + arg + ")";
@@ -48,10 +56,12 @@ public class Match2Instr extends Instr implements ResultInstr {
         arg = arg.getSimplifiedOperand(valueMap, force);
     }
 
+    @Override
     public Variable getResult() {
         return result;
     }
 
+    @Override
     public void updateResult(Variable v) {
         this.result = v;
     }
