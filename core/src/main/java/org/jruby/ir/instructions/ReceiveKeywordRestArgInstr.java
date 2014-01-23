@@ -2,12 +2,12 @@ package org.jruby.ir.instructions;
 
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.Operation;
-import org.jruby.runtime.Arity;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.RubyHash;
 import org.jruby.ir.operands.Fixnum;
 import org.jruby.ir.operands.Operand;
+import org.jruby.ir.transformations.inlining.InlinerInfo;
 
 public class ReceiveKeywordRestArgInstr extends ReceiveArgBase implements FixedArityInstr {
     public final int numUsedArgs;
@@ -28,15 +28,15 @@ public class ReceiveKeywordRestArgInstr extends ReceiveArgBase implements FixedA
     }
 
     @Override
+    public Instr cloneForInlining(InlinerInfo ii) {
+        return new ReceiveKeywordRestArgInstr(ii.getRenamedVariable(result), numUsedArgs);
+    }
+
+    @Override
     public IRubyObject receiveArg(ThreadContext context, int kwArgHashCount, IRubyObject[] args) {
-        if (kwArgHashCount == 0) {
+        if (kwArgHashCount == 0 || numUsedArgs == args.length) {
             return RubyHash.newSmallHash(context.getRuntime());
         } else {
-            if (numUsedArgs == args.length) {
-                /* throw ArgumentError */
-                Arity.raiseArgumentError(context.getRuntime(), args.length-1, numUsedArgs, -1);
-            }
-
             return args[args.length - 1];
         }
     }

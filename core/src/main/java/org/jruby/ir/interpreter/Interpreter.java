@@ -1,12 +1,7 @@
 package org.jruby.ir.interpreter;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.jruby.Ruby;
 import org.jruby.RubyFloat;
@@ -15,25 +10,19 @@ import org.jruby.RubyHash;
 import org.jruby.RubyModule;
 import org.jruby.ast.Node;
 import org.jruby.ast.RootNode;
-import org.jruby.exceptions.RaiseException;
-import org.jruby.exceptions.Unrescuable;
 import org.jruby.internal.runtime.methods.InterpretedIRMethod;
-import org.jruby.ir.Counter;
 import org.jruby.ir.IRBuilder;
 import org.jruby.ir.IRClosure;
 import org.jruby.ir.IREvalScript;
-import org.jruby.ir.IRMethod;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScriptBody;
 import org.jruby.ir.IRTranslator;
 import org.jruby.ir.Operation;
-import org.jruby.ir.OpClass;
 import org.jruby.ir.instructions.boxing.AluInstr;
 import org.jruby.ir.instructions.boxing.BoxFloatInstr;
 import org.jruby.ir.instructions.boxing.BoxInstr;
 import org.jruby.ir.instructions.boxing.UnboxInstr;
 import org.jruby.ir.instructions.BreakInstr;
-import org.jruby.ir.instructions.CallBase;
 import org.jruby.ir.instructions.CheckArityInstr;
 import org.jruby.ir.instructions.CopyInstr;
 import org.jruby.ir.instructions.GetFieldInstr;
@@ -41,9 +30,9 @@ import org.jruby.ir.instructions.Instr;
 import org.jruby.ir.instructions.JumpInstr;
 import org.jruby.ir.instructions.LineNumberInstr;
 import org.jruby.ir.instructions.NonlocalReturnInstr;
-import org.jruby.ir.instructions.OneOperandBranchInstr;
 import org.jruby.ir.instructions.ReceiveArgBase;
-import org.jruby.ir.instructions.ReceiveExceptionInstr;
+import org.jruby.ir.instructions.ReceiveRubyExceptionInstr;
+import org.jruby.ir.instructions.ReceiveJRubyExceptionInstr;
 import org.jruby.ir.instructions.ReceiveOptArgInstr;
 import org.jruby.ir.instructions.ReceivePreReqdArgInstr;
 import org.jruby.ir.instructions.RecordEndBlockInstr;
@@ -56,12 +45,16 @@ import org.jruby.ir.instructions.specialized.OneFixnumArgNoBlockCallInstr;
 import org.jruby.ir.instructions.specialized.OneOperandArgNoBlockCallInstr;
 import org.jruby.ir.instructions.specialized.OneOperandArgNoBlockNoResultCallInstr;
 import org.jruby.ir.instructions.specialized.ZeroOperandArgNoBlockCallInstr;
+import org.jruby.ir.operands.Bignum;
+import org.jruby.ir.operands.BooleanLiteral;
 import org.jruby.ir.operands.Fixnum;
 import org.jruby.ir.operands.Float;
 import org.jruby.ir.operands.IRException;
 import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.Self;
+import org.jruby.ir.operands.TemporaryFloatVariable;
+import org.jruby.ir.operands.TemporaryLocalVariable;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
@@ -76,69 +69,23 @@ import org.jruby.runtime.Helpers;
 import org.jruby.runtime.RubyEvent;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
-import org.jruby.runtime.CallSite;
 import org.jruby.runtime.builtin.IRubyObject;
-import org.jruby.runtime.callsite.CachingCallSite;
-import org.jruby.runtime.callsite.CacheEntry;
 import org.jruby.runtime.ivars.VariableAccessor;
 import org.jruby.util.log.Logger;
 import org.jruby.util.log.LoggerFactory;
 
 public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
-    private static class IRCallSite {
-        IRScope  s;
-        int      v; // scope version
-        CallBase call;
-        long     count;
-        InterpretedIRMethod tgtM;
-
-        public IRCallSite() { }
-
-        public IRCallSite(IRCallSite cs) {
-            this.s     = cs.s;
-            this.v     = cs.v;
-            this.call  = cs.call;
-            this.count = 0;
-        }
-
-        public int hashCode() {
-            return (int)this.call.callSiteId;
-        }
-    }
-
-    private static class CallSiteProfile {
-        IRCallSite cs;
-        HashMap<IRScope, Counter> counters;
-
-        public CallSiteProfile(IRCallSite cs) {
-            this.cs = new IRCallSite(cs);
-            this.counters = new HashMap<IRScope,Counter>();
-        }
-    }
-
-    private static IRCallSite callerSite = new IRCallSite();
 
     private static final Logger LOG = LoggerFactory.getLogger("Interpreter");
 
-    private static int versionCount = 1;
-    private static HashMap<IRScope, Integer> scopeVersionMap = new HashMap<IRScope, Integer>();
-
-    private static int inlineCount = 0;
     private static int interpInstrsCount = 0;
-    private static int codeModificationsCount = 0;
-    private static int numCyclesWithNoModifications = 0;
-    private static int globalThreadPollCount = 0;
-    private static HashMap<IRScope, Counter> scopeThreadPollCounts = new HashMap<IRScope, Counter>();
-    private static HashMap<Long, CallSiteProfile> callProfile = new HashMap<Long, CallSiteProfile>();
-    private static HashMap<Operation, Counter> opStats = new HashMap<Operation, Counter>();
 
     // we do not need instances of Interpreter
     // FIXME: Should we make it real singleton and get rid of static methods?
-    private Interpreter() {
-    }
+    private Interpreter() { }
 
     private static class InterpreterHolder {
-        // FIXME: REmove static reference unless lifus does later
+        // FIXME: Remove static reference unless lifus does later
         public static final Interpreter instance = new Interpreter();
     }
 
@@ -247,264 +194,17 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         }
     }
 
-    private static void analyzeProfile() {
-        versionCount++;
-
-        //if (inlineCount == 2) return;
-
-        if (codeModificationsCount == 0) numCyclesWithNoModifications++;
-        else numCyclesWithNoModifications = 0;
-
-        codeModificationsCount = 0;
-
-        if (numCyclesWithNoModifications < 3) return;
-
-        // We are now good to go -- start analyzing the profile
-
-        // System.out.println("-------------------start analysis-----------------------");
-
-        final HashMap<IRScope, Long> scopeCounts = new HashMap<IRScope, Long>();
-        final ArrayList<IRCallSite> callSites = new ArrayList<IRCallSite>();
-        HashMap<IRCallSite, Long> callSiteCounts = new HashMap<IRCallSite, Long>();
-        // System.out.println("# call sites: " + callProfile.keySet().size());
-        long total = 0;
-        for (Long id: callProfile.keySet()) {
-            Long c;
-
-            CallSiteProfile csp = callProfile.get(id);
-            IRCallSite      cs  = csp.cs;
-
-            if (cs.v != scopeVersionMap.get(cs.s).intValue()) {
-                // System.out.println("Skipping callsite: <" + cs.s + "," + cs.v + "> with compiled version: " + scopeVersionMap.get(cs.s));
-                continue;
-            }
-
-            Set<IRScope> calledScopes = csp.counters.keySet();
-            cs.count = 0;
-            for (IRScope s: calledScopes) {
-                c = scopeCounts.get(s);
-                if (c == null) {
-                    c = new Long(0);
-                    scopeCounts.put(s, c);
-                }
-
-                long x = csp.counters.get(s).count;
-                c += x;
-                cs.count += x;
-            }
-
-            CallBase call = cs.call;
-            if (calledScopes.size() == 1 && !call.inliningBlocked()) {
-                CallSite runtimeCS = call.getCallSite();
-                if (runtimeCS != null && (runtimeCS instanceof CachingCallSite)) {
-                    CachingCallSite ccs = (CachingCallSite)runtimeCS;
-                    CacheEntry ce = ccs.getCache();
-
-                    if (!(ce.method instanceof InterpretedIRMethod)) {
-                        // System.out.println("NOT IR-M!");
-                        continue;
-                    } else {
-                        callSites.add(cs);
-                        cs.tgtM = (InterpretedIRMethod)ce.method;
-                    }
-                }
-            }
-
-            total += cs.count;
-        }
-
-        Collections.sort(callSites, new java.util.Comparator<IRCallSite> () {
-            @Override
-            public int compare(IRCallSite a, IRCallSite b) {
-                if (a.count == b.count) return 0;
-                return (a.count < b.count) ? 1 : -1;
-            }
-        });
-
-        // Find top N call sites
-        double freq = 0.0;
-        int i = 0;
-        boolean noInlining = true;
-        Set<IRScope> inlinedScopes = new HashSet<IRScope>();
-        for (IRCallSite ircs: callSites) {
-            double contrib = (ircs.count*100.0)/total;
-
-            // 1% is arbitrary
-            if (contrib < 1.0) break;
-
-            i++;
-            freq += contrib;
-
-            // This check is arbitrary
-            if (i == 100 || freq > 99.0) break;
-
-            // System.out.println("Considering: " + ircs.call + " with id: " + ircs.call.callSiteId +
-            // " in scope " + ircs.s + " with count " + ircs.count + "; contrib " + contrib + "; freq: " + freq);
-
-            // Now inline here!
-            CallBase call = ircs.call;
-
-            IRScope hs = ircs.s;
-            boolean isHotClosure = hs instanceof IRClosure;
-            IRScope hc = isHotClosure ? hs : null;
-            hs = isHotClosure ? hs.getLexicalParent() : hs;
-
-            IRScope tgtMethod = ircs.tgtM.getIRMethod();
-
-            Instr[] instrs = tgtMethod.getInstrsForInterpretation();
-            // Dont inline large methods -- 500 is arbitrary
-            // Can be null if a previously inlined method hasn't been rebuilt
-            if ((instrs == null) || instrs.length > 500) {
-                // if (instrs == null) System.out.println("no instrs!");
-                // else System.out.println("large method with " + instrs.length + " instrs. skipping!");
-                continue;
-            }
-
-            RubyModule implClass = ircs.tgtM.getImplementationClass();
-            int classToken = implClass.getGeneration();
-            String n = tgtMethod.getName();
-            boolean inlineCall = true;
-            if (isHotClosure) {
-                Operand clArg = call.getClosureArg(null);
-                inlineCall = (clArg instanceof WrappedIRClosure) && (((WrappedIRClosure)clArg).getClosure() == hc);
-            }
-
-            if (inlineCall) {
-                noInlining = false;
-                long start = new java.util.Date().getTime();
-                hs.inlineMethod(tgtMethod, implClass, classToken, null, call, !inlinedScopes.contains(hs));
-                inlinedScopes.add(hs);
-                long end = new java.util.Date().getTime();
-                // System.out.println("Inlined " + tgtMethod + " in " + hs +
-                //     " @ instr " + call + " in time (ms): "
-                //     + (end-start) + " # instrs: " + instrs.length);
-
-                inlineCount++;
-            } else {
-                //System.out.println("--no inlining--");
-            }
-        }
-
-        for (IRScope x: inlinedScopes) {
-            // Update version count for inlined scopes
-            scopeVersionMap.put(x, versionCount);
-            // System.out.println("Updating version of " + x + " to " + versionCount);
-            //System.out.println("--- pre-inline-instrs ---");
-            //System.out.println(x.getCFG().toStringInstrs());
-            //System.out.println("--- post-inline-instrs ---");
-            //System.out.println(x.getCFG().toStringInstrs());
-        }
-
-        // Reset
-        codeModificationsCount = 0;
-        callProfile = new HashMap<Long, CallSiteProfile>();
-
-        // Every 1M thread polls, discard stats
-        if (globalThreadPollCount % 1000000 == 0)  {
-            globalThreadPollCount = 0;
-        }
-    }
-
-    private static void outputProfileStats() {
-        ArrayList<IRScope> scopes = new ArrayList<IRScope>(scopeThreadPollCounts.keySet());
-        Collections.sort(scopes, new java.util.Comparator<IRScope> () {
-            @Override
-            public int compare(IRScope a, IRScope b) {
-                // In non-methods and non-closures, we may not have any thread poll instrs.
-                int aden = a.getThreadPollInstrsCount();
-                if (aden == 0) aden = 1;
-                int bden = b.getThreadPollInstrsCount();
-                if (bden == 0) bden = 1;
-
-                // Use estimated instr count to order scopes -- rather than raw thread-poll count
-                float aCount = scopeThreadPollCounts.get(a).count * (1.0f * a.getInstrsForInterpretation().length/aden);
-                float bCount = scopeThreadPollCounts.get(b).count * (1.0f * b.getInstrsForInterpretation().length/bden);
-                if (aCount == bCount) return 0;
-                return (aCount < bCount) ? 1 : -1;
-            }
-        });
-
-
-        /*
-        LOG.info("------------------------");
-        LOG.info("Stats after " + globalThreadPollCount + " thread polls:");
-        LOG.info("------------------------");
-        LOG.info("# instructions: " + interpInstrsCount);
-        LOG.info("# code modifications in this period : " + codeModificationsCount);
-        LOG.info("------------------------");
-        */
-        int i = 0;
-        float f1 = 0.0f;
-        for (IRScope s: scopes) {
-            long n = scopeThreadPollCounts.get(s).count;
-            float p1 =  ((n*1000)/globalThreadPollCount)/10.0f;
-            String msg = i + ". " + s + " [file:" + s.getFileName() + ":" + s.getLineNumber() + "] = " + n + "; (" + p1 + "%)";
-            if (s instanceof IRClosure) {
-                IRMethod m = s.getNearestMethod();
-                //if (m != null) LOG.info(msg + " -- nearest enclosing method: " + m);
-                //else LOG.info(msg + " -- no enclosing method --");
-            } else {
-                //LOG.info(msg);
-            }
-
-            i++;
-            f1 += p1;
-
-            // Top 20 or those that account for 95% of thread poll events.
-            if (i == 20 || f1 >= 95.0) break;
-        }
-
-        // reset code modification counter
-        codeModificationsCount = 0;
-
-        // Every 1M thread polls, discard stats by reallocating the thread-poll count map
-         if (globalThreadPollCount % 1000000 == 0)  {
-            //System.out.println("---- resetting thread-poll counters ----");
-            scopeThreadPollCounts = new HashMap<IRScope, Counter>();
-            globalThreadPollCount = 0;
-        }
-    }
-
-    private static Integer initProfiling(IRScope scope) {
-        /* SSS: Not being used currently
-        tpCount = scopeThreadPollCounts.get(scope);
-        if (tpCount == null) {
-            tpCount = new Counter();
-            scopeThreadPollCounts.put(scope, tpCount);
-        }
-        */
-
-        Integer scopeVersion = scopeVersionMap.get(scope);
-        if (scopeVersion == null) {
-            scopeVersionMap.put(scope, versionCount);
-            scopeVersion = new Integer(versionCount);
-        }
-
-        if (callerSite.call != null) {
-            Long id = callerSite.call.callSiteId;
-            CallSiteProfile csp = callProfile.get(id);
-            if (csp == null) {
-                csp = new CallSiteProfile(callerSite);
-                callProfile.put(id, csp);
-            }
-
-            Counter csCount = csp.counters.get(scope);
-            if (csCount == null) {
-                csCount = new Counter();
-                csp.counters.put(scope, csCount);
-            }
-            csCount.count++;
-        }
-
-        return scopeVersion;
-    }
-
     private static void setResult(Object[] temp, DynamicScope currDynScope, Variable resultVar, Object result) {
         if (resultVar instanceof TemporaryVariable) {
-            temp[((TemporaryVariable)resultVar).offset] = result;
+            // Unboxed Java primitives (float/double/int/long) don't come here because result is an Object
+            // So, it is safe to use offset directly without any correction as long as IRScope uses
+            // three different allocators (each with its own 'offset' counter)
+            // * one for LOCAL, BOOLEAN, CURRENT_SCOPE, CURRENT_MODULE, CLOSURE tmpvars
+            // * one for FIXNUM
+            // * one for FLOAT
+            temp[((TemporaryLocalVariable)resultVar).offset] = result;
         } else {
             LocalVariable lv = (LocalVariable)resultVar;
-
             currDynScope.setValue((IRubyObject)result, lv.getLocation(), lv.getScopeDepth());
         }
     }
@@ -519,8 +219,8 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         Object res;
         if (r instanceof Self) {
             return self;
-        } else if (r instanceof TemporaryVariable) {
-            res = temp[((TemporaryVariable)r).offset];
+        } else if (r instanceof TemporaryLocalVariable) {
+            res = temp[((TemporaryLocalVariable)r).offset];
             return res == null ? context.nil : res;
         } else if (r instanceof LocalVariable) {
             LocalVariable lv = (LocalVariable)r;
@@ -532,11 +232,40 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
 
     }
 
-    private static void updateCallSite(Instr instr, IRScope scope, Integer scopeVersion) {
-        if (instr instanceof CallBase) {
-            callerSite.s = scope;
-            callerSite.v = scopeVersion;
-            callerSite.call = (CallBase)instr;
+    private static double getFloatArg(double[] floats, Operand arg) {
+        if (arg instanceof Float) {
+            return ((Float)arg).value;
+        } else if (arg instanceof Fixnum) {
+            return (double)((Fixnum)arg).value;
+        } else if (arg instanceof Bignum) {
+            return ((Bignum)arg).value.doubleValue();
+        } else if (arg instanceof TemporaryLocalVariable) {
+            return floats[((TemporaryLocalVariable)arg).offset];
+        } else {
+            return 0.0/0.0;
+        }
+    }
+
+    private static void setFloatVar(double[] floats, TemporaryLocalVariable var, double val) {
+        floats[var.offset] = val;
+    }
+
+    private static void setBooleanVar(ThreadContext context, Object[] temp, TemporaryLocalVariable var, boolean val) {
+        BooleanLiteral bVal = val ? BooleanLiteral.TRUE : BooleanLiteral.FALSE;
+        temp[var.offset] = bVal.cachedObject(context);
+    }
+
+    private static void computeResult(AluInstr instr, Operation op, ThreadContext context, double[] floats, Object[] temp) {
+        TemporaryLocalVariable dst = (TemporaryLocalVariable)instr.getResult();
+        double a1 = getFloatArg(floats, instr.getArg1());
+        double a2 = getFloatArg(floats, instr.getArg2());
+        switch (op) {
+        case FADD: setFloatVar(floats, dst, a1 + a2); break;
+        case FSUB: setFloatVar(floats, dst, a1 - a2); break;
+        case FMUL: setFloatVar(floats, dst, a1 * a2); break;
+        case FDIV: setFloatVar(floats, dst, a1 / a2); break;
+        case FLT : setBooleanVar(context, temp, dst, a1 < a2); break;
+        case FGT : setBooleanVar(context, temp, dst, a1 > a2); break;
         }
     }
 
@@ -546,7 +275,7 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         switch(operation) {
         case RECV_PRE_REQD_ARG:
             int argIndex = ((ReceivePreReqdArgInstr)instr).getArgIndex();
-            result = ((argIndex + kwArgHashCount) < args.length) ? args[argIndex] : context.nil; // SSS FIXME: This check is only required for closures, not methods
+            result = argIndex < args.length ? args[argIndex] : context.nil; // SSS FIXME: This check is only required for closures, not methods
             setResult(temp, currDynScope, instr.getResult(), result);
             return;
         case RECV_CLOSURE:
@@ -563,23 +292,12 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
             // For blocks, missing arg translates to nil
             setResult(temp, currDynScope, instr.getResult(), result == null ? context.nil : result);
             return;
-        case RECV_EXCEPTION: {
-            ReceiveExceptionInstr rei = (ReceiveExceptionInstr)instr;
-            // FIXME: HACK for now .. make semantics explicit rather
-            // than piggybacking on top of the checkType field
-            //
-            // Unrescuable:
-            //    IRReturnJump, ThreadKill, RubyContinuation, MainExitException, etc.
-            //    These cannot be rescued -- only run ensure blocks
-            //
-            // Others:
-            //    IRBreakJump, Ruby exceptions, errors, and other java exceptions.
-            //    These can be rescued -- run rescue blocks
-            if (rei.checkType && (exception instanceof Unrescuable)) {
-                Helpers.throwException((Throwable)exception);
-            }
-            result = (exception instanceof RaiseException && rei.checkType) ? ((RaiseException)exception).getException() : exception;
-            setResult(temp, currDynScope, instr.getResult(), result);
+        case RECV_RUBY_EXC: {
+            setResult(temp, currDynScope, instr.getResult(), IRRuntimeHelpers.unwrapRubyException(exception));
+            return;
+        }
+        case RECV_JRUBY_EXC: {
+            setResult(temp, currDynScope, instr.getResult(), exception);
             return;
         }
         default:
@@ -638,7 +356,7 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         }
     }
 
-    private static void processBookKeepingOp(ThreadContext context, Instr instr, Operation operation, IRScope scope, int numArgs, IRubyObject self, Block block, RubyModule implClass, Visibility visibility, boolean profile)
+    private static void processBookKeepingOp(ThreadContext context, Instr instr, Operation operation, IRScope scope, int numArgs, int kwArgHashCount, IRubyObject self, Block block, RubyModule implClass, Visibility visibility)
     {
         switch(operation) {
         case PUSH_FRAME: {
@@ -654,22 +372,11 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
             context.popScope();
             break;
         case THREAD_POLL:
-            if (profile) {
-                // SSS: Not being used currently
-                // tpCount.count++;
-                globalThreadPollCount++;
-
-                // 20K is arbitrary
-                // Every 20K profile counts, spit out profile stats
-                if (globalThreadPollCount % 20000 == 0) {
-                    analyzeProfile();
-                    // outputProfileStats();
-                }
-            }
+            if (IRRuntimeHelpers.inProfileMode()) Profiler.clockTick();
             context.callThreadPoll();
             break;
         case CHECK_ARITY:
-            ((CheckArityInstr)instr).checkArity(context.runtime, numArgs);
+            ((CheckArityInstr)instr).checkArity(context.runtime, numArgs, kwArgHashCount);
             break;
         case LINE_NUM:
             context.setLine(((LineNumberInstr)instr).lineNumber);
@@ -677,36 +384,6 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         case RECORD_END_BLOCK:
             ((RecordEndBlockInstr)instr).interpret();
             break;
-        }
-    }
-
-    private static double getFloatArg(double[] floats, Operand arg) {
-        if (arg instanceof Float) {
-            return ((Float)arg).value;
-        } else if (arg instanceof Fixnum) {
-            return (double)((Fixnum)arg).value;
-        } else if (arg instanceof TemporaryVariable) {
-            return floats[((TemporaryVariable)arg).offset];
-        } else {
-            return 0.0/0.0;
-        }
-    }
-
-    private static void setFloatVar(double[] floats, Variable var, double val) {
-        floats[((TemporaryVariable)var).offset] = val;
-    }
-
-    private static void computeResult(AluInstr instr, Operation op, double[] floats) {
-        Variable dst = instr.getResult();
-        double   a1  = getFloatArg(floats, instr.getArg1());
-        double   a2  = getFloatArg(floats, instr.getArg2());
-        switch (op) {
-        case FADD: setFloatVar(floats, dst, a1 + a2); break;
-        case FSUB: setFloatVar(floats, dst, a1 - a2); break;
-        case FMUL: setFloatVar(floats, dst, a1 * a2); break;
-        case FDIV: setFloatVar(floats, dst, a1 / a2); break;
-        case FLT: setFloatVar(floats, dst, a1 < a2 ? 1.0 : 0.0); break;
-        case FGT: setFloatVar(floats, dst, a1 > a2 ? 1.0 : 0.0); break;
         }
     }
 
@@ -720,6 +397,7 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         Map<Integer, Integer> rescueMap = scope.getRescueMap();
 
         int      numTempVars    = scope.getTemporaryVariablesCount();
+//        System.out.println("NUM: temp vars: " + numTempVars);
         Object[] temp           = numTempVars > 0 ? new Object[numTempVars] : null;
         int      numFloatVars   = scope.getFloatVariablesCount();
         double[] floats         = numFloatVars > 0 ? new double[numFloatVars] : null;
@@ -727,7 +405,7 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         int      ipc            = 0;
         Instr    instr          = null;
         Object   exception      = null;
-        int      kwArgHashCount = (scope.receivesKeywordArgs() && args[args.length - 1] instanceof RubyHash) ? 1 : 0;
+        int      kwArgHashCount = (scope.receivesKeywordArgs() && args.length > 0 && args[args.length - 1] instanceof RubyHash) ? 1 : 0;
         DynamicScope currDynScope = context.getCurrentScope();
 
         // Counter tpCount = null;
@@ -735,7 +413,7 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
         // Init profiling this scope
         boolean debug   = IRRuntimeHelpers.isDebug();
         boolean profile = IRRuntimeHelpers.inProfileMode();
-        Integer scopeVersion = profile ? initProfiling(scope) : 0;
+        Integer scopeVersion = profile ? Profiler.initProfiling(scope) : 0;
 
         // Enter the looooop!
         while (ipc < n) {
@@ -744,24 +422,16 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
             Operation operation = instr.getOperation();
             if (debug) {
                 LOG.info("I: {}", instr);
-               interpInstrsCount++;
+                interpInstrsCount++;
             } else if (profile) {
-                if (operation.modifiesCode()) codeModificationsCount++;
-               interpInstrsCount++;
-               /*
-               Counter cnt = opStats.get(operation);
-               if (cnt == null) {
-                   cnt = new Counter();
-                   opStats.put(operation, cnt);
-               }
-               cnt.count++;
-               */
+                Profiler.instrTick(operation);
+                interpInstrsCount++;
             }
 
             try {
                 switch (operation.opClass) {
                 case ALU_OP: {
-                    computeResult((AluInstr)instr, operation, floats);
+                    computeResult((AluInstr)instr, operation, context, floats, temp);
                     break;
                 }
                 case ARG_OP: {
@@ -771,14 +441,12 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
                 case BRANCH_OP: {
                     switch (operation) {
                     case JUMP: ipc = ((JumpInstr)instr).getJumpTarget().getTargetPC(); break;
-                    case B_TRUE_UNBOXED: if (getFloatArg(floats, ((OneOperandBranchInstr)instr).getArg1()) == 1.0) ipc = ((OneOperandBranchInstr)instr).getJumpTarget().getTargetPC(); break;
-                    case B_FALSE_UNBOXED: if (getFloatArg(floats, ((OneOperandBranchInstr)instr).getArg1()) == 0.0) ipc = ((OneOperandBranchInstr)instr).getJumpTarget().getTargetPC(); break;
                     default: ipc = instr.interpretAndGetNewIPC(context, currDynScope, self, temp, ipc); break;
                     }
                     break;
                 }
                 case CALL_OP: {
-                    if (profile) updateCallSite(instr, scope, scopeVersion);
+                    if (profile) Profiler.updateCallSite(instr, scope, scopeVersion);
                     processCall(context, instr, operation, scope, currDynScope, temp, self, block, blockType);
                     break;
                 }
@@ -791,7 +459,7 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
                         currDynScope = DynamicScope.newDynamicScope(scope.getStaticScope());
                         context.pushScope(currDynScope);
                     } else {
-                        processBookKeepingOp(context, instr, operation, scope, args.length, self, block, implClass, visibility, profile);
+                        processBookKeepingOp(context, instr, operation, scope, args.length, kwArgHashCount, self, block, implClass, visibility);
                     }
                     break;
                 }
@@ -822,14 +490,13 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
                     // ---------- Common instruction ---------
                     case COPY: {
                         CopyInstr c = (CopyInstr)instr;
-                        result = retrieveOp(c.getSource(), context, self, currDynScope, temp);
-                        setResult(temp, currDynScope, c.getResult(), result);
-                        break;
-                    }
-
-                    case COPY_UNBOXED: {
-                        CopyInstr c = (CopyInstr)instr;
-                        setFloatVar(floats, c.getResult(), getFloatArg(floats, c.getSource()));
+                        Operand  src = c.getSource();
+                        Variable res = c.getResult();
+                        if (res instanceof TemporaryFloatVariable) {
+                            setFloatVar(floats, (TemporaryFloatVariable)res, getFloatArg(floats, src));
+                        } else {
+                            setResult(temp, currDynScope, res, retrieveOp(src, context, self, currDynScope, temp));
+                        }
                         break;
                     }
 
@@ -863,9 +530,9 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
                         UnboxInstr ui = (UnboxInstr)instr;
                         Object val = retrieveOp(ui.getValue(), context, self, currDynScope, temp);
                         if (val instanceof RubyFloat) {
-                            floats[((TemporaryVariable)ui.getResult()).offset] = ((RubyFloat)val).getValue();
+                            floats[((TemporaryLocalVariable)ui.getResult()).offset] = ((RubyFloat)val).getValue();
                         } else {
-                            floats[((TemporaryVariable)ui.getResult()).offset] = ((RubyFixnum)val).getDoubleValue();
+                            floats[((TemporaryLocalVariable)ui.getResult()).offset] = ((RubyFixnum)val).getDoubleValue();
                         }
                         break;
                     }
@@ -886,7 +553,7 @@ public class Interpreter extends IRTranslator<IRubyObject, IRubyObject> {
                 if (debug) LOG.info("ipc for rescuer: " + ipc);
 
                 if (ipc == -1) {
-                    Helpers.throwException((Throwable)t);
+                    Helpers.throwException(t);
                 } else {
                     exception = t;
                 }

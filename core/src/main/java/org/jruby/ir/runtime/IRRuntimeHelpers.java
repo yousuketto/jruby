@@ -7,15 +7,17 @@ import org.jruby.RubyModule;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyFloat;
 import org.jruby.RubyInstanceConfig;
-import org.jruby.ir.operands.UndefinedValue;
-import org.jruby.javasupport.JavaClass;
-import org.jruby.javasupport.JavaUtil;
-import org.jruby.parser.StaticScope;
+import org.jruby.exceptions.RaiseException;
+import org.jruby.exceptions.Unrescuable;
 import org.jruby.ir.IREvalScript;
 import org.jruby.ir.IRClosure;
 import org.jruby.ir.IRMethod;
 import org.jruby.ir.IRScope;
 import org.jruby.ir.operands.IRException;
+import org.jruby.ir.operands.UndefinedValue;
+import org.jruby.javasupport.JavaClass;
+import org.jruby.javasupport.JavaUtil;
+import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.Helpers;
 import org.jruby.runtime.ThreadContext;
@@ -137,9 +139,10 @@ public class IRRuntimeHelpers {
         }
     }
 
-    public static IRubyObject handlePropagatedBreak(ThreadContext context, IRScope scope, Object bjExc, Block.Type blockType) throws RuntimeException {
+    public static IRubyObject handlePropagatedBreak(ThreadContext context, IRScope scope, Object bjExc, Block.Type blockType) {
         if (!(bjExc instanceof IRBreakJump)) {
-            throw (RuntimeException)bjExc;
+            Helpers.throwException((Throwable)bjExc);
+            return null;
         }
 
         IRBreakJump bj = (IRBreakJump)bjExc;
@@ -192,16 +195,24 @@ public class IRRuntimeHelpers {
         }
     }
 
-    public static double flt(double v1, double v2) {
-        return v1 < v2 ? 1.0 : 0.0;
+    public static boolean flt(double v1, double v2) {
+        return v1 < v2;
     }
 
-    public static double fgt(double v1, double v2) {
-        return v1 > v2 ? 1.0 : 0.0;
+    public static boolean fgt(double v1, double v2) {
+        return v1 > v2;
     }
 
-    public static boolean feq(double v) {
-        return v == 1.0;
+    public static Object unwrapRubyException(Object excObj) {
+        // Unrescuable:
+        //   IRBreakJump, IRReturnJump, ThreadKill, RubyContinuation, MainExitException, etc.
+        //   These cannot be rescued -- only run ensure blocks
+        if (excObj instanceof Unrescuable) {
+            Helpers.throwException((Throwable)excObj);
+        }
+        // Ruby exceptions, errors, and other java exceptions.
+        // These can be rescued -- run rescue blocks
+        return (excObj instanceof RaiseException) ? ((RaiseException)excObj).getException() : excObj;
     }
 
     // SSS FIXME: Is this code effectively equivalent to Helpers.isJavaExceptionHandled?

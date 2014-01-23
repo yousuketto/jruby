@@ -2723,10 +2723,10 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
 
         if (receiver != null) {
             invokeUtilityMethod("defs", sig(IRubyObject.class,
-                    params(ThreadContext.class, IRubyObject.class, IRubyObject.class, Object.class, String.class, String.class, StaticScope.class, int.class, String.class, int.class, CallConfiguration.class, String.class, MethodNodes.class)));
+                    params(ThreadContext.class, IRubyObject.class, IRubyObject.class, Object.class, String.class, String.class, StaticScope.class, int.class, String.class, int.class, CallConfiguration.class, String.class)));
         } else {
             invokeUtilityMethod("def", sig(IRubyObject.class,
-                    params(ThreadContext.class, IRubyObject.class, Object.class, String.class, String.class, StaticScope.class, int.class, String.class, int.class, CallConfiguration.class, String.class, MethodNodes.class)));
+                    params(ThreadContext.class, IRubyObject.class, Object.class, String.class, String.class, StaticScope.class, int.class, String.class, int.class, CallConfiguration.class, String.class)));
         }
 
         script.addInvokerDescriptor(name, newMethodName, methodArity, scope, inspector.getCallConfig(), filename, line, methodNodes);
@@ -2820,7 +2820,8 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             Map<CompilerCallback, int[]> switchCases,
             List<ArgumentsCallback> conditionals,
             List<CompilerCallback> bodies,
-            CompilerCallback fallback) {
+            CompilerCallback fallback,
+            boolean outline) {
         Map<CompilerCallback, Label> bodyLabels = new HashMap<CompilerCallback, Label>();
         Label defaultCase = new Label();
         Label slowPath = new Label();
@@ -2916,7 +2917,15 @@ public abstract class BaseBodyCompiler implements BodyCompiler {
             Label bodyLabel = bodyLabels.get(body);
             if (bodyLabel != null) method.label(bodyLabel);
 
-            body.call(this);
+            // if we're told to outline bodies, generate into its own method
+            // see ASTCompiler#compileCase and ASTInspector#inspect
+            if (outline) {
+                BaseBodyCompiler outlined = outline(methodName + "_when_" +  script.getAndIncrementMethodIndex());
+                body.call(outlined);
+                outlined.endBody();
+            } else {
+                body.call(this);
+            }
 
             method.go_to(done);
         }

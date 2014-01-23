@@ -285,9 +285,15 @@ public class Helpers {
         return CompiledSharedScopeBlock.newCompiledSharedScopeClosure(context, self, Arity.createArity(arity),
                 context.getCurrentScope(), callback, hasMultipleArgsHead, argsNodeType);
     }
-    
+
     public static IRubyObject def(ThreadContext context, IRubyObject self, Object scriptObject, String rubyName, String javaName, StaticScope scope,
-            int arity, String filename, int line, CallConfiguration callConfig, String parameterDesc, MethodNodes methodNodes) {
+                                  int arity, String filename, int line, CallConfiguration callConfig, String parameterDesc) {
+        // TODO: Need to have access to AST for recompilation. See #1395
+        return def(context, self, scriptObject, rubyName, javaName, scope, arity, filename, line, callConfig, parameterDesc, null);
+    }
+
+    public static IRubyObject def(ThreadContext context, IRubyObject self, Object scriptObject, String rubyName, String javaName, StaticScope scope,
+                                  int arity, String filename, int line, CallConfiguration callConfig, String parameterDesc, MethodNodes methodNodes) {
         Class compiledClass = scriptObject.getClass();
         Ruby runtime = context.runtime;
 
@@ -304,6 +310,12 @@ public class Helpers {
                 methodNodes);
 
         return addInstanceMethod(containingClass, rubyName, method, currVisibility, context, runtime);
+    }
+
+    public static IRubyObject defs(ThreadContext context, IRubyObject self, IRubyObject receiver, Object scriptObject, String rubyName, String javaName, StaticScope scope,
+                                   int arity, String filename, int line, CallConfiguration callConfig, String parameterDesc) {
+        // TODO: Need to have access to AST for recompilation. See #1395
+        return defs(context, self, receiver, scriptObject, rubyName, javaName, scope, arity, filename, line, callConfig, parameterDesc, null);
     }
 
     public static IRubyObject defs(ThreadContext context, IRubyObject self, IRubyObject receiver, Object scriptObject, String rubyName, String javaName, StaticScope scope,
@@ -425,6 +437,10 @@ public class Helpers {
             map.put(keyValues[i++], keyValues[i++]);
         }
         return map;
+    }
+
+    public static IRubyObject handleNextJump(ThreadContext context, JumpException.NextJump nj) {
+        return nj.getValue() == null ? context.runtime.getNil() : (IRubyObject)nj.getValue();
     }
 
     private static class MethodMissingMethod extends DynamicMethod {
@@ -746,6 +762,7 @@ public class Helpers {
             case REDO:
                 return JumpException.REDO_JUMP;
             case NEXT:
+                if (jumpError.exit_value().isNil()) throw JumpException.NEXT_JUMP;
                 return new JumpException.NextJump(jumpError.exit_value());
             case BREAK:
                 return new JumpException.BreakJump(context.getFrameJumpTarget(), jumpError.exit_value());
@@ -1249,6 +1266,8 @@ public class Helpers {
     }
 
     public static IRubyObject nextJump(IRubyObject value) {
+        if (value.isNil()) throw JumpException.NEXT_JUMP;
+
         throw new JumpException.NextJump(value);
     }
     
@@ -2729,7 +2748,9 @@ public class Helpers {
             builder.append("b").append(argsNode.getBlock().getName());
         }
 
-        if (!added) builder.append("NONE");
+        if (!added) {
+          return "NONE";
+        }
 
         return builder.toString();
     }

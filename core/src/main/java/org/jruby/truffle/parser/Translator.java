@@ -11,14 +11,15 @@ package org.jruby.truffle.parser;
 
 import java.math.*;
 import java.util.*;
-import java.util.regex.*;
 
 import com.oracle.truffle.api.*;
 import com.oracle.truffle.api.nodes.instrument.*;
 import com.oracle.truffle.api.nodes.instrument.InstrumentationProbeNode.ProbeChain;
 import com.oracle.truffle.api.frame.*;
 import com.oracle.truffle.api.impl.*;
+import org.joni.Regex;
 import org.jruby.ast.MultipleAsgn19Node;
+import org.jruby.common.IRubyWarnings;
 import org.jruby.truffle.nodes.*;
 import org.jruby.truffle.nodes.call.*;
 import org.jruby.truffle.nodes.cast.*;
@@ -89,6 +90,15 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
         nodeDefinedNames.put(org.jruby.ast.OrNode.class, "expression");
         nodeDefinedNames.put(org.jruby.ast.LocalVarNode.class, "local-variable");
         nodeDefinedNames.put(org.jruby.ast.DVarNode.class, "local-variable");
+    }
+
+    private static final Set<String> debugIgnoredCalls = new HashSet<>();
+
+    static {
+        debugIgnoredCalls.add("downto");
+        debugIgnoredCalls.add("each");
+        debugIgnoredCalls.add("times");
+        debugIgnoredCalls.add("upto");
     }
 
     /**
@@ -293,7 +303,20 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
 
         final ArgumentsAndBlockTranslation argumentsAndBlock = translateArgumentsAndBlock(sourceSection, block, args, extraArgument);
 
-        return new CallNode(context, sourceSection, node.getName(), receiverTranslated, argumentsAndBlock.getBlock(), argumentsAndBlock.isSplatted(), argumentsAndBlock.getArguments());
+        RubyNode translated = new CallNode(context, sourceSection, node.getName(), receiverTranslated, argumentsAndBlock.getBlock(), argumentsAndBlock.isSplatted(), argumentsAndBlock.getArguments());
+
+        if (Options.TRUFFLE_DEBUG_NODES.load()) {
+            final CallNode callNode = (CallNode) translated;
+            if (!debugIgnoredCalls.contains(callNode.getName())) {
+
+                final RubyProxyNode proxy = new RubyProxyNode(context, translated);
+                proxy.markAs(NodePhylum.CALL);
+                proxy.getProbeChain().appendProbe(new RubyCallProbe(context, node.getName()));
+                translated = proxy;
+            }
+        }
+
+        return translated;
     }
 
     protected class ArgumentsAndBlockTranslation {
@@ -655,7 +678,7 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
         RubyNode readNode = environment.findLocalVarNode(node.getName(), translate(node.getPosition()));
 
         if (readNode == null) {
-            context.implementationMessage("can't find variable %s at %s, using noop", node.getName(), node.getPosition());
+            context.getRuntime().getWarnings().warn(IRubyWarnings.ID.TRUFFLE, node.getPosition().getFile(), node.getPosition().getStartLine(), "can't find variable " + node.getName() + ", translating as nil");
             readNode = new NilNode(context, translate(node.getPosition()));
         }
 
@@ -948,8 +971,7 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
         final RubyNode rhs = (RubyNode) node.getValueNode().accept(this);
 
         if (FRAME_LOCAL_GLOBAL_VARIABLES.contains(name)) {
-            context.implementationMessage("Assigning to frame local global variables not implemented at %s", node.getPosition());
-
+            context.getRuntime().getWarnings().warn(IRubyWarnings.ID.TRUFFLE, node.getPosition().getFile(), node.getPosition().getStartLine(), "assigning to frame local global variables not implemented");
             return rhs;
         } else {
             final ObjectLiteralNode globalVariablesObjectNode = new ObjectLiteralNode(context, sourceSection, context.getCoreLibrary().getGlobalVariablesObject());
@@ -1174,7 +1196,7 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
         RubyNode readNode = environment.findLocalVarNode(name, sourceSection);
 
         if (readNode == null) {
-            context.implementationMessage("Local variable found by parser but not by translator - " + name + " at " + node.getPosition());
+            context.getRuntime().getWarnings().warn(IRubyWarnings.ID.TRUFFLE, node.getPosition().getFile(), node.getPosition().getStartLine(), "local variable " + name + " found by parser but not by translator");
             readNode = environment.findLocalVarNode(environment.allocateLocalTemp(), sourceSection);
         }
 
@@ -1234,7 +1256,7 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
         RubyNode rhsTranslated;
 
         if (rhs == null) {
-            context.implementationMessage("warning: no RHS for multiple assignment - using noop");
+            context.getRuntime().getWarnings().warn(IRubyWarnings.ID.TRUFFLE, node.getPosition().getFile(), node.getPosition().getStartLine(), "no RHS for multiple assignment - using nil");
             rhsTranslated = new NilNode(context, sourceSection);
         } else {
             rhsTranslated = (RubyNode) rhs.accept(this);
@@ -1682,6 +1704,11 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
     public Object visitPreExeNode(org.jruby.ast.PreExeNode node) {
         return unimplemented(node);
     }
+    
+    @Override
+    public Object visitRationalNode(org.jruby.ast.RationalNode node) {
+        return unimplemented(node);
+    }
 
     @Override
     public Object visitRedoNode(org.jruby.ast.RedoNode node) {
@@ -1690,32 +1717,15 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
 
     @Override
     public Object visitRegexpNode(org.jruby.ast.RegexpNode node) {
-        RubyRegexp regexp;
+        Regex regex;
 
-        try {
-            final String patternText = node.getValue().toString();
-
-            int flags = Pattern.MULTILINE | Pattern.UNIX_LINES;
-
-            final org.jruby.util.RegexpOptions options = node.getOptions();
-
-            if (options.isIgnorecase()) {
-                flags |= Pattern.CASE_INSENSITIVE;
-            }
-
-            if (options.isMultiline()) {
-                // TODO(cs): isn't this the default?
-                flags |= Pattern.MULTILINE;
-            }
-
-            final Pattern pattern = Pattern.compile(patternText, flags);
-
-            regexp = new RubyRegexp(context.getCoreLibrary().getRegexpClass(), pattern);
-        } catch (PatternSyntaxException e) {
-            context.implementationMessage("failed to parse Ruby regexp " + node.getValue() + " as Java regexp - replacing with .");
-            regexp = new RubyRegexp(context.getCoreLibrary().getRegexpClass(), ".");
+        if (node.getPattern() != null) {
+            regex = node.getPattern().getPattern();
+        } else {
+            regex = RubyRegexp.compile(context, node.getValue().bytes(), node.getEncoding(), node.getOptions().toOptions());
         }
 
+        final RubyRegexp regexp = new RubyRegexp(context.getCoreLibrary().getRegexpClass(), regex, node.getValue().toString());
         final ObjectLiteralNode literalNode = new ObjectLiteralNode(context, translate(node.getPosition()), regexp);
         return literalNode;
     }
@@ -2066,7 +2076,7 @@ public class Translator implements org.jruby.ast.visitor.NodeVisitor {
     }
 
     protected Object unimplemented(org.jruby.ast.Node node) {
-        context.implementationMessage("warning: %s at %s does nothing", node, node.getPosition());
+        context.getRuntime().getWarnings().warn(IRubyWarnings.ID.TRUFFLE, node.getPosition().getFile(), node.getPosition().getStartLine(), node + " does nothing - translating as nil");
         return new NilNode(context, translate(node.getPosition()));
     }
 

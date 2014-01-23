@@ -17,7 +17,6 @@ import org.jruby.ir.IRScope;
 import org.jruby.ir.IRScopeType;
 import org.jruby.ir.Operation;
 import org.jruby.ir.instructions.Instr;
-import org.jruby.ir.instructions.ResultInstr;
 import org.jruby.ir.operands.Operand;
 import org.jruby.ir.operands.OperandType;
 import org.jruby.parser.StaticScope;
@@ -28,7 +27,6 @@ import org.jruby.parser.StaticScope;
  * Represents a file which is persisted to storage.
  */
 public class IRWriterFile implements IRWriterEncoder, IRPersistenceValues {
-    private static final boolean DEBUG = false;
     private static final int VERSION = 0;
 
     private final Map<IRScope, Integer> scopeInstructionOffsets = new HashMap<IRScope, Integer>();
@@ -36,6 +34,7 @@ public class IRWriterFile implements IRWriterEncoder, IRPersistenceValues {
     private final ByteBuffer buf = ByteBuffer.allocate(TWO_MEGS);
     private final File file;
     private final OperandEncoderMap operandEncoder;
+    private final InstrEncoderMap instrEncoder;
     private final IRWriterAnalzer analyzer;
 
     int headersOffset = -1;
@@ -44,6 +43,7 @@ public class IRWriterFile implements IRWriterEncoder, IRPersistenceValues {
     public IRWriterFile(File file) throws FileNotFoundException {
         this.file = file;
         this.operandEncoder = new OperandEncoderMap(this);
+        this.instrEncoder = new InstrEncoderMap(this);
         this.analyzer = new IRWriterAnalzer();
     }
 
@@ -85,7 +85,7 @@ public class IRWriterFile implements IRWriterEncoder, IRPersistenceValues {
         //FIXME: Use bit math
         // We can write 7 bits of ints as a single byte and if 8th is set we end
         // using first byte to indicate full precision int.
-        if (value >= 0 && value <= 128) {
+        if (value >= 0 && value <= 127) {
             buf.put((byte) value);
         } else {
             buf.put(FULL);
@@ -95,7 +95,7 @@ public class IRWriterFile implements IRWriterEncoder, IRPersistenceValues {
 
     @Override
     public void encode(long value) {
-        if (value >= 0 && value <= 128) {
+        if (value >= 0 && value <= 127) {
             encode((byte) value);
         } else {
             buf.put(FULL);
@@ -117,7 +117,6 @@ public class IRWriterFile implements IRWriterEncoder, IRPersistenceValues {
 
     @Override
     public void encode(String value) {
-//        buf.put(STRING);
         encode(value.length());
         buf.put(value.getBytes());
     }
@@ -145,17 +144,7 @@ public class IRWriterFile implements IRWriterEncoder, IRPersistenceValues {
 
     @Override
     public void encode(Instr instr) {
-        encode(instr.getOperation());
-        if (DEBUG) System.out.println("ENCODING : " + instr);
-        if (instr instanceof ResultInstr) encode(((ResultInstr) instr).getResult());
-
-        Operand[] operands = instr.getOperands();
-//        if (!(instr instanceof FixedArityInstr)) encode(operands.length);
-
-        for (Operand operand: operands) {
-            if (DEBUG) System.out.println("ENCODING OPER: " + operand);
-            encode(operand);
-        }
+        instrEncoder.encode(instr);
     }
 
     @Override

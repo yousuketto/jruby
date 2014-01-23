@@ -53,7 +53,8 @@ public enum Operation {
     RECV_REST_ARG(OpFlags.f_is_arg_receive),
     RECV_OPT_ARG(OpFlags.f_is_arg_receive),
     RECV_CLOSURE(OpFlags.f_is_arg_receive),
-    RECV_EXCEPTION(OpFlags.f_is_arg_receive),
+    RECV_RUBY_EXC(OpFlags.f_is_arg_receive),
+    RECV_JRUBY_EXC(OpFlags.f_is_arg_receive),
 
     /* By default, call instructions cannot be deleted even if their results
      * aren't used by anyone unless we know more about what the call is,
@@ -183,9 +184,6 @@ public enum Operation {
     FDIV(OpFlags.f_is_alu_op),
     FLT(OpFlags.f_is_alu_op),
     FGT(OpFlags.f_is_alu_op),
-    COPY_UNBOXED(0),
-    B_TRUE_UNBOXED(OpFlags.f_is_jump_or_branch),
-    B_FALSE_UNBOXED(OpFlags.f_is_jump_or_branch),
 
     /** Other JRuby internal primitives for optimizations */
     MODULE_GUARD(OpFlags.f_is_jump_or_branch), /* a guard acts as a branch */

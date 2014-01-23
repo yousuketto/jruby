@@ -3,6 +3,7 @@ package org.jruby.ir.representations;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -55,8 +56,6 @@ public class CFG {
     // Map of bb -> first bb of the rescue block that initiates exception handling for all exceptions thrown within this bb
     private Map<BasicBlock, BasicBlock> rescuerMap;
 
-    private List<ExceptionRegion> outermostERs;
-
     /** Entry BB */
     private BasicBlock entryBB;
 
@@ -78,7 +77,6 @@ public class CFG {
         this.graph = new DirectedGraph<BasicBlock>();
         this.bbMap = new HashMap<Label, BasicBlock>();
         this.rescuerMap = new HashMap<BasicBlock, BasicBlock>();
-        this.outermostERs = new ArrayList<ExceptionRegion>();
         this.nextBBId = 0;
         this.entryBB = this.exitBB = null;
         this.globalEnsureBB = null;
@@ -112,10 +110,6 @@ public class CFG {
 
     public BasicBlock getGlobalEnsureBB() {
         return globalEnsureBB;
-    }
-
-    public List<ExceptionRegion> getOutermostExceptionRegions() {
-        return outermostERs;
     }
 
     public LinkedList<BasicBlock> postOrderList() {
@@ -314,9 +308,7 @@ public class CFG {
                 rr.addBB(currBB);
                 allExceptionRegions.add(rr);
 
-                if (nestedExceptionRegions.empty()) {
-                    outermostERs.add(rr);
-                } else {
+                if (!nestedExceptionRegions.empty()) {
                     nestedExceptionRegions.peek().addNestedRegion(rr);
                 }
 
@@ -402,12 +394,6 @@ public class CFG {
         buildExitBasicBlock(nestedExceptionRegions, firstBB, returnBBs, exceptionBBs, nextBBIsFallThrough, currBB, entryBB);
 
         optimize(); // remove useless cfg edges & orphaned bbs
-
-        /*
-        for (ExceptionRegion er: this.outermostERs) {
-            System.out.println(er);
-        }
-        */
 
         return graph;
     }
@@ -541,11 +527,6 @@ public class CFG {
                 setRescuerBB(a, bR);
             }
 
-            // Fix up exception regions
-            for (ExceptionRegion er: this.outermostERs) {
-                er.mergeBBs(a, b);
-            }
-
             return true;
         } else {
             return false;
@@ -627,7 +608,10 @@ public class CFG {
             buf.append(b.toStringInstrs());
         }
         buf.append("\n\n------ Rescue block map ------\n");
-        for (BasicBlock bb : rescuerMap.keySet()) {
+        List<BasicBlock> e = new ArrayList<BasicBlock>(rescuerMap.keySet());
+        Collections.sort(e);
+        
+        for (BasicBlock bb : e) {
             buf.append("BB ").append(bb.getID()).append(" --> BB ").append(rescuerMap.get(bb).getID()).append("\n");
         }
 
@@ -642,7 +626,7 @@ public class CFG {
 
         return buf.toString();
     }
-
+    
     public void removeEdge(BasicBlock a, BasicBlock b) {
        graph.removeEdge(a, b);
     }
@@ -720,9 +704,6 @@ public class CFG {
 
         this.entryBB = cloneBBMap.get(sourceCFG.entryBB);
         this.exitBB  = cloneBBMap.get(sourceCFG.exitBB);
-
-        // SSS FIXME: Is this field required after cfg is built?
-        this.outermostERs = null;
 
         // Clone rescuer map
         for (BasicBlock b: sourceCFG.rescuerMap.keySet()) {

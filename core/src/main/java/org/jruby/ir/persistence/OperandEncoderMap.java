@@ -37,11 +37,11 @@ import org.jruby.ir.operands.StandardError;
 import org.jruby.ir.operands.StringLiteral;
 import org.jruby.ir.operands.Symbol;
 import org.jruby.ir.operands.TemporaryClosureVariable;
+import org.jruby.ir.operands.TemporaryLocalVariable;
 import org.jruby.ir.operands.TemporaryVariable;
 import org.jruby.ir.operands.UndefinedValue;
 import org.jruby.ir.operands.UnexecutableNil;
 import org.jruby.ir.operands.WrappedIRClosure;
-import org.jruby.util.RegexpOptions;
 
 /**
  * Can cycles develop or will IR output guarantee non-cyclical nested operands?
@@ -112,8 +112,9 @@ class OperandEncoderMap extends IRVisitor {
         }
     }
 
-    // FIXME: Can't I determine this instead of persisting it?
-    @Override public void CurrentScope(CurrentScope scope) {  }
+    @Override public void CurrentScope(CurrentScope scope) {
+        encoder.encode(scope.getScope());
+    }
 
     //@Override public void DynamicSymbol(DynamicSymbol dsym) { encode(dsym.getSymbolName()); }
     @Override public void DynamicSymbol(DynamicSymbol dsym) {  }
@@ -134,7 +135,10 @@ class OperandEncoderMap extends IRVisitor {
 
     @Override public void IRException(IRException irexception) { encoder.encode((byte) irexception.getType().ordinal()); }
 
-    @Override public void Label(Label label) { encoder.encode(label.label); }
+    @Override public void Label(Label label) { 
+        encoder.encode(label.prefix);
+        encoder.encode(label.id);
+    }
 
     @Override public void LocalVariable(LocalVariable variable) {
         encoder.encode(variable.getName());
@@ -161,11 +165,9 @@ class OperandEncoderMap extends IRVisitor {
     }
 
     @Override public void Regexp(Regexp regexp) {
-        RegexpOptions options = regexp.options;
-
         encode(regexp.getRegexp());
-        encoder.encode((byte) options.getKCode().ordinal());
-        encoder.encode(options.isKcodeDefault());
+        encoder.encode(regexp.options.isEncodingNone());
+        encoder.encode(regexp.options.toEmbeddedOptions());
     }
 
     @Override public void ScopeModule(ScopeModule scope) { encoder.encode(scope.getScope()); }
@@ -182,21 +184,30 @@ class OperandEncoderMap extends IRVisitor {
 
     @Override public void Symbol(Symbol symbol) { encoder.encode(symbol.getName()); }
 
-    // FIXME: There are two forms of constructors for both temp vars and they are not clear what there actual
-    // requirements are (prefix/offset/name question).
-    @Override public void TemporaryClosureVariable(TemporaryClosureVariable variable) {
-        encoder.encode(variable.getName());
-        encoder.encode(variable.offset);
-    }
-
     @Override public void TemporaryVariable(TemporaryVariable variable) {
-        encoder.encode(variable.getName());
-//        encoder.encode(variable.offset);
+        encoder.encode((byte) variable.getType().ordinal());
+        
+        switch(variable.getType()) {
+            case CLOSURE:
+                encoder.encode(((TemporaryClosureVariable) variable).getClosureId());
+                encoder.encode(((TemporaryClosureVariable) variable).getOffset());
+                break;
+                
+            case FLOAT:
+            case LOCAL:
+            case CURRENT_MODULE:
+            case CURRENT_SCOPE:
+                encoder.encode(((TemporaryLocalVariable) variable).getOffset());
+                break;
+        }
     }
-
+    
     @Override public void UndefinedValue(UndefinedValue undefinedvalue) {} // No data
 
     @Override public void UnexecutableNil(UnexecutableNil unexecutablenil) {} // No data
 
-    @Override public void WrappedIRClosure(WrappedIRClosure scope) { encoder.encode(scope.getClosure()); }
+    @Override public void WrappedIRClosure(WrappedIRClosure scope) { 
+        encoder.encode(scope.getSelf());
+        encoder.encode(scope.getClosure()); 
+    }
 }

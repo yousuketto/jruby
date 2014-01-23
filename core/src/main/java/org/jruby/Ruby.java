@@ -1220,7 +1220,9 @@ public final class Ruby {
         }
         
         // everything booted, so SizedQueue should be available; set up root fiber
-        ThreadFiber.initRootFiber(tc);
+        if (getInstanceConfig().getCompileMode() != CompileMode.TRUFFLE) {
+            ThreadFiber.initRootFiber(tc);
+        }
         
         if(config.isProfiling()) {
             // additional twiddling for profiled mode
@@ -1848,6 +1850,14 @@ public final class Ruby {
 
     public void setRespondToMethod(DynamicMethod rtm) {
         this.respondTo = rtm;
+    }
+
+    public DynamicMethod getRespondToMissingMethod() {
+        return respondToMissing;
+    }
+
+    public void setRespondToMissingMethod(DynamicMethod rtmm) {
+        this.respondToMissing = rtmm;
     }
     
     public RubyClass getDummy() {
@@ -2568,12 +2578,9 @@ public final class Ruby {
         try {
             // Get IR from .ir file
             return IRReader.load(getIRManager(), new IRReaderFile(getIRManager(), IRFileExpert.getIRPersistedFile(file)));
-        } catch (Exception e) {
-            System.out.println(e);
-            e.printStackTrace();
-            // If something gone wrong with ir -
-//            return parseFileAndGetAST(in, file, scope, lineNumber, false);
-            return null;
+        } catch (IOException e) {
+            // FIXME: What is something actually throws IOException
+            return parseFileAndGetAST(in, file, scope, lineNumber, false);
         }
     }
 
@@ -2592,11 +2599,10 @@ public final class Ruby {
         
         try {
             return IRReader.load(getIRManager(), new IRReaderFile(getIRManager(), IRFileExpert.getIRPersistedFile(file)));
-        } catch (Exception e) {
+        } catch (IOException e) {
             System.out.println(e);
             e.printStackTrace();
-//            return parseFileFromMainAndGetAST(in, file, scope);
-            return null;
+            return parseFileFromMainAndGetAST(in, file, scope);
         }
     }
 
@@ -4695,7 +4701,7 @@ public final class Ruby {
             procSysModule, precisionModule, errnoModule;
 
     private DynamicMethod privateMethodMissing, protectedMethodMissing, variableMethodMissing,
-            superMethodMissing, normalMethodMissing, defaultMethodMissing, respondTo;
+            superMethodMissing, normalMethodMissing, defaultMethodMissing, respondTo, respondToMissing;
     
     // record separator var, to speed up io ops that use it
     private GlobalVariable recordSeparatorVar;

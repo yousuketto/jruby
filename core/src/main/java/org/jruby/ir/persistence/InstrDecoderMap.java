@@ -1,6 +1,7 @@
 package org.jruby.ir.persistence;
 
 import org.jcodings.Encoding;
+import org.jruby.RubyInstanceConfig;
 import org.jruby.ir.IRClassBody;
 import org.jruby.ir.IRClosure;
 import org.jruby.ir.IRManager;
@@ -67,9 +68,11 @@ import org.jruby.ir.instructions.PutFieldInstr;
 import org.jruby.ir.instructions.PutGlobalVarInstr;
 import org.jruby.ir.instructions.RaiseArgumentErrorInstr;
 import org.jruby.ir.instructions.ReceiveClosureInstr;
-import org.jruby.ir.instructions.ReceiveExceptionInstr;
+import org.jruby.ir.instructions.ReceiveRubyExceptionInstr;
+import org.jruby.ir.instructions.ReceiveJRubyExceptionInstr;
 import org.jruby.ir.instructions.ReceiveKeywordArgInstr;
 import org.jruby.ir.instructions.ReceiveKeywordRestArgInstr;
+import org.jruby.ir.instructions.ReceiveOptArgInstr;
 import org.jruby.ir.instructions.ReceivePostReqdArgInstr;
 import org.jruby.ir.instructions.ReceivePreReqdArgInstr;
 import org.jruby.ir.instructions.ReceiveRestArgInstr;
@@ -79,6 +82,7 @@ import org.jruby.ir.instructions.ReqdArgMultipleAsgnInstr;
 import org.jruby.ir.instructions.RescueEQQInstr;
 import org.jruby.ir.instructions.RestArgMultipleAsgnInstr;
 import org.jruby.ir.instructions.ReturnInstr;
+import org.jruby.ir.instructions.RuntimeHelperCall;
 import org.jruby.ir.instructions.SearchConstInstr;
 import org.jruby.ir.instructions.SetReturnAddressInstr;
 import org.jruby.ir.instructions.StoreLocalVarInstr;
@@ -101,15 +105,12 @@ import org.jruby.ir.instructions.defined.MethodDefinedInstr;
 import org.jruby.ir.instructions.defined.MethodIsPublicInstr;
 import org.jruby.ir.instructions.defined.RestoreErrorInfoInstr;
 import org.jruby.ir.instructions.defined.SuperMethodBoundInstr;
-import org.jruby.ir.operands.BooleanLiteral;
-import org.jruby.ir.operands.Fixnum;
 import org.jruby.ir.operands.Label;
 import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.MethAddr;
 import org.jruby.ir.operands.Operand;
-import org.jruby.ir.operands.ScopeModule;
 import org.jruby.ir.operands.StringLiteral;
-import org.jruby.ir.operands.TemporaryVariable;
+import org.jruby.ir.operands.TemporaryLocalVariable;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.operands.WrappedIRClosure;
 import org.jruby.lexer.yacc.SimpleSourcePosition;
@@ -129,17 +130,26 @@ class InstrDecoderMap implements IRPersistenceValues {
     }
 
     public Instr decode(Operation operation) {
+        Instr instr = null;
         try {
+            instr = decodeInner(operation);
+        } catch (Exception e) {
+            System.out.println("Got: " + instr + ", :" + d.getCurrentScope().getClass().getName());
+        }
+        return instr;
+    }
+    
+    public Instr decodeInner(Operation operation) {
         switch(operation) {
             case ALIAS: return new AliasInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperand());
             case ATTR_ASSIGN: return decodeAttrAssignInstr();
             case BACKREF_IS_MATCH_DATA: return new BackrefIsMatchDataInstr(d.decodeVariable());
             case BEQ: return BEQInstr.create(d.decodeOperand(), d.decodeOperand(), (Label) d.decodeOperand());
-            case BINDING_LOAD: return new LoadLocalVarInstr(d.decodeOperandAsIRScope(), (TemporaryVariable) d.decodeOperand(), (LocalVariable) d.decodeOperand());
-            case BINDING_STORE:return new StoreLocalVarInstr(d.decodeOperand(), d.decodeOperandAsIRScope(), (LocalVariable) d.decodeOperand());
+            case BINDING_LOAD: return new LoadLocalVarInstr(d.decodeScope(), (TemporaryLocalVariable) d.decodeOperand(), (LocalVariable) d.decodeOperand());
+            case BINDING_STORE:return new StoreLocalVarInstr(d.decodeOperand(), d.decodeScope(), (LocalVariable) d.decodeOperand());
             case BLOCK_GIVEN: return new BlockGivenInstr(d.decodeVariable(), d.decodeOperand());
             case BNE: return new BNEInstr(d.decodeOperand(), d.decodeOperand(), (Label) d.decodeOperand());
-            case BREAK: return new BreakInstr(d.decodeOperand(), d.decodeOperandAsIRScope());
+            case BREAK: return new BreakInstr(d.decodeOperand(), d.decodeScope());
             case B_FALSE: return createBFalse();
             case B_NIL: return createBNil();
             case B_TRUE: return createBTrue();
@@ -149,14 +159,14 @@ class InstrDecoderMap implements IRPersistenceValues {
             case CHECK_ARITY: return new CheckArityInstr(d.decodeInt(), d.decodeInt(), d.decodeInt());
             case CLASS_VAR_IS_DEFINED: return new ClassVarIsDefinedInstr(d.decodeVariable(), d.decodeOperand(), (StringLiteral) d.decodeOperand());
             case CLASS_VAR_MODULE: return new GetClassVarContainerModuleInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperand());
-            case CONST_MISSING: return new ConstMissingInstr(d.decodeVariable(), d.decodeOperand(), d.decodeString());
+            case CONST_MISSING: return decodeConstMissingInstr();
             case COPY: return decodeCopy();
-            case DEFINED_CONSTANT_OR_METHOD:         return new GetDefinedConstantOrMethodInstr(d.decodeVariable(), d.decodeOperand(), (StringLiteral) d.decodeOperand());
-            case DEF_CLASS: return new DefineClassInstr((d.decodeVariable()), (IRClassBody) d.decodeOperandAsIRScope(), d.decodeOperand(), d.decodeOperand());
-            case DEF_CLASS_METH: return new DefineClassMethodInstr(d.decodeOperand(), (IRMethod) d.decodeOperandAsIRScope());
-            case DEF_INST_METH: return new DefineInstanceMethodInstr(d.decodeOperand(), (IRMethod) d.decodeOperandAsIRScope());
-            case DEF_META_CLASS: return new DefineMetaClassInstr(d.decodeVariable(), d.decodeOperand(), (IRModuleBody) d.decodeOperandAsIRScope());
-            case DEF_MODULE: return new DefineModuleInstr(d.decodeVariable(), (IRModuleBody) d.decodeOperandAsIRScope(), d.decodeOperand());
+            case DEFINED_CONSTANT_OR_METHOD: return new GetDefinedConstantOrMethodInstr(d.decodeVariable(), d.decodeOperand(), (StringLiteral) d.decodeOperand());
+            case DEF_CLASS: return new DefineClassInstr((d.decodeVariable()), (IRClassBody) d.decodeScope(), d.decodeOperand(), d.decodeOperand());
+            case DEF_CLASS_METH: return new DefineClassMethodInstr(d.decodeOperand(), (IRMethod) d.decodeScope());
+            case DEF_INST_METH: return new DefineInstanceMethodInstr(d.decodeOperand(), (IRMethod) d.decodeScope());
+            case DEF_META_CLASS: return new DefineMetaClassInstr(d.decodeVariable(), d.decodeOperand(), (IRModuleBody) d.decodeScope());
+            case DEF_MODULE: return new DefineModuleInstr(d.decodeVariable(), (IRModuleBody) d.decodeScope(), d.decodeOperand());
             case EQQ: return new EQQInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperand());
             case EXC_REGION_END: return new ExceptionRegionEndMarkerInstr();
             case EXC_REGION_START: return new ExceptionRegionStartMarkerInstr((Label) d.decodeOperand(), (Label) d.decodeOperand(), (Label) d.decodeOperand());
@@ -187,56 +197,55 @@ class InstrDecoderMap implements IRPersistenceValues {
             case METHOD_DEFINED: return new MethodDefinedInstr(d.decodeVariable(), d.decodeOperand(), (StringLiteral) d.decodeOperand());
             case METHOD_IS_PUBLIC: return new MethodIsPublicInstr(d.decodeVariable(), d.decodeOperand(), (StringLiteral) d.decodeOperand());
             case METHOD_LOOKUP: return new MethodLookupInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperand());
-            case NONLOCAL_RETURN: return new NonlocalReturnInstr(d.decodeOperand(), (IRMethod) d.decodeOperandAsIRScope());
+            case NONLOCAL_RETURN: return decodeNonlocalReturnInstr();
             case NOP: return NopInstr.NOP;
             case NORESULT_CALL: return decodeNoResultCall();
             case NOT: return new NotInstr(d.decodeVariable(), d.decodeOperand());
             case POP_BINDING: return new PopBindingInstr();
             case POP_FRAME: return new PopFrameInstr();
             case PROCESS_MODULE_BODY: return new ProcessModuleBodyInstr(d.decodeVariable(), d.decodeOperand());
-            case PUSH_BINDING: return new PushBindingInstr(d.decodeOperandAsIRScope());
+            case PUSH_BINDING: return new PushBindingInstr(d.decodeScope());
             case PUSH_FRAME: return new PushFrameInstr();
             case PUT_CONST: return new PutConstInstr(d.decodeOperand(), d.decodeString(), d.decodeOperand());
             case PUT_CVAR: return new PutClassVariableInstr(d.decodeOperand(), d.decodeString(), d.decodeOperand());
             case PUT_FIELD: return new PutFieldInstr(d.decodeOperand(), d.decodeString(), d.decodeOperand());
             case PUT_GLOBAL_VAR: return new PutGlobalVarInstr(d.decodeString(), d.decodeOperand());
             case RAISE_ARGUMENT_ERROR: return new RaiseArgumentErrorInstr(d.decodeInt(), d.decodeInt(), d.decodeInt(), d.decodeInt());
-            case RECORD_END_BLOCK: return new RecordEndBlockInstr(d.decodeOperandAsIRScope(), (IRClosure) d.decodeOperandAsIRScope());
+            case RECORD_END_BLOCK: return new RecordEndBlockInstr(d.decodeScope(), (IRClosure) d.decodeScope());
             case RECV_CLOSURE: return new ReceiveClosureInstr(d.decodeVariable());
-            case RECV_EXCEPTION: return new ReceiveExceptionInstr(d.decodeVariable(), d.decodeBoolean());
-            case RECV_KW_ARG: return new ReceiveKeywordArgInstr(d.decodeVariable(), d.decodeInt());
+            case RECV_RUBY_EXC: return decodeReceiveRubyException();
+            case RECV_JRUBY_EXC: return decodeReceiveJRubyException();
+            case RECV_KW_ARG: return new ReceiveKeywordArgInstr(d.decodeVariable(), d.decodeString(), d.decodeInt());
             case RECV_KW_REST_ARG: return new ReceiveKeywordRestArgInstr(d.decodeVariable(), d.decodeInt());
-            case RECV_OPT_ARG: return new ReceivePostReqdArgInstr(d.decodeVariable(), d.decodeInt(), d.decodeInt(), d.decodeInt());
+            case RECV_OPT_ARG: return new ReceiveOptArgInstr(d.decodeVariable(), d.decodeInt(), d.decodeInt(), d.decodeInt());
             case RECV_POST_REQD_ARG: return new ReceivePostReqdArgInstr(d.decodeVariable(), d.decodeInt(), d.decodeInt(), d.decodeInt());
             case RECV_PRE_REQD_ARG: return new ReceivePreReqdArgInstr(d.decodeVariable(), d.decodeInt());
-            case RECV_REST_ARG: return new ReceiveRestArgInstr(d.decodeVariable(), d.decodeInt(), d.decodeInt());
+            case RECV_REST_ARG: return decodeReceiveRestArgInstr();
             case RECV_SELF: return new ReceiveSelfInstr(d.decodeVariable());
             case RESCUE_EQQ: return new RescueEQQInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperand());
             case RESTORE_ERROR_INFO: return new RestoreErrorInfoInstr(d.decodeOperand());
             case RETURN: return new ReturnInstr(d.decodeOperand());
+            case RUNTIME_HELPER: return decodeRuntimeHelperCall();
             case SEARCH_CONST: return decodeSearchConst();
             case SET_RETADDR: return new SetReturnAddressInstr(d.decodeVariable(), (Label) d.decodeOperand());
-            case CLASS_SUPER: return new ClassSuperInstr(d.decodeVariable(), d.decodeOperand(), (MethAddr) d.decodeOperand(), d.decodeOperandArray(), d.decodeOperand());
-            case INSTANCE_SUPER: return new InstanceSuperInstr(d.decodeVariable(), d.decodeOperand(), (MethAddr) d.decodeOperand(), d.decodeOperandArray(), d.decodeOperand());
-            case UNRESOLVED_SUPER: return new UnresolvedSuperInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperandArray(), d.decodeOperand());
+            case CLASS_SUPER: return decodeSuperInstr(operation);
+            case INSTANCE_SUPER: return decodeSuperInstr(operation);
+            case UNRESOLVED_SUPER: return decodeUnresolvedSuperInstr();
             case SUPER_METHOD_BOUND: return new SuperMethodBoundInstr(d.decodeVariable(), d.decodeOperand());
             case THREAD_POLL: return new ThreadPollInstr(d.decodeBoolean());
             case THROW: return new ThrowExceptionInstr(d.decodeOperand());
             case TO_ARY: return new ToAryInstr(d.decodeVariable(), d.decodeOperand());
             case UNDEF_METHOD: return new UndefMethodInstr(d.decodeVariable(), d.decodeOperand());
             case YIELD: return new YieldInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperand(), d.decodeBoolean());
-            case ZSUPER: return new ZSuperInstr(d.decodeVariable(), d.decodeOperand(), d.decodeOperand());
-        }
-        } catch (Exception e) {
-            e.printStackTrace();
+            case ZSUPER: return decodeZSuperInstr();
         }
 
-        return null;
+        throw new IllegalArgumentException("Whoa bro: " + operation);
     }
 
     private Instr decodeAttrAssignInstr() {
         Operand op = d.decodeOperand();
-        MethAddr methAddr = (MethAddr) d.decodeOperand();
+        String methAddr = d.decodeString();
 
         int length = d.decodeInt();
         Operand[] args = new Operand[length];
@@ -245,21 +254,22 @@ class InstrDecoderMap implements IRPersistenceValues {
             args[i] = d.decodeOperand();
         }
 
-        return new AttrAssignInstr(op, methAddr, args);
+        return new AttrAssignInstr(op, new MethAddr(methAddr), args);
     }
 
     private Instr decodeCall() {
-        if (IRReaderFile.DEBUG) System.out.println("decoding call");
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding call");
         Variable result = d.decodeVariable();
-        if (IRReaderFile.DEBUG) System.out.println("decoding call, result:  "+ result);
-        Fixnum callTypeOrdinal = (Fixnum) d.decodeOperand();
-        if (IRReaderFile.DEBUG) System.out.println("decoding call, result:  "+ callTypeOrdinal);
-        MethAddr methAddr = (MethAddr) d.decodeOperand();
-        if (IRReaderFile.DEBUG) System.out.println("decoding call, methaddr:  "+ methAddr);
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding call, result:  "+ result);
+        int callTypeOrdinal = d.decodeInt();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding call, calltype(ord):  "+ callTypeOrdinal);
+        String methAddr = d.decodeString();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding call, methaddr:  "+ methAddr);
         Operand receiver = d.decodeOperand();
-        Fixnum argsCount = (Fixnum) d.decodeOperand();
-        boolean hasClosureArg = argsCount.value < 0;
-        int argsLength = Math.abs((int) argsCount.value);
+        int argsCount = d.decodeInt();
+        boolean hasClosureArg = argsCount < 0;
+        int argsLength = hasClosureArg ? (-1 * (argsCount + 1)) : argsCount;
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("ARGS: " + argsLength + ", CLOSURE: " + hasClosureArg);
         Operand[] args = new Operand[argsLength];
 
         for (int i = 0; i < argsLength; i++) {
@@ -268,52 +278,73 @@ class InstrDecoderMap implements IRPersistenceValues {
 
         Operand closure = hasClosureArg ? d.decodeOperand() : null;
 
-        return CallInstr.create(CallType.fromOrdinal((int) callTypeOrdinal.value), result, methAddr, receiver, args, closure);
+        return CallInstr.create(CallType.fromOrdinal(callTypeOrdinal), result, new MethAddr(methAddr), receiver, args, closure);
+    }
+    
+    private Instr decodeConstMissingInstr() {
+        return new ConstMissingInstr(d.decodeVariable(), d.decodeOperand(), d.decodeString());
     }
 
     private Instr decodeLambda() {
         Variable v = d.decodeVariable();
         WrappedIRClosure c = (WrappedIRClosure) d.decodeOperand();
-        StringLiteral l = (StringLiteral) d.decodeOperand();
-        Fixnum f = (Fixnum) d.decodeOperand();
 
-        return new BuildLambdaInstr(v, c, new SimpleSourcePosition(l.getString(), (int) f.value));
+        return new BuildLambdaInstr(v, c, new SimpleSourcePosition(d.decodeString(), d.decodeInt()));
     }
 
     private Instr decodeNoResultCall() {
-        Fixnum callTypeOrdinal = (Fixnum) d.decodeOperand();
-        MethAddr methAddr = (MethAddr) d.decodeOperand();
+        int callTypeOrdinal = d.decodeInt();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding call, ordinal:  "+ callTypeOrdinal);
+        String methAddr = d.decodeString();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding call, methaddr:  "+ methAddr);
         Operand receiver = d.decodeOperand();
-        Operand[] args = d.decodeOperandArray();
-        Operand closure = d.decodeOperand();
+        int argsCount = d.decodeInt();
+        boolean hasClosureArg = argsCount < 0;
+        int argsLength = hasClosureArg ? (-1 * (argsCount + 1)) : argsCount;
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("ARGS: " + argsLength + ", CLOSURE: " + hasClosureArg);
+        Operand[] args = new Operand[argsLength];
 
-        return new NoResultCallInstr(Operation.NORESULT_CALL, CallType.fromOrdinal((int) callTypeOrdinal.value), methAddr, receiver, args, closure);
+        for (int i = 0; i < argsLength; i++) {
+            args[i] = d.decodeOperand();
+        }
+
+        Operand closure = hasClosureArg ? d.decodeOperand() : null;
+
+        return new NoResultCallInstr(Operation.NORESULT_CALL, CallType.fromOrdinal(callTypeOrdinal), new MethAddr(methAddr), receiver, args, closure);
     }
 
     private Instr decodeCopy() {
-        Variable variable = d.decodeVariable();
-        if (IRReaderFile.DEBUG) System.out.println("VARIABLE: " + variable);
-        Operand value = d.decodeOperand();
-        if (IRReaderFile.DEBUG) System.out.println("VALUE: " + value);
-
-        return new CopyInstr(variable, value);
+        return new CopyInstr(d.decodeVariable(), d.decodeOperand());
     }
 
     private Instr decodeLineNumber() {
-        ScopeModule scope = (ScopeModule) d.decodeOperand();
-        if (IRReaderFile.DEBUG) System.out.println("IR Scope " + scope);
-        int lineNumber = (int) ((Fixnum)d.decodeOperand()).value;
-        if (IRReaderFile.DEBUG) System.out.println("On Line Number " + lineNumber);
-        return new LineNumberInstr(scope.getScope(), lineNumber);
+        return new LineNumberInstr(d.decodeScope(), d.decodeInt());
+    }
+    
+    private Instr decodeReceiveRestArgInstr() {
+        return new ReceiveRestArgInstr(d.decodeVariable(), d.decodeInt(), d.decodeInt());
+    }
+    
+    private Instr decodeRuntimeHelperCall() {
+        Variable result = d.decodeVariable();
+        String name = d.decodeString();
+        int size = d.decodeInt();
+        Operand[] args = new Operand[size];
+        
+        for (int i = 0; i < size; i++) {
+            args[i] = d.decodeOperand();
+        }
+        
+        return new RuntimeHelperCall(result, name, args);
     }
 
     private Instr decodeSearchConst() {
         Variable result = d.decodeVariable();
-        String constName = d.decodeOperandAsString();
+        String constName = d.decodeString();
         Operand startScope = d.decodeOperand();
-        BooleanLiteral noPrivateConst = (BooleanLiteral) d.decodeOperand();
+        boolean noPrivateConst = d.decodeBoolean();
 
-        return new SearchConstInstr(result, constName, startScope, noPrivateConst.isTrue());
+        return new SearchConstInstr(result, constName, startScope, noPrivateConst);
     }
 
     private Instr createBFalse() {
@@ -330,5 +361,79 @@ class InstrDecoderMap implements IRPersistenceValues {
 
     private Instr createBUndef() {
         return new BUndefInstr(d.decodeOperand(), (Label) d.decodeOperand());
+    }
+
+    private Instr decodeReceiveRubyException() {
+        return new ReceiveRubyExceptionInstr(d.decodeVariable());
+    }
+
+    private Instr decodeReceiveJRubyException() {
+        return new ReceiveJRubyExceptionInstr(d.decodeVariable());
+    }
+
+    private Instr decodeSuperInstr(Operation operation) {
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding super");
+        Variable result = d.decodeVariable();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding super, result:  "+ result);
+        int callTypeOrdinal = d.decodeInt();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding super, calltype(ord):  "+ callTypeOrdinal);
+        MethAddr methAddr = new MethAddr(d.decodeString());
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding super, methaddr:  "+ methAddr);
+        Operand receiver = d.decodeOperand();
+        int argsCount = d.decodeInt();
+        boolean hasClosureArg = argsCount < 0;
+        int argsLength = hasClosureArg ? (-1 * (argsCount + 1)) : argsCount;
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("ARGS: " + argsLength + ", CLOSURE: " + hasClosureArg);
+        Operand[] args = new Operand[argsLength];
+
+        for (int i = 0; i < argsLength; i++) {
+            args[i] = d.decodeOperand();
+        }
+
+        Operand closure = hasClosureArg ? d.decodeOperand() : null;
+        
+        if (operation == Operation.CLASS_SUPER) return new ClassSuperInstr(result, receiver, methAddr, args, closure);
+                
+        return new InstanceSuperInstr(result, receiver, methAddr, args, closure);
+    }
+    
+    public Instr decodeUnresolvedSuperInstr() {
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding un. super");
+        Variable result = d.decodeVariable();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding un. super, result:  "+ result);
+        int callTypeOrdinal = d.decodeInt();
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("decoding un. super, calltype(ord):  "+ callTypeOrdinal);
+        Operand receiver = d.decodeOperand();
+        int argsCount = d.decodeInt();
+        boolean hasClosureArg = argsCount < 0;
+        int argsLength = hasClosureArg ? (-1 * (argsCount + 1)) : argsCount;
+        if (RubyInstanceConfig.IR_READING_DEBUG) System.out.println("ARGS: " + argsLength + ", CLOSURE: " + hasClosureArg);
+        Operand[] args = new Operand[argsLength];
+
+        for (int i = 0; i < argsLength; i++) {
+            args[i] = d.decodeOperand();
+        }
+
+        Operand closure = hasClosureArg ? d.decodeOperand() : null;
+        
+        return new UnresolvedSuperInstr(result, receiver, args, closure);
+    }
+    
+    public Instr decodeZSuperInstr() {
+        Variable result = d.decodeVariable();
+        Operand receiver = d.decodeOperand();
+        boolean hasClosure = d.decodeBoolean();
+        Operand closure = hasClosure ? d.decodeOperand() : null;
+        
+        return new ZSuperInstr(result, receiver, closure);
+    }
+
+    private Instr decodeNonlocalReturnInstr() {
+        Operand returnValue = d.decodeOperand();
+        boolean hasMethod = d.decodeBoolean();
+        
+        if (hasMethod) return new NonlocalReturnInstr(returnValue, (IRMethod) d.decodeScope());
+        
+        return new NonlocalReturnInstr(returnValue);
     }
  }

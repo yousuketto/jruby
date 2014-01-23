@@ -30,12 +30,19 @@
     <repository>
       <id>truffle</id>
       <url>http://lafo.ssw.uni-linz.ac.at/truffle/maven/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
   </repositories>
 
   <modules>
     <module>ext</module>
     <module>core</module>
+    <module>lib</module>
   </modules>
 
   <description>
@@ -57,6 +64,9 @@
 
   <properties>
     <project.build.sourceEncoding>utf-8</project.build.sourceEncoding>
+    <tesla.version>0.0.8</tesla.version>
+    <tesla.dump.pom>pom.xml</tesla.dump.pom>
+    <tesla.dump.readonly>true</tesla.dump.readonly>
     <jruby.plugins.version>1.0.0-rc3</jruby.plugins.version>
     <rake.version>10.1.0</rake.version>
     <rspec.version>2.14.1</rspec.version>
@@ -70,6 +80,9 @@
     <rdoc.version>4.1.0.preview.3</rdoc.version>
     <json.version>1.8.0</json.version>
     <bouncy-castle.version>1.47</bouncy-castle.version>
+    <bc.version>1.5.0147</bc.version>
+    <krypt.version>0.0.1</krypt.version>
+    <jopenssl.version>0.9.4</jopenssl.version>
     <ant.version>1.9.2</ant.version>
     <joda.time.version>2.3</joda.time.version>
     <jffi.version>1.2.7</jffi.version>
@@ -78,6 +91,7 @@
     <base.javac.version>1.7</base.javac.version>
     <version.jruby>${project.version}</version.jruby>
     <jruby.basedir>${project.basedir}</jruby.basedir>
+    <jruby.home>${project.basedir}</jruby.home>
     <main.basedir>${project.basedir}</main.basedir>
     <github.global.server>github</github.global.server>
     <bundle.name>JRuby</bundle.name>
@@ -311,6 +325,25 @@
         <plugin>
           <artifactId>maven-invoker-plugin</artifactId>
           <version>1.8</version>
+          <executions>
+            <execution>
+              <id>integration-test</id>
+              <goals>
+		<goal>install</goal>
+		<goal>run</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+	    <settingsFile>${basedir}/src/it/settings.xml</settingsFile>
+	    <localRepositoryPath>${project.build.directory}/local-repo</localRepositoryPath>
+            <pomIncludes><pomInclude>*/pom.xml</pomInclude></pomIncludes>
+            <projectsDirectory>src/it</projectsDirectory>
+            <cloneProjectsTo>${project.build.directory}/it</cloneProjectsTo>
+            <preBuildHookScript>setup.bsh</preBuildHookScript>
+            <postBuildHookScript>verify.bsh</postBuildHookScript>
+            <streamLogs>true</streamLogs>
+          </configuration>
         </plugin>
 
         <plugin>
@@ -408,7 +441,6 @@
     <profile>
       <id>main</id>
       <modules>
-	<module>test</module>
         <module>maven</module>
       </modules>
       <build>
@@ -418,14 +450,12 @@
     <profile>
       <id>jruby-jars</id>
       <modules>
-	<module>test</module>
         <module>maven</module>
       </modules>
     </profile>
     <profile>
       <id>complete</id>
       <modules>
-	<module>test</module>
         <module>maven</module>
       </modules>
       <build>
@@ -444,7 +474,6 @@
     <profile>
       <id>dist</id>
       <modules>
-	<module>test</module>
         <module>maven</module>
       </modules>
     </profile>
@@ -466,6 +495,7 @@
         <module>maven</module>
       </modules>
     </profile>
+<!-- not used right now - if ever
     <profile>
       <id>repo</id>
       <distributionManagement>
@@ -482,6 +512,7 @@
 	<defaultGoal>deploy</defaultGoal>
       </build>
     </profile>
+-->
   </profiles>
   <reporting>
       <plugins>

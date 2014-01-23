@@ -2,12 +2,10 @@ package org.jruby.ir.dataflow.analyses;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.jruby.ir.IRClosure;
-import org.jruby.ir.IRScope;
 import org.jruby.ir.dataflow.DataFlowProblem;
 import org.jruby.ir.dataflow.DataFlowConstants;
 import org.jruby.ir.dataflow.FlowGraphNode;
-import org.jruby.ir.operands.TemporaryVariable;
+import org.jruby.ir.operands.TemporaryLocalVariable;
 import org.jruby.ir.operands.Variable;
 import org.jruby.ir.representations.BasicBlock;
 
@@ -47,9 +45,9 @@ public class UnboxableOpsAnalysisProblem extends DataFlowProblem {
     }
 
     public void unbox() {
-        // System.out.println("-- scope before unboxing--");
+        // System.out.println("---------------- SCOPE BEFORE unboxing ----------------");
         // System.out.println("\nInstrs:\n" + getScope().cfg().toStringInstrs());
-        Map<Variable, TemporaryVariable> unboxMap = new HashMap<Variable, TemporaryVariable>();
+        Map<Variable, TemporaryLocalVariable> unboxMap = new HashMap<Variable, TemporaryLocalVariable>();
         for (FlowGraphNode n : getInitialWorkList()) {
             ((UnboxableOpsAnalysisNode) n).unbox(unboxMap);
         }

@@ -170,6 +170,7 @@ public class RubyKernel {
         RubyModule module = runtime.getKernel();
 
         runtime.setRespondToMethod(module.searchMethod("respond_to?"));
+        runtime.setRespondToMissingMethod(module.searchMethod("respond_to_missing?"));
     }
 
     @JRubyMethod(module = true, visibility = PRIVATE)

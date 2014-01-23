@@ -2,9 +2,7 @@ package org.jruby.ir.passes;
 
 import java.util.Arrays;
 import java.util.List;
-import org.jruby.ir.IRClosure;
 import org.jruby.ir.IRScope;
-import org.jruby.ir.dataflow.DataFlowConstants;
 import org.jruby.ir.dataflow.analyses.UnboxableOpsAnalysisProblem;
 
 public class UnboxingPass extends CompilerPass {
@@ -25,9 +23,6 @@ public class UnboxingPass extends CompilerPass {
         problem.setup(scope);
         problem.compute_MOP_Solution();
         problem.unbox();
-
-        // SSS FIXME: This should be done differently
-        problem.getScope().setDataFlowSolution(DataFlowConstants.LVP_NAME, null);
 
         return true;
     }
