@@ -49,8 +49,11 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.BlockBody;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.Helpers;
+import org.jruby.runtime.JRuby;
 import org.jruby.runtime.ObjectAllocator;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.encoding.EncodingCapable;
 import org.jruby.runtime.invokedynamic.MethodNames;
@@ -62,8 +65,10 @@ import org.jruby.util.Qsort;
 import org.jruby.util.RecursiveComparator;
 import org.jruby.util.TypeConverter;
 
+import com.sun.tracing.Probe; 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
@@ -92,6 +97,10 @@ import static org.jruby.RubyEnumerator.SizeFn;
 @JRubyClass(name="Array")
 public class RubyArray extends RubyObject implements List, RandomAccess {
     public static final int DEFAULT_INSPECT_STR_SIZE = 10;
+    
+    public static JRuby provider = Provider.getInstance();
+    private static Method methodArrayCreate;
+    private static Probe probeArrayCreate; 
 
     public static RubyClass createArrayClass(Ruby runtime) {
         RubyClass arrayc = runtime.defineClass("Array", runtime.getObject(), ARRAY_ALLOCATOR);
@@ -104,6 +113,11 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
 
         arrayc.includeModule(runtime.getEnumerable());
         arrayc.defineAnnotatedMethods(RubyArray.class);
+        
+        try{
+           methodArrayCreate = JRuby.class.getMethod("arrayCreate", Integer.TYPE, String.class, Integer.TYPE); 
+        }catch (Exception e) {}
+        probeArrayCreate = provider.getProbe(methodArrayCreate);
 
         return arrayc;
     }
@@ -265,6 +279,11 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
         super(runtime, runtime.getArray());
         values = vals;
         realLength = vals.length;
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     /* 
@@ -274,6 +293,11 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
         super(runtime, runtime.getArray(), objectSpace);
         values = vals;
         realLength = vals.length;
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     /* 
@@ -285,6 +309,11 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
         this.begin = begin;
         this.realLength = vals.length - begin;
         this.isShared = true;
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     private RubyArray(Ruby runtime, IRubyObject[] vals, int begin, int length) {
@@ -293,6 +322,11 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
         this.begin = begin;
         this.realLength = length;
         this.isShared = true;
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     private RubyArray(Ruby runtime, RubyClass metaClass, IRubyObject[] vals, int begin, int length) {
@@ -301,16 +335,31 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
         this.begin = begin;
         this.realLength = length;
         this.isShared = true;
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
     
     protected RubyArray(Ruby runtime, int length) {
         super(runtime, runtime.getArray());
         values = length == 0 ? IRubyObject.NULL_ARRAY : new IRubyObject[length];
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     private RubyArray(Ruby runtime, int length, boolean objectspace) {
         super(runtime, runtime.getArray(), objectspace);
         values = length == 0 ? IRubyObject.NULL_ARRAY : new IRubyObject[length];
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     /* NEWOBJ and OBJSETUP equivalent
@@ -318,10 +367,20 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
      */
     private RubyArray(Ruby runtime, boolean objectSpace) {
         super(runtime, runtime.getArray(), objectSpace);
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     private RubyArray(Ruby runtime, RubyClass klass) {
         super(runtime, klass);
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     /* Array constructors taking the MetaClass to fulfil MRI Array subclass behaviour
@@ -330,15 +389,30 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
     private RubyArray(Ruby runtime, RubyClass klass, int length) {
         super(runtime, klass);
         values = length == 0 ? IRubyObject.NULL_ARRAY : new IRubyObject[length];
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     private RubyArray(Ruby runtime, RubyClass klass, IRubyObject[]vals, boolean objectspace) {
         super(runtime, klass, objectspace);
         values = vals;
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }    
 
     private RubyArray(Ruby runtime, RubyClass klass, boolean objectSpace) {
         super(runtime, klass, objectSpace);
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
     
     private RubyArray(Ruby runtime, RubyClass klass, RubyArray original) {
@@ -346,12 +420,22 @@ public class RubyArray extends RubyObject implements List, RandomAccess {
         realLength = original.realLength;
         values = new IRubyObject[realLength];
         safeArrayCopy(runtime, original.values, original.begin, values, 0, realLength);
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
     
     private RubyArray(Ruby runtime, RubyClass klass, IRubyObject[] vals) {
         super(runtime, klass);
         values = vals;
         realLength = vals.length;
+        if(probeArrayCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.arrayCreate(this.realLength, runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     private void alloc(int length) {

@@ -58,8 +58,11 @@ import org.jruby.anno.JRubyMethod;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.Helpers;
+import org.jruby.runtime.JRuby;
 import org.jruby.runtime.ObjectAllocator;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.encoding.EncodingCapable;
 import org.jruby.runtime.encoding.MarshalEncoding;
@@ -104,6 +107,9 @@ import static org.jruby.util.StringSupport.unpackArg;
 import static org.jruby.util.StringSupport.unpackResult;
 import static org.jruby.RubyEnumerator.SizeFn;
 
+import com.sun.tracing.Probe;
+import java.lang.reflect.Method;
+
 /**
  * Implementation of Ruby String class
  * 
@@ -129,6 +135,11 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
     private ByteList value;
     
+    //variables used for dtrace
+    public static JRuby provider = Provider.getInstance();
+    private static Method methodStringCreate;
+    private static Probe probeStringCreate;
+    
     private static final String[][] opTable19 = {
         { "+", "+(binary)" }, 
         { "-", "-(binary)" }
@@ -143,7 +154,10 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
         stringClass.includeModule(runtime.getComparable());
         stringClass.defineAnnotatedMethods(RubyString.class);
-
+        try{
+           methodStringCreate = JRuby.class.getMethod("stringCreate", Integer.TYPE, String.class, Integer.TYPE); 
+        }catch (Exception e) {} 
+        probeStringCreate = provider.getProbe(methodStringCreate);
         return stringClass;
     }
 
@@ -390,33 +404,58 @@ public class RubyString extends RubyObject implements EncodingCapable, MarshalEn
 
         Encoding defaultEncoding = runtime.getEncodingService().getLocaleEncoding();
         if (defaultEncoding == null) defaultEncoding = UTF8;
-
+        
         this.value = encodeBytelist(value, defaultEncoding);
+        if(probeStringCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.stringCreate(this.value.length(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyString(Ruby runtime, RubyClass rubyClass, CharSequence value, Encoding defaultEncoding) {
         super(runtime, rubyClass);
         assert value != null;
-
+        
         this.value = encodeBytelist(value, defaultEncoding);
+        if(probeStringCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.stringCreate(this.value.length(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyString(Ruby runtime, RubyClass rubyClass, byte[] value) {
         super(runtime, rubyClass);
         assert value != null;
         this.value = new ByteList(value);
+        if(probeStringCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.stringCreate(this.value.length(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyString(Ruby runtime, RubyClass rubyClass, ByteList value) {
         super(runtime, rubyClass);
         assert value != null;
         this.value = value;
+        if(probeStringCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.stringCreate(this.value.length(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyString(Ruby runtime, RubyClass rubyClass, ByteList value, boolean objectSpace) {
         super(runtime, rubyClass, objectSpace);
         assert value != null;
         this.value = value;
+        if(probeStringCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.stringCreate(this.value.length(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyString(Ruby runtime, RubyClass rubyClass, ByteList value, Encoding encoding, boolean objectSpace) {

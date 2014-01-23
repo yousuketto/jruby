@@ -51,6 +51,8 @@ public interface JRuby extends Provider {
     @FunctionName("org.jruby.internal.runtime.methods.DynamicMethod.call()") void methodEntry(String classname, String methodName, String fileName, int lineNo);
     @FunctionName("org.jruby.internal.runtime.methods.DynamicMethod.call()") void methodReturn(String classname, String methodName, String fileName, int lineNo);
     @FunctionName("org.jruby.RubyBasicObject()") void objectCreate(String className, String fileName, int lineNo);
-    
+    @FunctionName("org.jruby.RubyString()") void stringCreate(int length, String fileName, int lineNo);
+    @FunctionName("org.jruby.RubyArray()") void arrayCreate(int length, String fileName, int lineNo);
+    @FunctionName("org.jruby.RubyHash()") void hashCreate(int length, String fileName, int lineNo);
 
 }

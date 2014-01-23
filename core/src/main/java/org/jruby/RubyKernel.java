@@ -74,6 +74,7 @@ import org.jruby.util.cli.Options;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -48,8 +48,11 @@ import org.jruby.runtime.Arity;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.Helpers;
+import org.jruby.runtime.JRuby;
 import org.jruby.runtime.ObjectAllocator;
+import org.jruby.runtime.Provider;
 import org.jruby.runtime.ThreadContext;
+import org.jruby.runtime.backtrace.RubyStackTraceElement;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.invokedynamic.MethodNames;
 import org.jruby.runtime.marshal.MarshalStream;
@@ -68,10 +71,15 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 
 import static org.jruby.RubyEnumerator.enumeratorizeWithSize;
+import static org.jruby.CompatVersion.*;
+import static org.jruby.runtime.Visibility.*;
 import static org.jruby.runtime.Helpers.invokedynamic;
 import static org.jruby.runtime.Visibility.PRIVATE;
 import static org.jruby.runtime.invokedynamic.MethodNames.HASH;
 import static org.jruby.RubyEnumerator.SizeFn;
+
+import com.sun.tracing.Probe;
+import java.lang.reflect.Method;
 
 // Design overview:
 //
@@ -112,6 +120,10 @@ import static org.jruby.RubyEnumerator.SizeFn;
 @JRubyClass(name = "Hash", include="Enumerable")
 public class RubyHash extends RubyObject implements Map {
     public static final int DEFAULT_INSPECT_STR_SIZE = 20;
+    
+    public static JRuby provider = Provider.getInstance();
+    private static Method methodHashCreate;
+    private static Probe probeHashCreate;
 
     public static RubyClass createHashClass(Ruby runtime) {
         RubyClass hashc = runtime.defineClass("Hash", runtime.getObject(), HASH_ALLOCATOR);
@@ -126,6 +138,11 @@ public class RubyHash extends RubyObject implements Map {
 
         hashc.defineAnnotatedMethods(RubyHash.class);
 
+        try{
+           methodHashCreate = JRuby.class.getMethod("hashCreate", Integer.TYPE, String.class, Integer.TYPE); 
+        }catch (Exception e) {} 
+        probeHashCreate = provider.getProbe(methodHashCreate);
+        
         return hashc;
     }
 
@@ -178,6 +195,7 @@ public class RubyHash extends RubyObject implements Map {
                         hash.fastASet(key, val);
                     }
                 }
+                
                 return hash;
             }
         }
@@ -188,7 +206,7 @@ public class RubyHash extends RubyObject implements Map {
 
         hash = (RubyHash)klass.allocate();
         for (int i=0; i < args.length; i+=2) hash.op_aset(context, args[i], args[i+1]);
-
+        
         return hash;
     }
 
@@ -234,12 +252,22 @@ public class RubyHash extends RubyObject implements Map {
         threshold = INITIAL_THRESHOLD;
         table = other.internalCopyTable(head);
         size = other.size;
+        if(probeHashCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.hashCreate(this.size(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyHash(Ruby runtime, RubyClass klass) {
         super(runtime, klass);
         this.ifNone = runtime.getNil();
         allocFirst();
+        if(probeHashCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.hashCreate(this.size(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyHash(Ruby runtime, int buckets) {
@@ -254,12 +282,22 @@ public class RubyHash extends RubyObject implements Map {
         super(runtime, runtime.getHash());
         this.ifNone = defaultValue;
         allocFirst();
+        if(probeHashCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.hashCreate(this.size(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     public RubyHash(Ruby runtime, IRubyObject defaultValue, int buckets) {
         super(runtime, runtime.getHash());
         this.ifNone = defaultValue;
         allocFirst(buckets);
+        if(probeHashCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.hashCreate(this.size(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     /*
@@ -269,6 +307,11 @@ public class RubyHash extends RubyObject implements Map {
     RubyHash(Ruby runtime, boolean objectSpace) {
         super(runtime, runtime.getHash(), objectSpace);
         allocFirst();
+        if(probeHashCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.hashCreate(this.size(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
+        }
     }
 
     // TODO should this be deprecated ? (to be efficient, internals should deal with RubyHash directly)
@@ -280,6 +323,11 @@ public class RubyHash extends RubyObject implements Map {
         for (Iterator iter = valueMap.entrySet().iterator();iter.hasNext();) {
             Map.Entry e = (Map.Entry)iter.next();
             internalPut((IRubyObject)e.getKey(), (IRubyObject)e.getValue());
+        }
+        if(probeHashCreate.isEnabled()){
+            RubyStackTraceElement[] elements = runtime.getCurrentContext().getTraceSubset(1, null, Thread.currentThread().getStackTrace());
+            RubyStackTraceElement firstElement = elements!=null && elements.length > 0 ? elements[0] : new RubyStackTraceElement("", "", "(empty)", 0, false);
+            provider.hashCreate(this.size(), runtime.getCurrentContext().getFile(), firstElement.getLineNumber());
         }
     }
 
