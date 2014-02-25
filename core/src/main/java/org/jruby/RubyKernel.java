@@ -1836,13 +1836,13 @@ public class RubyKernel {
                 String progStr = cfg.getExecArgs()[0];
 
                 String[] argv = cfg.getExecArgs();
-
-                runtime.getPosix().chdir(System.getProperty("user.dir"));
                 
                 if (Platform.IS_WINDOWS) {
                     // Windows exec logic is much more elaborate; exec() in jnr-posix attempts to duplicate it
                     runtime.getPosix().exec(progStr, argv);
                 } else {
+                    runtime.getPosix().chdir(System.getProperty("user.dir"));
+
                     // TODO: other logic surrounding this call? In jnr-posix?
                     ArrayList envStrings = new ArrayList();
                     for (Map.Entry<String, String> envEntry : ((Map<String, String>)runtime.getENV()).entrySet()) {
